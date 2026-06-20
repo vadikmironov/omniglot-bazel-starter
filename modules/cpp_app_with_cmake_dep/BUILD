@@ -1,3 +1,5 @@
+# gazelle:publish_ignore
+
 load("@rules_cc//cc:defs.bzl", "cc_binary")
 load("@rules_foreign_cc//foreign_cc:defs.bzl", "cmake")
 load("//tools/lint:linters.bzl", "clang_tidy_test")
