@@ -1,0 +1,271 @@
+# Bootstrap Manifest
+#
+# This file defines the mapping between repository files and languages.
+# The bootstrap tool reads this manifest to determine which files to include
+# in a new repository based on the user's language selection.
+#
+# File categories:
+#   [core]            - Always included regardless of language selection
+#   [languages.*]     - Per-language root configs and tool directories
+#   [features.*]      - Opt-in capabilities (own dirs / files / composite files)
+#   [language_files]  - Individual files in shared directories, keyed by language tag
+#   [composite]       - Files with section markers (# --- BEGIN/END lang:*|feature:* ---)
+#   [exclude]         - Files to skip (overrides all other sections);
+#                       [exclude.when_feature_absent] drops files when a feature is off
+#   [substitutions]   - String replacements applied to all generated files
+
+# ---------------------------------------------------------------------------
+# Repository defaults
+# ---------------------------------------------------------------------------
+[repo]
+default_module_dir = "modules"
+
+# ---------------------------------------------------------------------------
+# Core files — always included regardless of language selection
+# ---------------------------------------------------------------------------
+[core]
+files = [
+    ".bazelversion",
+    "WORKSPACE.bazel",
+    ".bazelignore",
+    ".bazeliskrc",
+    "bazel_downloader.cfg",
+]
+# tools/setup holds the Bazelisk installer — every repo needs Bazel, so it
+# ships regardless of which languages or features are selected.
+directories = ["tools/setup"]
+
+# ---------------------------------------------------------------------------
+# Language definitions — each has a label, root config files, and directories
+# ---------------------------------------------------------------------------
+[languages.python]
+label = "Python"
+files = [".mypy.ini"]
+directories = ["tools/python"]
+
+[languages.cpp]
+label = "C++"
+files = [".clang-tidy"]
+directories = ["tools/cpp"]
+
+[languages.rust]
+label = "Rust"
+files = [".rustfmt.toml", ".clippy.toml"]
+directories = ["tools/rust"]
+
+[languages.java]
+label = "Java"
+files = [".pmd.xml", ".spotbugs-exclude.xml"]
+directories = ["tools/java"]
+
+[languages.go]
+label = "Go"
+files = ["go.sum", ".nogo_config.json"]
+directories = ["tools/go"]
+
+# ---------------------------------------------------------------------------
+# Features — optional cross-cutting capabilities the user can toggle on top
+# of language selection. Each feature may declare:
+#   label             - display name for the CLI checkbox
+#   requires          - list of language keys auto-promoted when selected
+#   directories       - tool directories copied when feature is selected
+#   files             - individual files copied when feature is selected
+#   composite_files   - section-filtered files added when feature is selected
+# Section markers use the form: # --- BEGIN feature:<name> --- / END
+# ---------------------------------------------------------------------------
+[features.publish]
+label = "Publishing (Maven / PyPI / OCI via mint)"
+requires = ["go"]
+directories = ["tools/publish"]
+composite_files = [
+    ".publish.toml",
+    # Section-filtered rather than raw-copied so its ruff lint_test can be
+    # gated behind the lint feature.
+    "tools/publish/BUILD",
+    # Shared gazelle directive vocabulary — see the [features.lint] note. Owned
+    # by lint OR publish, so listed identically under both (de-duped in
+    # resolve_files); pruned only once both are dropped.
+    "tools/gazelle/directives/directives.go",
+    "tools/gazelle/directives/BUILD",
+    "tools/gazelle/vocab/vocab.go",
+    "tools/gazelle/vocab/BUILD",
+]
+
+[features.lint]
+label = "Linting & static analysis (lint_test aspects, tool deps, gazelle autogen)"
+requires = ["go"]
+# The linter aspect definitions and tool binaries ship only when lint is
+# selected; every reference to them is gated with a feature:lint predicate.
+#
+# The gazelle lint-extension is enumerated file-by-file (not as a `directories`
+# copy) so its per-language sections are section-filtered: lang.go is the
+# marker-free extension contract, while BUILD / kinds.go / generate.go carry
+# lang:<x> blocks trimmed to the selection. (A `directories` copy is verbatim —
+# markers and all — which is why these must be composite.)
+composite_files = [
+    "tools/lint/linters.bzl",
+    "tools/lint/BUILD",
+    "tools/lint/gazelle/lang.go",
+    "tools/lint/gazelle/BUILD",
+    "tools/lint/gazelle/kinds.go",
+    "tools/lint/gazelle/generate.go",
+    # Shared gazelle directive vocabulary, depended on by every generator's
+    # gazelle_binary (lint_gen and publish_gen). It ships whenever lint OR
+    # publish is selected, so it is listed identically under [features.publish];
+    # the resolver de-dupes when both are on, and a re-bootstrap prunes it only
+    # once both are dropped. directives.go is section-filtered (its lint/publish
+    # constants are marker-gated), so it must be composite, not a raw copy.
+    "tools/gazelle/directives/directives.go",
+    "tools/gazelle/directives/BUILD",
+    "tools/gazelle/vocab/vocab.go",
+    "tools/gazelle/vocab/BUILD",
+]
+
+# Single-language gazelle generators: shipped only when the lint feature AND the
+# named language are both selected, so an omitted language's generator file is
+# absent (and pruned on re-bootstrap) rather than left as an emptied stub.
+[features.lint.composite_language_files]
+cpp = ["tools/lint/gazelle/cpp.go"]
+rust = ["tools/lint/gazelle/rust.go"]
+java = ["tools/lint/gazelle/java.go"]
+python = ["tools/lint/gazelle/python.go"]
+
+[features.remote_cache]
+label = "Remote build cache (BuildBuddy)"
+# Owns no files of its own: it gates the BuildBuddy remote-cache wiring via
+# feature:remote_cache markers — the `build:remote-cache` / `build:ci` configs in
+# .bazelrc, the API-key block in user.bazelrc.template, and the README "Remote
+# Cache" section. No `requires` — remote caching is language-agnostic.
+
+[features.custom_toolchains]
+label = "Custom/local toolchains (per selected language)"
+# Owns no files of its own: it gates the non-default (host / local / custom-remote)
+# toolchain wiring that each language ships beyond its hermetic default. No
+# `requires` — it applies to whichever of Python / C++ / Java / Go are selected
+# and is a no-op for Rust (rules_rust has no local toolchain). The per-language
+# `.bazelrc` configs and MODULE-segment registrations are wrapped in
+# `feature:custom_toolchains` markers; the whole `tools/*/toolchains` dirs are
+# dropped via `[exclude.when_feature_absent]` below.
+
+# ---------------------------------------------------------------------------
+# Language-specific files in shared directories
+#
+# These are individual files (not whole directories) that belong to specific
+# languages. Keys use the same tag syntax as section markers: comma-separated
+# tags mean "include if ANY of these languages is selected" (OR logic).
+# ---------------------------------------------------------------------------
+[language_files]
+java = [
+    "tools/format/src/main/shell/clang_format_adapter_for_aspect_lint_java.sh",
+]
+
+# ---------------------------------------------------------------------------
+# Composite files — contain section markers that the processor filters
+#
+# These files use # --- BEGIN lang:<tag> --- / # --- END lang:<tag> ---
+# markers. The processor always includes lang:core sections, plus any
+# sections whose tags match the selected languages. Multi-tag sections
+# (e.g., lang:cpp,java) are included if ANY tag matches (OR logic).
+# ---------------------------------------------------------------------------
+[composite]
+files = [
+    "MODULE.bazel",
+    ".bazelrc",
+    "BUILD",
+    ".gitignore",
+    "tools/format/BUILD",
+    "user.bazelrc.template",
+]
+
+# ---------------------------------------------------------------------------
+# Language-specific composite files — only processed when the language
+# is selected. Keys use the same tag syntax as section markers: comma-
+# separated tags mean "include if ANY of these languages is selected".
+# ---------------------------------------------------------------------------
+[composite_language_files]
+python = [
+    ".ruff.toml",
+    "tools/python/requirements.in",
+    # Section-filtered so the rules_mypy block can be gated behind feature:lint.
+    "tools/python/python_segment.MODULE.bazel",
+    # pre-commit itself is installed from the Python .venv, so its hook config
+    # rides with Python; the inner clang-format/ruff sections still filter by
+    # language and the lint feature.
+    ".pre-commit-config.yaml",
+]
+cpp = [
+    "tools/cpp/cpp_3rd_party_dependencies.MODULE.bazel",
+    # Section-filtered so its host gcc/clang register_toolchains block can be
+    # gated behind feature:custom_toolchains (the rules_cc dep stays).
+    "tools/cpp/cpp_segment.MODULE.bazel",
+]
+rust = ["tools/rust/Cargo.toml"]
+java = [
+    "tools/java/java_segment.MODULE.bazel",
+    "tools/java/package_defs.bzl",
+]
+go = ["go.mod", "tools/go/go_segment.MODULE.bazel"]
+# clang-format is the formatter for C++ and Java only, so .clang-format ships
+# when either is selected (OR over the comma-tag) and is skipped otherwise.
+# The LLVM toolchain shard (and its empty tools/cpp package marker) is likewise
+# shared: MODULE.bazel's `include("//tools/cpp:llvm_segment.MODULE.bazel")` is
+# gated lang:cpp,java (Java uses clang-format too), so the file — and a BUILD to
+# make //tools/cpp a loadable package — must ship for Java even without C++.
+# Listed as composite_language_files (not a raw tools/cpp dir copy) so they are
+# skipped from the C++ tool-directory copytree and written once for either lang.
+"cpp,java" = [
+    ".clang-format",
+    "tools/cpp/BUILD",
+    "tools/cpp/llvm_segment.MODULE.bazel",
+]
+
+# ---------------------------------------------------------------------------
+# Exclude — files to skip during bootstrapping (overrides all other sections)
+#
+# Any file matching an entry here is never copied, even if it appears in
+# [core], [languages.*], or [language_files]. Useful for files kept in the
+# source repo for documentation or historical reference.
+# ---------------------------------------------------------------------------
+[exclude]
+files = [
+    # Palantir Java formatter: disabled alternative kept for documentation.
+    # The active Java formatter uses clang-format via the adapter wrapper.
+    "tools/format/src/main/java/monorepo/test/PalantirJavaFormatWrapper.java",
+]
+
+# Feature-conditional excludes: dropped when the named feature is NOT selected,
+# layered on top of each file's normal language ownership. These are static-
+# analysis artifacts with no section markers (plain config files / a tool dir),
+# so they ride with their language but only make sense under the lint feature:
+#   .mypy.ini, tools/python/mypy/  → Python type-checking (rules_mypy aspect)
+#   .nogo_config.json              → Go nogo static analysis
+#   .pmd.xml, .spotbugs-exclude.xml → Java PMD / SpotBugs aspects
+# (.clang-tidy / .clippy.toml are intentionally left ungated — their tools come
+#  from the toolchain / rules_lint with no dep to gate, so they ride with C++/Rust.)
+[exclude.when_feature_absent]
+lint = [
+    ".mypy.ini",
+    ".nogo_config.json",
+    ".pmd.xml",
+    ".spotbugs-exclude.xml",
+    "tools/python/mypy",
+]
+# Each tools/<lang>/toolchains dir holds only the language's custom/local
+# toolchain examples (host gcc/clang, local Go SDK, local + remote Corretto),
+# so the whole dir is dropped when custom_toolchains is off. The matching
+# .bazelrc configs and MODULE-segment registrations are gated by
+# feature:custom_toolchains markers, so nothing references the dropped dirs.
+custom_toolchains = [
+    "tools/cpp/toolchains",
+    "tools/go/toolchains",
+    "tools/java/toolchains",
+]
+
+# ---------------------------------------------------------------------------
+# Substitutions — applied to all generated text files
+#
+# The tool replaces original_name with the user-provided repo name in every
+# output file (MODULE.bazel module name, pip hub_name, .bazelignore paths, etc.)
+# ---------------------------------------------------------------------------
+[substitutions]
+original_name = "omniglot-bazel-starter"

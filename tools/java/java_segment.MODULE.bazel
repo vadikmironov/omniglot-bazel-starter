@@ -1,0 +1,277 @@
+#
+# rules_java block
+#
+# Java Rules for Bazel
+#
+# Please find documentation here:
+# https://github.com/bazelbuild/rules_java/releases
+#
+bazel_dep(name = "rules_java", version = "9.6.1")
+
+# --- BEGIN feature:custom_toolchains ---
+#
+# System-installed JDK configuration (alternative example)
+#
+# This demonstrates how to configure a JDK that's already installed on the system
+# (e.g., via apt, brew, or manual installation) using use_repo_rule to directly
+# call the local_java_repository rule from rules_java.
+#
+# How it works:
+# - use_repo_rule exposes the repository rule for direct use in MODULE.bazel
+# - local_java_repository creates java_runtime and toolchain targets pointing
+#   to the specified java_home path
+# - Toolchain is registered on-demand via --extra_toolchains in .bazelrc
+#
+# Note: When using use_repo_rule to call the rule directly (instead of the macro),
+# the runtime_name attribute must be set explicitly (typically same as name).
+#
+# Usage in .bazelrc:
+#   build:java_default_17_host --java_runtime_version=local_host_jdk_17_toolchain
+#   build:java_default_17_host --tool_java_runtime_version=local_host_jdk_17_toolchain
+#   build:java_default_17_host --extra_toolchains=@local_host_jdk_17_toolchain//:all
+#
+# Reference documentation:
+# https://github.com/bazelbuild/rules_java/blob/master/toolchains/local_java_repository.bzl
+#
+local_java_repository = use_repo_rule(
+    "@rules_java//toolchains:local_java_repository.bzl",
+    "_local_java_repository_rule",
+)
+
+local_java_repository(
+    name = "local_host_jdk_17_toolchain",
+    java_home = "/usr/lib/jvm/java-17-openjdk-amd64",
+    runtime_name = "local_host_jdk_17_toolchain",
+    version = "17",
+)
+
+#
+# Local Corretto JDK configuration
+#
+# Custom module extension under //tools/java/toolchains/ that calls
+# local_java_repository from rules_java and configures local Corretto JDKs in bulk.
+#
+# How it works:
+# - local_java_repository creates both java_runtime and toolchain targets
+# - Toolchains are selected via --java_runtime_version flag matching the repo name
+#   or version (e.g., --java_runtime_version=local_corretto_jdk17 or just "17")
+# - register_toolchains with //:all registers both runtime and compile toolchains
+#
+# Setup: Run //tools/java/toolchains/local_corretto_toolchains_setup.sh
+# with --toolchain_root_path argument to download and install Corretto JDKs
+# (e.g., --toolchain_root_path=/opt/corretto_jdks)
+#
+# Usage in .bazelrc:
+#   build:java_17_local --java_runtime_version=local_corretto_jdk17
+#   build:java_17_local --tool_java_runtime_version=local_corretto_jdk17
+#
+local_corretto_toolchains = use_extension("//tools/java/toolchains:local_corretto_toolchains.bzl", "local_corretto_toolchains")
+local_corretto_toolchains.config(
+    unix_base_path = "~/.corretto_jdks",
+    windows_base_path = "~/.corretto_jdks",
+)
+
+SUPPORTED_CORRETO_VERSIONS = [
+    "8",
+    "11",
+    "17",
+    "21",
+    "25",
+]
+
+LOCAL_CORRETO_TOOLCHAINS_REPOS = [("local_corretto_jdk" + "_" + version) for version in SUPPORTED_CORRETO_VERSIONS]
+
+[use_repo(
+    local_corretto_toolchains,
+    repo,
+) for repo in LOCAL_CORRETO_TOOLCHAINS_REPOS]
+
+[use_repo(
+    local_corretto_toolchains,
+    repo + "_toolchain_config_repo",
+) for repo in LOCAL_CORRETO_TOOLCHAINS_REPOS]
+
+# Register both runtime and compilation toolchains:
+[register_toolchains("@" + name + "_toolchain_config_repo//:all") for name in LOCAL_CORRETO_TOOLCHAINS_REPOS]
+
+#
+# Remote Corretto JDK configuration
+#
+# Custom module extension under //tools/java/toolchains/ that calls
+# remote_java_repository from rules_java and configures remote Corretto JDKs in bulk.
+#
+# How remote_java_repository works:
+# - Creates TWO repositories for each JDK:
+#   1. @{name} - contains the JDK files and java_runtime target (:jdk)
+#   2. @{name}_toolchain_config_repo - contains toolchain definitions and config settings
+# - The JDK archive is only downloaded when the toolchain is actually selected and used
+# - Toolchain config repos are lightweight (just BUILD files) and safe to register globally
+#
+# Toolchain selection via --java_runtime_version:
+# - The `prefix` parameter in remote_java_repository controls the matching pattern
+# - Config settings match: "{prefix}_{version}" or just "{version}"
+# - Example: prefix="remote_corretto" + version="17" matches "remote_corretto_17"
+# - Platform selection (linux/macos/windows) is automatic via target_compatible_with
+#
+# Toolchain registration options:
+#
+# Option 1 - Global registration (similar to local_corretto_toolchains above):
+#   Add register_toolchains() for each toolchain_config_repo:
+#     register_toolchains("@remote_corretto_jdk17_linux_toolchain_config_repo//:all")
+#   Then in .bazelrc only set the version:
+#     build:java_17_remote_corretto --java_runtime_version=remote_corretto_17
+#
+# Option 2 - On-demand registration via --extra_toolchains (used below):
+#   No register_toolchains() needed in MODULE.bazel.
+#   In .bazelrc, register toolchains and set version together:
+#     build:java_17_remote_corretto --extra_toolchains=@remote_corretto_jdk17_linux_toolchain_config_repo//:all
+#     build:java_17_remote_corretto --java_runtime_version=remote_corretto_17
+#     build:java_17_remote_corretto --tool_java_runtime_version=remote_corretto_17
+#   Note: To use the same config option across all platforms, include all platform variants:
+#     build:java_17_remote_corretto --extra_toolchains=@remote_corretto_jdk17_linux_toolchain_config_repo//:all
+#     build:java_17_remote_corretto --extra_toolchains=@remote_corretto_jdk17_linux_aarch64_toolchain_config_repo//:all
+#     build:java_17_remote_corretto --extra_toolchains=@remote_corretto_jdk17_macos_toolchain_config_repo//:all
+#     build:java_17_remote_corretto --extra_toolchains=@remote_corretto_jdk17_macos_aarch64_toolchain_config_repo//:all
+#     build:java_17_remote_corretto --extra_toolchains=@remote_corretto_jdk17_windows_toolchain_config_repo//:all
+#
+# For a comprehensive guide on the "Toolchainization" pattern used here (module extensions
+# that configure toolchains with external registration), see:
+# https://blog.engflow.com/2025/05/14/migrating-to-bazel-modules-aka-bzlmod---toolchainization/
+#
+remote_corretto_toolchains = use_extension("//tools/java/toolchains:remote_corretto_toolchains.bzl", "remote_corretto_toolchains")
+use_repo(
+    remote_corretto_toolchains,
+    # JDK 8
+    "remote_corretto_jdk8_linux",
+    "remote_corretto_jdk8_linux_aarch64",
+    "remote_corretto_jdk8_linux_aarch64_toolchain_config_repo",
+    "remote_corretto_jdk8_linux_toolchain_config_repo",
+    "remote_corretto_jdk8_macos",
+    "remote_corretto_jdk8_macos_aarch64",
+    "remote_corretto_jdk8_macos_aarch64_toolchain_config_repo",
+    "remote_corretto_jdk8_macos_toolchain_config_repo",
+    "remote_corretto_jdk8_windows",
+    "remote_corretto_jdk8_windows_toolchain_config_repo",
+    # JDK 11
+    "remote_corretto_jdk11_linux",
+    "remote_corretto_jdk11_linux_aarch64",
+    "remote_corretto_jdk11_linux_aarch64_toolchain_config_repo",
+    "remote_corretto_jdk11_linux_toolchain_config_repo",
+    "remote_corretto_jdk11_macos",
+    "remote_corretto_jdk11_macos_aarch64",
+    "remote_corretto_jdk11_macos_aarch64_toolchain_config_repo",
+    "remote_corretto_jdk11_macos_toolchain_config_repo",
+    "remote_corretto_jdk11_windows",
+    "remote_corretto_jdk11_windows_toolchain_config_repo",
+    # JDK 17
+    "remote_corretto_jdk17_linux",
+    "remote_corretto_jdk17_linux_aarch64",
+    "remote_corretto_jdk17_linux_aarch64_toolchain_config_repo",
+    "remote_corretto_jdk17_linux_toolchain_config_repo",
+    "remote_corretto_jdk17_macos",
+    "remote_corretto_jdk17_macos_aarch64",
+    "remote_corretto_jdk17_macos_aarch64_toolchain_config_repo",
+    "remote_corretto_jdk17_macos_toolchain_config_repo",
+    "remote_corretto_jdk17_windows",
+    "remote_corretto_jdk17_windows_toolchain_config_repo",
+    # JDK 21
+    "remote_corretto_jdk21_linux",
+    "remote_corretto_jdk21_linux_aarch64",
+    "remote_corretto_jdk21_linux_aarch64_toolchain_config_repo",
+    "remote_corretto_jdk21_linux_toolchain_config_repo",
+    "remote_corretto_jdk21_macos",
+    "remote_corretto_jdk21_macos_aarch64",
+    "remote_corretto_jdk21_macos_aarch64_toolchain_config_repo",
+    "remote_corretto_jdk21_macos_toolchain_config_repo",
+    "remote_corretto_jdk21_windows",
+    "remote_corretto_jdk21_windows_toolchain_config_repo",
+    # JDK 25
+    "remote_corretto_jdk25_linux",
+    "remote_corretto_jdk25_linux_aarch64",
+    "remote_corretto_jdk25_linux_aarch64_toolchain_config_repo",
+    "remote_corretto_jdk25_linux_toolchain_config_repo",
+    "remote_corretto_jdk25_macos",
+    "remote_corretto_jdk25_macos_aarch64",
+    "remote_corretto_jdk25_macos_aarch64_toolchain_config_repo",
+    "remote_corretto_jdk25_macos_toolchain_config_repo",
+    "remote_corretto_jdk25_windows",
+    "remote_corretto_jdk25_windows_toolchain_config_repo",
+)
+# --- END feature:custom_toolchains ---
+
+#
+# rules_jvm_external block
+#
+# Maven dependency management for Bazel. Handles transitive dependency resolution,
+# artifact fetching, and generates Bazel targets for Maven artifacts.
+#
+# Documentation: https://github.com/bazel-contrib/rules_jvm_external/releases
+#
+bazel_dep(name = "rules_jvm_external", version = "7.0")
+
+#
+# Project-specific Maven repository name. Using a unique name prevents conflicts
+# with other Bazel modules that also use rules_jvm_external (e.g., protobuf).
+#
+PROJECT_REPOSITORY_NAME = "omniglot-bazel-starter_maven_dependencies"
+
+#
+# Maven extension block where all external Java dependencies are defined.
+#
+# After adding, removing, or updating dependencies in the artifacts list,
+# regenerate the lock file with:
+#   REPIN=1 bazel run @omniglot-bazel-starter_maven_dependencies//:pin
+#
+# For more information on lock file management, see:
+# https://github.com/bazel-contrib/rules_jvm_external?tab=readme-ov-file#updating-maven_installjson
+#
+maven = use_extension("@rules_jvm_external//:extensions.bzl", "maven")
+maven.install(
+    name = PROJECT_REPOSITORY_NAME,
+    artifacts = [
+        # --- BEGIN exclude ---
+        # aspect_rules_lint dependency (disabled — kept for documentation only)
+        "com.palantir.javaformat:palantir-java-format:2.93.0",
+        # --- END exclude ---
+        # --- BEGIN feature:lint ---
+        # PMD and SpotBugs back the Java lint_test aspects (see tools/lint/BUILD).
+        "net.sourceforge.pmd:pmd-core:7.25.0",
+        "net.sourceforge.pmd:pmd-java:7.25.0",
+        "net.sourceforge.pmd:pmd-cli:7.25.0",
+        "com.github.spotbugs:spotbugs:4.10.2",
+        # --- END feature:lint ---
+
+        # log4j — a general logging dependency (exposed via log4j_build_deps in
+        # tools/java/package_defs.bzl). The PMD/SpotBugs binaries reuse it, but
+        # it is left ungated because most Java projects want logging available.
+        "org.apache.logging.log4j:log4j-core:2.26.0",
+        "org.apache.logging.log4j:log4j-api:2.26.0",
+        "org.apache.logging.log4j:log4j-slf4j-impl:2.26.0",
+        "org.apache.logging.log4j:log4j-slf4j2-impl:2.26.0",
+
+        # JUnit 5
+        "org.junit.platform:junit-platform-console:6.1.0",
+        "org.junit.platform:junit-platform-launcher:6.1.0",
+        "org.junit.platform:junit-platform-reporting:6.1.0",
+        "org.junit.jupiter:junit-jupiter-api:6.1.0",
+        "org.junit.jupiter:junit-jupiter-params:6.1.0",
+        "org.junit.jupiter:junit-jupiter-engine:6.1.0",
+
+        # --- BEGIN user-managed ---
+        # Your Maven coordinates here. Preserved across re-bootstrap.
+        # --- END user-managed ---
+
+        # --- BEGIN exclude ---
+        # jsoup
+        "org.jsoup:jsoup:1.22.2",
+        # --- END exclude ---
+    ],
+    lock_file = "//tools/java:maven_install.json",
+    repositories = [
+        "https://repo1.maven.org/maven2",
+    ],
+    # Enable for authenticated private maven repository, for details plese see:
+    # https://github.com/bazel-contrib/rules_jvm_external/pull/778
+    #use_credentials_from_home_netrc_file = True,
+)
+use_repo(maven, PROJECT_REPOSITORY_NAME)

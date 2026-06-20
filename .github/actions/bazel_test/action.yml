@@ -1,0 +1,55 @@
+name: 'Bazel Build and Test'
+description: 'Build and test with Bazel, with optional BuildBuddy remote cache'
+inputs:
+  targets:
+    description: 'Bazel target pattern to test'
+    required: false
+    default: '//...'
+  bazel_startup_opts:
+    description: 'Bazel startup options (e.g., --output_base for Windows)'
+    required: false
+    default: ''
+  buildbuddy_api_key:
+    description: 'BuildBuddy API key for remote cache (omit to build without cache)'
+    required: false
+    default: ''
+  bazel_config:
+    description: 'Extra --config to apply (e.g. gcc_hermetic). Empty = default toolchain (hermetic Clang).'
+    required: false
+    default: ''
+runs:
+  using: "composite"
+  steps:
+    # Fork PRs don't have access to secrets, so we gracefully skip remote cache.
+    # --build_tag_filters / --test_tag_filters with -lint scope this action to
+    # non-lint targets; lint runs in its own Linux-only job (clang-tidy/PMD/
+    # spotbugs aren't set up on the other platforms), and excluding it here
+    # also avoids redundantly running lint twice on Linux. Both flags are
+    # needed: --test_tag_filters alone only skips test *execution*, while
+    # `bazel test //...` still builds matched lint_test rules, which fires
+    # the clang-tidy aspect on macOS where the toolchain can't locate libc++.
+    - name: Build and test with Bazel
+      shell: bash
+      env:
+        BUILDBUDDY_API_KEY: ${{ inputs.buildbuddy_api_key }}
+        BAZEL_CONFIG: ${{ inputs.bazel_config }}
+      run: |
+        EXTRA_CONFIG=""
+        if [ -n "$BAZEL_CONFIG" ]; then
+          EXTRA_CONFIG="--config=$BAZEL_CONFIG"
+          echo "Extra config: $EXTRA_CONFIG"
+        fi
+        if [ -n "$BUILDBUDDY_API_KEY" ]; then
+          echo "Remote cache enabled"
+          bazel ${{ inputs.bazel_startup_opts }} test --config=ci $EXTRA_CONFIG \
+            --build_tag_filters=-lint \
+            --test_tag_filters=-lint \
+            --remote_header=x-buildbuddy-api-key="$BUILDBUDDY_API_KEY" \
+            ${{ inputs.targets }}
+        else
+          echo "Remote cache disabled (no API key available)"
+          bazel ${{ inputs.bazel_startup_opts }} test $EXTRA_CONFIG \
+            --build_tag_filters=-lint \
+            --test_tag_filters=-lint \
+            ${{ inputs.targets }}
+        fi

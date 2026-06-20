@@ -1,0 +1,49 @@
+# https://clang.llvm.org/extra/clang-tidy/
+#
+# Disabled check families:
+#   -abseil-*, -fuchsia-*, -llvm-*, -llvmlibc-*, -altera-*, -boost-*
+#     Libraries not used in this codebase.
+#
+# Disabled individual checks:
+#   -portability-avoid-pragma-once
+#     #pragma once is the project standard for header guards.
+#   -readability-convert-member-functions-to-static
+#     Flags methods that could be static but are kept as members by design.
+#   -modernize-use-integer-sign-comparison
+#     C++26 feature not yet widely available.
+#   -clang-diagnostic-builtin-macro-redefined
+#     PY_SSIZE_T_CLEAN must be #defined before Python.h (CPython requirement);
+#     the warning has no source location so inline NOLINT is impossible.
+#   -google-runtime-int
+#     CPython/libcurl APIs use long/long long in their signatures;
+#     replacing with int64_t would break type-trait dispatch and API contracts.
+#   -misc-header-include-cycle
+#     Triggered by libcurl's internal header structure (external code, read-only).
+#   -clang-analyzer-optin.cplusplus.UninitializedObject
+#     False positive in external fmt library headers (read-only).
+Checks: >-
+  *,
+  -abseil-*,
+  -fuchsia-*,
+  -llvm-*,
+  -llvmlibc-*,
+  -altera-*,
+  -boost-*,
+  -portability-avoid-pragma-once,
+  -readability-convert-member-functions-to-static,
+  -modernize-use-integer-sign-comparison,
+  -clang-diagnostic-builtin-macro-redefined,
+  -google-runtime-int,
+  -misc-header-include-cycle,
+  -clang-analyzer-optin.cplusplus.UninitializedObject,
+  -readability-identifier-length,
+  -cppcoreguidelines-pro-bounds-constant-array-index,
+  -cppcoreguidelines-avoid-do-while,
+  -bugprone-easily-swappable-parameters
+# Override -stdlib=libc++ from the hermetic LLVM toolchain.
+# clang-tidy 21 cannot locate the bundled libc++ headers in the Bazel
+# sandbox, causing "missing '(' after '__has_feature'" parse errors.
+# Using libstdc++ for analysis is safe: clang-tidy checks source patterns,
+# not stdlib implementation details, and both libraries implement the same
+# C++ standard API surface.
+ExtraArgs: ["-stdlib=libstdc++"]

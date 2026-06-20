@@ -1,0 +1,30 @@
+#
+# Module-local MODULE.bazel segment for //modules/cpp_app_with_cmake_dep.
+#
+# Fetches the fmt source tarball as a plain external repository so the cmake()
+# rule can build it through fmt's own CMakeLists.txt. This is deliberately not
+# the BCR @fmt module (which is a native Bazel cc_library) — the point of the
+# example is to exercise CMake interop via rules_foreign_cc.
+#
+# Included from the root MODULE.bazel (included files cannot themselves call
+# include(), so the wiring lives there).
+#
+# fmt homepage: https://github.com/fmtlib/fmt
+#
+http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+
+# build_file_content exposes every fetched file as an `all_srcs` filegroup,
+# which the cmake() rule consumes via its lib_source attribute.
+http_archive(
+    name = "fmt_src",
+    build_file_content = """\
+filegroup(
+    name = "all_srcs",
+    srcs = glob(["**"]),
+    visibility = ["//visibility:public"],
+)
+""",
+    sha256 = "8b852bb5aa6e7d8564f9e81394055395dd1d1936d38dfd3a17792a02bebd7af0",
+    strip_prefix = "fmt-12.2.0",
+    urls = ["https://github.com/fmtlib/fmt/archive/refs/tags/12.2.0.tar.gz"],
+)

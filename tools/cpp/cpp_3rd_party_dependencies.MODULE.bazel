@@ -1,0 +1,42 @@
+#
+# This file is a MODULE.bazel shard that captures all third-party dependencies
+# for C++ applications in this repository. This includes only dependencies that
+# are registered in the [Bazel Central Registry](https://registry.bazel.build/),
+# For libraries that are not registered there it is possible to use the
+# [rules_foreign_cc](https://github.com/bazel-contrib/rules_foreign_cc).
+#
+
+#
+# BCR page: https://registry.bazel.build/modules/googletest
+# Googletest home page: https://github.com/google/googletest
+# Documentation: https://google.github.io/googletest/primer.html
+#
+bazel_dep(name = "googletest", version = "1.17.0.bcr.2")
+
+# --- BEGIN user-managed ---
+# Your C++ bazel_dep(...) / single_version_override(...) entries.
+# Preserved across re-bootstrap.
+# --- END user-managed ---
+
+# --- BEGIN exclude ---
+#
+# BCR page: https://registry.bazel.build/modules/curl
+# Curl homepage: https://github.com/curl/curl
+# Documentation: https://curl.se/libcurl/c/
+#
+bazel_dep(name = "curl", version = "8.12.0.bcr.1")
+
+#
+# BCR page: https://registry.bazel.build/modules/libxml2
+# Libxml2 homepage: https://gitlab.gnome.org/GNOME/libxml2
+# Documentation: https://gnome.pages.gitlab.gnome.org/libxml2/devhelp/index.html
+#
+bazel_dep(name = "libxml2", version = "2.15.3")
+
+#
+# BCR page: https://registry.bazel.build/modules/spdlog
+# spdlog homepage: https://github.com/gabime/spdlog
+# Documentation: https://spdlog.docsforge.com/
+#
+bazel_dep(name = "spdlog", version = "1.17.0")
+# --- END exclude ---

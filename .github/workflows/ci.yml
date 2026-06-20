@@ -1,0 +1,153 @@
+name: Monorepo with Bazel
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+# Cancel stale runs when new commits are pushed
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# CI policy
+# ---------
+# Every pull request and push to main runs the full gate: build + test across the
+# hermetic Clang and hermetic GCC toolchains on Linux and hermetic Clang on macOS,
+# plus the lint phase (clang-tidy, GCC -fanalyzer, PMD/SpotBugs/ruff/mypy, and the
+# gazelle/publish/mint drift gates). Windows is currently disabled — see build-windows.
+
+jobs:
+  # Linux/Clang leg: build + test. Independent of the lint job (no `needs:`) so
+  # build/test feedback isn't gated on lint.
+  build-linux-clang:
+    runs-on: ubuntu-latest
+    name: Build & test (Linux x64, hermetic Clang)
+    permissions:
+      contents: read
+
+    steps:
+    - uses: actions/checkout@v6
+    - uses: ./.github/actions/setup_linux
+    - uses: ./.github/actions/bazel_test
+      with:
+        buildbuddy_api_key: ${{ secrets.BUILDBUDDY_API_KEY }}
+
+  # Linux build + test under the hermetic GCC toolchain (compiler-portability leg).
+  build-linux-gcc:
+    runs-on: ubuntu-latest
+    name: Build & test (Linux x64, hermetic GCC)
+    permissions:
+      contents: read
+
+    steps:
+    - uses: actions/checkout@v6
+    - uses: ./.github/actions/setup_linux
+    - name: Build and test with hermetic GCC
+      uses: ./.github/actions/bazel_test
+      with:
+        bazel_config: gcc_hermetic
+        buildbuddy_api_key: ${{ secrets.BUILDBUDDY_API_KEY }}
+
+  # macOS build + test (default hermetic Clang). There is no macOS/GCC leg — the
+  # hermetic GCC toolchain (f0rmiga/gcc-toolchain) is Linux-only.
+  # Note: macOS x64 (Intel) is not supported because the pinned LLVM has no Intel
+  # macOS distribution. See:
+  # https://github.com/bazel-contrib/toolchains_llvm/blob/master/toolchain/internal/llvm_distributions.bzl
+  build-macos:
+    runs-on: macos-latest
+    name: Build & test (macOS ARM64, hermetic Clang)
+    permissions:
+      contents: read
+
+    steps:
+    - uses: actions/checkout@v6
+    - uses: ./.github/actions/setup_macos
+    - uses: ./.github/actions/bazel_test
+      with:
+        buildbuddy_api_key: ${{ secrets.BUILDBUDDY_API_KEY }}
+
+  # The lint phase: formatting, the linter aspects (clang-tidy / clippy / PMD /
+  # SpotBugs / ruff / mypy), GCC -fanalyzer static analysis, and the gazelle /
+  # publish / mint drift gates.
+  lint:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+    - uses: actions/checkout@v6
+    - uses: ./.github/actions/setup_linux
+    - name: Configure remote cache
+      env:
+        BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
+      run: |
+        if [ -n "$BUILDBUDDY_API_KEY" ]; then
+          echo "build:remote-cache --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" > user.bazelrc
+          echo "build --config=remote-cache" >> user.bazelrc
+          echo "Remote cache enabled for lint"
+        fi
+    - name: Run buildifier check
+      run: bazel run //:buildifier.check
+    - name: Run formatter check
+      run: bazel run //tools/format:format.check
+    - name: Run linter check
+      run: bazel test --test_tag_filters=lint //...
+    - name: GCC static analysis (-fanalyzer, the clang-tidy analog)
+      # GCC's built-in analyzer over first-party C++ only (the gcc_analyzer config
+      # scopes -fanalyzer to modules/ sources); -Werror promotes findings to errors.
+      # Excludes the cpp_py_* modules, whose Python.h surface mirrors the .clang-tidy
+      # carve-outs. Remote cache is inherited from the user.bazelrc written above.
+      run: |
+        bazel build --config=gcc_analyzer \
+          //modules/cpp_app //modules/cpp_app_with_ext_dep //modules/cpp_library
+    - name: Check lint targets up-to-date
+      # Scope the diff to BUILD files only — the lint job's bazel invocations
+      # can legitimately rewrite MODULE.bazel.lock due to crate_universe's
+      # transitive-digest nondeterminism, which we don't want to misattribute
+      # to gazelle.
+      run: |
+        bazel run //:lint_gen
+        if ! git diff --exit-code -- '**/BUILD' '**/BUILD.bazel'; then
+          echo "ERROR: lint_test targets are out of date. Run: bazel run //:lint_gen" >&2
+          exit 1
+        fi
+    - name: Check publish targets up-to-date
+      run: |
+        bazel run //:publish_gen -- -publish_strict
+        if ! git diff --exit-code -- '**/BUILD' '**/BUILD.bazel'; then
+          echo "ERROR: :publish targets are out of date. Run: bazel run //:publish_gen" >&2
+          exit 1
+        fi
+    - name: Mint dry-run smoke test
+      # Exercises the mint engine end-to-end (scope resolution, version
+      # planning, :publish_image discovery via bazel query) without
+      # touching any registry. Catches engine regressions the gazelle
+      # drift gate above can't see.
+      run: bazel run //tools/publish:mint -- --mode dev --include-pub-targets all --dry-run
+
+  # Windows build - currently disabled. Remove the `if: false` below to re-enable
+  # (it will then run on every PR and push like the other jobs).
+  build-windows:
+    if: false
+    runs-on: windows-latest
+    name: Build & test (Windows x64)
+    permissions:
+      contents: read
+
+    env:
+      # Use shorter output_base to avoid Windows MAX_PATH (260 char) limit
+      # See: https://github.com/bazelbuild/rules_rust/issues/1946
+      BAZEL_STARTUP_OPTS: "--output_base=C:/bazel_build"
+
+    steps:
+    - uses: actions/checkout@v6
+    - uses: ./.github/actions/setup_windows
+      with:
+        bazel_startup_opts: ${{ env.BAZEL_STARTUP_OPTS }}
+    - uses: ./.github/actions/bazel_test
+      with:
+        buildbuddy_api_key: ${{ secrets.BUILDBUDDY_API_KEY }}
+        bazel_startup_opts: ${{ env.BAZEL_STARTUP_OPTS }}

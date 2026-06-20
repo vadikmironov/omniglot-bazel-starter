@@ -1,0 +1,108 @@
+#
+# rules_pkg block
+#
+# Bazel rules for creating packages (tar, zip, deb, rpm, etc.)
+# Used by binary_bundle_publish / library_archive_publish for the .zip
+# Maven artifacts. (image_publish uses tar.bzl below — pkg_tar is no
+# longer recommended by rules_oci; see bazel-contrib/rules_oci#808.)
+#
+# Please find documentation here:
+# https://github.com/bazelbuild/rules_pkg/releases
+#
+bazel_dep(name = "rules_pkg", version = "1.2.0")
+
+#
+# tar.bzl block
+#
+# Hermetic, reproducible bsdtar-backed tar rule. Used by image_publish to
+# build OCI image layers. Recommended over pkg_tar by rules_oci itself — the
+# layer-hash-determinism guarantees matter for OCI registry layer cache
+# deduplication.
+#
+# Please find documentation here:
+# https://github.com/bazel-contrib/tar.bzl/releases
+#
+bazel_dep(name = "tar.bzl", version = "0.10.5")
+
+#
+# rules_oci block
+#
+# Bazel rules for building and pushing OCI container images without a
+# Docker daemon. Used by image_publish to ship "batteries-included" app
+# images alongside the existing Maven/PyPI artifacts.
+#
+# Please find documentation here:
+# https://github.com/bazel-contrib/rules_oci/releases
+#
+bazel_dep(name = "rules_oci", version = "2.3.0")
+
+#
+# aspect_bazel_lib block
+#
+# Source of platform_transition_filegroup, used by image_publish to
+# configure oci_image and its base under a linux/amd64 platform regardless
+# of the host. Without this, oci.pull's host-platform alias fails to
+# resolve on darwin hosts (no darwin variant is registered).
+#
+# Already a transitive dep of rules_oci; declared directly so .bzl files
+# can load from it.
+#
+bazel_dep(name = "aspect_bazel_lib", version = "2.22.5")
+
+oci = use_extension("@rules_oci//oci:extensions.bzl", "oci")
+
+# Distroless base images, pinned by digest for reproducibility. Renovate's
+# bazel-module manager auto-bumps the digest within the tag track declared
+# by `tag = "nonroot"`; rules_oci ignores `tag` at fetch time (digest wins)
+# and uses it solely as a hint for upgrade tooling. To verify a proposed
+# digest or bump manually, query the registry's manifest endpoint:
+#
+#   curl -sI -H 'Accept: application/vnd.oci.image.index.v1+json' -H 'Accept: application/vnd.docker.distribution.manifest.list.v2+json' -H 'Accept: application/vnd.docker.distribution.manifest.v2+json' 'https://gcr.io/v2/distroless/java17-debian13/manifests/nonroot' | grep -i '^docker-content-digest:'
+#
+# Single-platform (linux/amd64).
+#
+# Naming convention:
+#   - Registry-source prefix (gcr_io_) keeps the namespace clean for future
+#     multi-source pulls.
+#   - Language version included where applicable (java17, python3); OS
+#     version excluded — that lives in the digest.
+#   - static/cc carry no version suffix — they encode flavor, not version.
+oci.pull(
+    name = "gcr_io_distroless_java17",
+    digest = "sha256:81d09cac6ec47f6a13c61a941557f95079213320f3ddbf9d353de9317669aab5",
+    image = "gcr.io/distroless/java17-debian13",
+    platforms = ["linux/amd64"],
+    tag = "nonroot",
+)
+oci.pull(
+    name = "gcr_io_distroless_python3",
+    digest = "sha256:886011e8c25a19ab38fa6d929e06b47d4fd3661d1dff61c6b4ebb4becd030c37",
+    image = "gcr.io/distroless/python3-debian13",
+    platforms = ["linux/amd64"],
+    tag = "nonroot",
+)
+oci.pull(
+    name = "gcr_io_distroless_static",
+    digest = "sha256:963fa6c544fe5ce420f1f54fb88b6fb01479f054c8056d0f74cc2c6000df5240",
+    image = "gcr.io/distroless/static-debian13",
+    platforms = ["linux/amd64"],
+    tag = "nonroot",
+)
+oci.pull(
+    name = "gcr_io_distroless_cc",
+    digest = "sha256:d3cda6e91129130d7229a1806b6a73d292ef245ab032da7851907798024cefba",
+    image = "gcr.io/distroless/cc-debian13",
+    platforms = ["linux/amd64"],
+    tag = "nonroot",
+)
+use_repo(
+    oci,
+    "gcr_io_distroless_cc",
+    "gcr_io_distroless_cc_linux_amd64",
+    "gcr_io_distroless_java17",
+    "gcr_io_distroless_java17_linux_amd64",
+    "gcr_io_distroless_python3",
+    "gcr_io_distroless_python3_linux_amd64",
+    "gcr_io_distroless_static",
+    "gcr_io_distroless_static_linux_amd64",
+)

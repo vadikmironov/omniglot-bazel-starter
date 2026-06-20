@@ -1,0 +1,28 @@
+name: 'Setup Windows for Bazel'
+description: 'Common Windows setup steps for Bazel builds'
+inputs:
+  bazel_startup_opts:
+    description: 'Bazel startup options'
+    required: false
+    default: ''
+runs:
+  using: "composite"
+  steps:
+    - name: Setup Bazel
+      uses: bazel-contrib/setup-bazel@0.19.0
+      with:
+        bazelisk-cache: true
+        disk-cache: true
+        repository-cache: true
+    - name: Print debug info
+      shell: pwsh
+      run: |
+        Write-Host "=== PowerShell version ==="
+        Write-Host "Version: $($PSVersionTable.PSVersion)"
+        Write-Host "Edition: $($PSVersionTable.PSEdition)"
+        Write-Host "=== Git Bash version ==="
+        & bash --version | Select-Object -First 1
+        Write-Host "=== Bazel version ==="
+        & bazel ${{ inputs.bazel_startup_opts }} version
+        Write-Host "=== Bazel info ==="
+        & bazel ${{ inputs.bazel_startup_opts }} info

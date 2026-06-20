@@ -1,0 +1,40 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Run Bazel App: //modules/cpp_py_bootstrap_app:cpp_py_bootstrap_app",
+            "type": "node-terminal",
+            "request": "launch",
+            "command": "bazel run //modules/cpp_py_bootstrap_app:cpp_py_bootstrap_app",
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "name": "Debug Bazel App: //modules/cpp_py_bootstrap_app:cpp_py_bootstrap_app",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/bazel-bin/modules/cpp_py_bootstrap_app/cpp_py_bootstrap_app",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [
+                {
+                    "name": "PYTHON_LIB_PATH",
+                    "value": "${workspaceFolder}/modules/python_lib/src"
+                }
+            ],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ],
+            "preLaunchTask": "Bazel Build (Debug): //modules/cpp_py_bootstrap_app:cpp_py_bootstrap_app"
+        }
+    ]
+}

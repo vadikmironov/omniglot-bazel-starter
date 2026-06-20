@@ -1,0 +1,26 @@
+# rules_rust block, please find documentation here:
+# https://github.com/bazelbuild/rules_rust/releases
+bazel_dep(name = "rules_rust", version = "0.70.0")
+
+rust = use_extension("@rules_rust//rust:extensions.bzl", "rust")
+
+# when updating edition, please also update the edition in .rustfmt.toml
+# and Cargo.toml
+rust.toolchain(
+    edition = "2024",
+    versions = ["1.96.0"],
+)
+use_repo(rust, "rust_toolchains")
+
+register_toolchains("@rust_toolchains//:all")
+
+crate = use_extension(
+    "@rules_rust//crate_universe:extensions.bzl",
+    "crate",
+)
+crate.from_cargo(
+    name = "crates",
+    cargo_lockfile = "//tools/rust:Cargo.lock",
+    manifests = ["//tools/rust:Cargo.toml"],
+)
+use_repo(crate, "crates")

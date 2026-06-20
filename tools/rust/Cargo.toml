@@ -1,0 +1,23 @@
+[workspace]
+
+[package]
+name = "omniglot-bazel-starter_crates"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[lib]
+path = "fake.rs"
+
+# After editing dependencies, regenerate the lockfile:
+#   CARGO_BAZEL_REPIN=1 bazel fetch @crates//...
+[dependencies]
+# --- BEGIN user-managed ---
+# Your crates here (members of [dependencies]). Preserved across re-bootstrap.
+# --- END user-managed ---
+# --- BEGIN exclude ---
+# opting for simplicity sake to use rustls to avoid the dependency on openssl-dev package
+reqwest = { version = "0.13.4", default-features = false, features = ["http2"] }
+tokio = { version = "1.52.1", features = ["full"] }
+august = { version = "2.4.0" }
+# --- END exclude ---

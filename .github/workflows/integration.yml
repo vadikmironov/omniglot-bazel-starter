@@ -1,0 +1,42 @@
+name: Integration Tests
+
+on:
+  schedule:
+    # Every Sunday at 03:00 UTC
+    - cron: '0 3 * * 0'
+  workflow_dispatch:
+
+# Cancel stale runs when a new run is triggered
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  integration-linux:
+    runs-on: ubuntu-latest
+    name: Integration Tests (Linux x64)
+    permissions:
+      contents: read
+
+    steps:
+    - uses: actions/checkout@v6
+    - uses: ./.github/actions/setup_linux
+    - name: Configure remote cache
+      env:
+        BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
+      run: |
+        if [ -n "$BUILDBUDDY_API_KEY" ]; then
+          echo "build:remote-cache --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" > user.bazelrc
+          echo "build --config=remote-cache" >> user.bazelrc
+          echo "Remote cache enabled for integration tests"
+        fi
+    - name: Run integration tests
+      # Each subset spins up cold nested Bazel servers; the suite runs ~3300s
+      # locally and CI runners are slower, so allow headroom over the 3600s
+      # ("eternal") default. The remote cache above cuts this substantially when
+      # BUILDBUDDY_API_KEY is set.
+      run: >
+        bazel test
+        --test_tag_filters=manual
+        --test_timeout=5400
+        //tools/bootstrap/tests/...

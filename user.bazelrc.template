@@ -1,0 +1,58 @@
+##
+## Local developer overrides — copy this file to 'user.bazelrc'
+##
+##   cp user.bazelrc.template user.bazelrc
+##
+## user.bazelrc is gitignored and loaded automatically via try-import in .bazelrc
+##
+
+# --- BEGIN feature:remote_cache ---
+##
+## BuildBuddy remote cache
+##
+## To enable remote caching for local builds:
+##   1. Sign up at https://app.buildbuddy.io
+##   2. Copy your API key from Settings -> API Keys
+##   3. Uncomment the line below and paste your key
+##   4. Use: bazel build --config=remote-cache //...
+##
+# build:remote-cache --remote_header=x-buildbuddy-api-key=YOUR_API_KEY_HERE
+# --- END feature:remote_cache ---
+
+##
+## Shared repository cache
+##
+## Share extracted external libraries (Maven JARs, LLVM, JDK, etc.) across
+## multiple Bazel workspaces on the same machine. Avoids redundant downloads
+## when several projects use the same dependencies.
+## https://github.com/bazelbuild/bazel/issues/12227
+##
+common --repository_cache=~/.cache/bazel/repo-cache
+
+# --- BEGIN feature:publish ---
+##
+## Artifact publishing
+##
+## Configure credentials and registry URL for `bazel run --config=publish //<module>:publish`.
+## See tools/publish/README.md for full setup instructions.
+##
+## 1. Add your registry credentials to ~/.netrc:
+##      machine registry.example.com
+##        login <your-username>
+##        password <your-token>
+##
+## 2. Uncomment and set your registry URL:
+##
+# build:publish --//tools/publish:url=https://registry.example.com/artifactory
+# build:publish --//tools/publish:platform=artifactory  # or: nexus, gitea
+# build:publish --//tools/publish:owner=myorg
+# build:publish --//tools/publish:maven_repo=libs-release-local
+# build:publish --//tools/publish:pypi_repo=pypi-local
+# build:publish --//tools/publish:generic_repo=generic-local
+# --- END feature:publish ---
+
+##
+## Personal preferences (examples)
+##
+# build --jobs=8
+# test --test_output=all

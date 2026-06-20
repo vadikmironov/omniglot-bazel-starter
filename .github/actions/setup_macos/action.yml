@@ -1,0 +1,50 @@
+name: 'Setup macOS for Bazel'
+description: 'Common macOS setup steps for Bazel builds'
+inputs:
+  bazel_startup_opts:
+    description: 'Bazel startup options'
+    required: false
+    default: ''
+runs:
+  using: "composite"
+  steps:
+    - name: Setup Bazel
+      uses: bazel-contrib/setup-bazel@0.19.0
+      with:
+        bazelisk-cache: true
+        disk-cache: ${{ hashFiles('.bazelversion', 'MODULE.bazel') }}
+        repository-cache: true
+    - name: Install bash 4+ via Homebrew
+      shell: bash
+      run: brew install bash
+    - name: Print debug info
+      shell: bash
+      run: |
+        echo "=== System bash version ==="
+        echo "Path: $(which bash)"
+        echo "Version: $BASH_VERSION"
+        echo "=== Homebrew bash version ==="
+        /opt/homebrew/bin/bash --version || /usr/local/bin/bash --version
+        echo "=== Bazel version ==="
+        bazel ${{ inputs.bazel_startup_opts }} version
+        echo "=== Bazel info ==="
+        bazel ${{ inputs.bazel_startup_opts }} info
+    - name: Patch LLVM 21 libc++ __hash_memory bug
+      shell: bash
+      run: |
+        # LLVM 21's macOS distribution was built without
+        # -DLIBCXX_ENABLE_VENDOR_AVAILABILITY_ANNOTATIONS=ON, so libc++ headers
+        # reference __hash_memory as an external symbol but the library doesn't
+        # export it, causing linker errors.
+        # Workaround: force the inline fallback by patching the availability check.
+        # See: https://github.com/llvm/llvm-project/issues/170970
+        # Adopted from: https://github.com/OpenMS/OpenMS/blob/38159835/.github/workflows/openms_ci_matrix_full.yml#L328
+        bazel ${{ inputs.bazel_startup_opts }} fetch @llvm_toolchain_llvm//... 2>/dev/null || true
+        LLVM_PREFIX="$(bazel ${{ inputs.bazel_startup_opts }} info output_base)/external/toolchains_llvm++llvm+llvm_toolchain_llvm"
+        HASH_H="$LLVM_PREFIX/include/c++/v1/__functional/hash.h"
+        if [ -f "$HASH_H" ] && grep -q '^#if _LIBCPP_AVAILABILITY_HAS_HASH_MEMORY$' "$HASH_H"; then
+          sed -i '' 's/^#if _LIBCPP_AVAILABILITY_HAS_HASH_MEMORY$/#if 0 \/\/ PATCHED: LLVM 21 libc++ missing __hash_memory/' "$HASH_H"
+          echo "Patched $HASH_H to force inline __hash_memory fallback"
+        else
+          echo "Header not found or already patched — skipping"
+        fi

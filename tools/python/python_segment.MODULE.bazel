@@ -1,0 +1,105 @@
+##
+## Toolchain versions configuration
+##
+PYTHON_VERSION = "3.14"
+
+PYTHON_VERSION_SNAKE = PYTHON_VERSION.replace(".", "_")
+
+#
+# rules_python block
+#
+# This repository is the home of the core Python rules -- py_library, py_binary,
+# py_test, py_proto_library, and related symbols that provide the basis for Python
+# support in Bazel. It also contains package installation rules for integrating
+# with PyPI and other indices.
+#
+# Please find documentation here:
+# https://github.com/bazelbuild/rules_python/releases
+#
+bazel_dep(name = "rules_python", version = "2.0.3")
+
+python = use_extension("@rules_python//python/extensions:python.bzl", "python")
+
+# All supported python toolchains are listed here:
+# https://github.com/bazelbuild/rules_python/blob/main/python/versions.bzl
+#
+# Please see the following documentation on using different Python toolchains:
+# https://github.com/bookingcom/rules_python/blob/main/docs/_includes/py_console_script_binary.md#using-a-specific-python-version-directly-from-a-toolchain
+python.toolchain(
+    is_default = True,
+    python_version = PYTHON_VERSION,
+)
+use_repo(python, "python_" + PYTHON_VERSION_SNAKE)
+
+pip = use_extension("@rules_python//python/extensions:pip.bzl", "pip")
+pip.parse(
+    extra_pip_args = [],
+    hub_name = "omniglot-bazel-starter_pip_dependencies",
+    python_version = PYTHON_VERSION,
+    requirements_lock = "//tools/python:requirements_lock.txt",
+)
+use_repo(pip, "omniglot-bazel-starter_pip_dependencies")
+
+# --- BEGIN feature:custom_toolchains ---
+#
+# Local python runtime toolchain definition
+#
+# It is based on the rules_python documentation here: https://rules-python.readthedocs.io/en/latest/toolchains.html#local-toolchain
+# The call to register_toolchain is omitted as local toolchain would be registered ahead of
+# hermetic rules_python toolchains. This would prevent the use of standard build toolchain selection
+# via build configs defined in .bazelrc.
+#
+local_runtime_repo = use_repo_rule(
+    "@rules_python//python/local_toolchains:repos.bzl",
+    "local_runtime_repo",
+)
+
+local_runtime_toolchains_repo = use_repo_rule(
+    "@rules_python//python/local_toolchains:repos.bzl",
+    "local_runtime_toolchains_repo",
+)
+
+local_runtime_repo(
+    name = "host_python3_13_repo",
+    interpreter_path = "/usr/bin/python3.13",
+    on_failure = "fail",
+)
+
+local_runtime_toolchains_repo(
+    name = "host_python3_13_toolchain",
+    runtimes = ["host_python3_13_repo"],
+)
+# Note that register_toolchains will insert the local toolchain earlier in the toolchain ordering,
+# so it will take precedence over other registered toolchains.
+#register_toolchains("@local_toolchains//:all", dev_dependency = True)
+# --- END feature:custom_toolchains ---
+
+# --- BEGIN feature:lint ---
+#
+# rules_mypy block
+#
+# An aspect to instrument py_* targets with mypy type-checking. Part of the lint
+# feature; the aspect is wired in .bazelrc and defined in tools/python/mypy/.
+#
+# Please find documentation here:
+# https://github.com/theoremlp/rules_mypy/releases
+bazel_dep(name = "rules_mypy", version = "0.41.0")
+
+types = use_extension("@rules_mypy//mypy:types.bzl", "types")
+types.requirements(
+    name = "mypy_pip_types",
+    pip_requirements = "@omniglot-bazel-starter_pip_dependencies//:requirements.bzl",
+    requirements_txt = "//tools/python:requirements_lock.txt",
+)
+use_repo(types, "mypy_pip_types")
+# --- END feature:lint ---
+
+#
+# rules_uv block
+#
+# Bazel rules to enable use of uv to compile pip requirements and generate
+# virtual envs.
+#
+# Please find documentation here:
+# https://github.com/theoremlp/rules_uv/releases
+bazel_dep(name = "rules_uv", version = "0.89.2")

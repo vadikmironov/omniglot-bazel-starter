@@ -1,0 +1,31 @@
+line-length = 120
+
+# --- BEGIN feature:lint ---
+[lint]
+select = ["E", "I", "F", "S", "SIM", "PTH", "UP", "B"]
+
+ignore = ["E501"]
+
+unfixable = ["B"]
+
+[lint.per-file-ignores]
+"__init__.py" = ["E402"]
+"**/{tests,docs,tools}/*" = ["E402"]
+# --- END feature:lint ---
+# --- BEGIN feature:lint feature:publish ---
+# S603 (subprocess with non-literal): all subprocess calls use list form (no shell injection).
+# S607 (partial executable path): git is the only external binary; it must be on PATH.
+# Argument injection is mitigated by -- separators and CLI input validation.
+"tools/publish/src/mint/*.py" = ["S603", "S607"]
+"tools/publish/tests/**/*.py" = ["S603", "S607"]
+# --- END feature:lint feature:publish ---
+
+# --- BEGIN user-managed ---
+# Project-specific ruff entries (continues the per-file-ignores table above;
+# any new tables — e.g. isort — must come after). Preserved across re-bootstrap.
+# --- END user-managed ---
+
+# --- BEGIN exclude ---
+[lint.isort]
+known-first-party = ["bootstrap"]
+# --- END exclude ---

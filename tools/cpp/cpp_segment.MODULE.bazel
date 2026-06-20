@@ -1,0 +1,60 @@
+#
+# rules_cc block
+#
+# This repository contains a Starlark implementation of C++ rules in Bazel.
+#
+# Please find documentation here:
+# https://github.com/bazelbuild/rules_cc/releases
+#
+bazel_dep(name = "rules_cc", version = "0.2.19")
+
+#
+# rules_foreign_cc block
+#
+# Builds libraries that ship their own non-Bazel build system (CMake, Make,
+# Autotools) from source and exposes the result as a cc_library-compatible
+# target. Ships prebuilt hermetic cmake and ninja toolchains, so no host
+# install is required. Fetch the library's source as an http_archive in the
+# module that consumes it.
+#
+# Please find documentation here:
+# https://github.com/bazel-contrib/rules_foreign_cc/releases
+#
+bazel_dep(name = "rules_foreign_cc", version = "0.15.1")
+# TODO(#1427): on 0.15.1 the from-source pkg-config bundles a glib that fails to
+# build under GCC 15's C23 default, so --config=gcc_hermetic can't build
+# cmake()/make() targets. Fixed upstream past 0.15.1 (-std=gnu90 pkg-config
+# build). On the next bump, re-test --config=gcc_hermetic and remove this note.
+# https://github.com/bazel-contrib/rules_foreign_cc/issues/1427
+
+#
+# Hermetic GCC toolchain (f0rmiga/gcc-toolchain), complementing the default
+# hermetic LLVM/Clang (llvm_segment.MODULE.bazel). Selected on demand via
+# `--config=gcc_hermetic`; not register_toolchains()'d, so Clang stays default
+# (the config's --extra_toolchains outranks the registered LLVM).
+#
+# Please find documentation here:
+# https://github.com/f0rmiga/gcc-toolchain/releases
+#
+bazel_dep(name = "gcc_toolchain", version = "0.10.0")
+
+gcc_toolchains = use_extension("@gcc_toolchain//toolchain:module_extensions.bzl", "gcc_toolchains")
+gcc_toolchains.toolchain(
+    name = "gcc_toolchain_x86_64",
+    # Pin the GCC version explicitly (module default is 16.1.0). Available:
+    # 12.5.0, 13.4.0, 14.3.0, 15.2.0, 16.1.0.
+    gcc_version = "15.2.0",
+    target_arch = "x86_64",
+)
+use_repo(gcc_toolchains, "gcc_toolchain_x86_64")
+
+# --- BEGIN feature:custom_toolchains ---
+# Configure and register any custom toolchains - in our case gcc and clang host compilers.
+register_toolchains(
+    "//tools/cpp/toolchains:host_gcc_cc_toolchain_for_linux_x86_64",
+)
+
+register_toolchains(
+    "//tools/cpp/toolchains:host_clang_cc_toolchain_for_linux_x86_64",
+)
+# --- END feature:custom_toolchains ---

@@ -1,0 +1,37 @@
+# After editing this file, regenerate the lockfile:
+#   bazel run //tools/python:generate_requirements_lock.update
+
+###############################################################################
+# development dependencies
+###############################################################################
+
+# --- BEGIN feature:lint ---
+# linter & formatter CLI for local runs / editor integration. Bazel formatting
+# uses the rules_lint ruff binary, so this is only needed for the lint feature.
+ruff
+# security linter
+bandit
+# type checker
+mypy
+# --- END feature:lint ---
+# git pre-commit hooks framework
+pre-commit
+
+# --- BEGIN user-managed ---
+# Your project's pip dependencies. Preserved across re-bootstrap.
+# --- END user-managed ---
+
+# --- BEGIN exclude ---
+###############################################################################
+# bootstrap tool dependency
+###############################################################################
+
+questionary
+
+###############################################################################
+# example dependency for python_app_with_ext_dep
+###############################################################################
+
+requests
+types-requests
+# --- END exclude ---

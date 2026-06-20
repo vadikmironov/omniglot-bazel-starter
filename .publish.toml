@@ -1,0 +1,139 @@
+# =============================================================================
+# .publish.toml — Version and component configuration for the monorepo
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Repo-wide settings
+# schema is a template — {name} expands to the matching schema's template
+# -----------------------------------------------------------------------------
+[repo]
+schema = "{semver}"
+
+# -----------------------------------------------------------------------------
+# Conventions — consumed by the gazelle publish extension (not by mint).
+# Drives `bazel run //:publish_gen`, which auto-generates :publish targets
+# from BUILD-file conventions.
+#
+# path_patterns:
+#   Allowlist of repo-relative paths where :publish targets should be
+#   emitted. A package is eligible only if its path matches at least one
+#   pattern. Supported syntax per pattern:
+#       "foo/bar"    — exact
+#       "foo/*"      — immediate children of foo/
+#       "foo/**"     — foo/ and any descendant (common case)
+#   An empty/omitted list disables the scope filter (every package is
+#   considered eligible).
+#
+# python_distribution_prefix:
+#   Prepended (with a "-" separator) to the kebab-cased package basename
+#   to form the wheel distribution name. e.g. prefix "omniglot-bazel-starter" +
+#   package "python_lib" → "omniglot-bazel-starter-python-lib".
+#
+# image_app_prefix:
+#   In-image filesystem prefix passed to each image_publish rule's
+#   app_prefix attribute. Empty string is allowed (binary lands at tar
+#   root); leading/trailing slashes and ".." segments are rejected.
+#   Default "app" if omitted.
+# -----------------------------------------------------------------------------
+[conventions]
+path_patterns = ["modules/**"]
+python_distribution_prefix = "omniglot-bazel-starter"
+image_app_prefix = "app"
+
+# -----------------------------------------------------------------------------
+# Image bases — consumed by the gazelle publish extension to populate
+# the `base` attribute of each :publish_image rule. The key is the
+# canonical binary kind (java_binary, py_binary, go_binary, rust_binary,
+# cc_binary); the value is a Bazel label resolving to an oci_pull-ed
+# base image. A kind absent from this table emits a warning at
+# publish_gen time and skips :publish_image for that package — the
+# :publish artifact target is unaffected.
+#
+# Bases pinned by digest in tools/publish/publish_segment.MODULE.bazel.
+# Bumping a digest is a manual operation (`crane digest <image>:<tag>`).
+# -----------------------------------------------------------------------------
+[image_bases]
+java_binary = "@gcr_io_distroless_java17"
+py_binary = "@gcr_io_distroless_python3"
+go_binary = "@gcr_io_distroless_static"
+rust_binary = "@gcr_io_distroless_cc"
+cc_binary = "@gcr_io_distroless_cc"
+
+# -----------------------------------------------------------------------------
+# Version schemas
+#
+# Built-in schemas below. To define custom schemas, add a new [schemas.<name>]
+# section with release and development templates using the placeholders below.
+# For inspiration on versioning schemes, see:
+# https://nesbitt.io/2024/06/24/from-zerover-to-semver-a-comprehensive-list-of-versioning-schemes-in-open-source.html
+#
+# Release placeholders:  {major}, {minor}, {patch}, {YYYY}, {MM}, {DD},
+#                         {git_count}
+# Dev placeholders:      {next_version}, {git_count}, {git_commit}, {timestamp}
+# -----------------------------------------------------------------------------
+[schemas.semver]
+release = "{major}.{minor}.{patch}"
+development = "{next_version}.dev{git_count}+{git_commit}"
+auto_increment = "patch"
+
+[schemas.calver]
+release = "{YYYY}.{MM}.{DD}"
+development = "{next_version}.dev{git_count}+{git_commit}"
+
+[schemas.gitdate]
+release = "{YYYY}.{MM}.{DD}.{git_count}"
+development = "{next_version}+{git_commit}"
+
+# --- BEGIN exclude ---
+# -----------------------------------------------------------------------------
+# Component sets — coordinated version groups
+# Tag format: {set_name}/v{version}
+# -----------------------------------------------------------------------------
+[component_sets.java_all]
+modules = [
+    "//modules/java_lib",
+    "//modules/java_app",
+    "//modules/java_app_with_ext_dep",
+]
+
+[component_sets.python_all]
+modules = [
+    "//modules/python_lib",
+    "//modules/python_app",
+    "//modules/python_app_with_ext_dep",
+]
+
+[component_sets.go_all]
+modules = [
+    "//modules/go_app",
+    "//modules/go_app_with_ext_dep",
+    "//modules/go_lib",
+]
+
+[component_sets.rust_all]
+modules = [
+    "//modules/rust_app",
+    "//modules/rust_app_with_ext_dep",
+    "//modules/rust_lib",
+]
+
+[component_sets.cpp_all]
+modules = [
+    "//modules/cpp_app",
+    "//modules/cpp_app_with_ext_dep",
+    "//modules/cpp_py_bootstrap_app",
+    "//modules/cpp_py_ext_module",
+]
+
+# -----------------------------------------------------------------------------
+# Independent components — own version lifecycle
+# Tag format: {component_id}/v{version}
+# component_id derived from Bazel label by tooling
+# -----------------------------------------------------------------------------
+[components]
+independent = [
+    "//modules/cpp_library",
+]
+
+# Everything not listed above uses repo-wide versioning (tag: v{version})
+# --- END exclude ---

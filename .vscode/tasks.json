@@ -1,0 +1,22 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Bazel Build (Debug): //modules/cpp_py_bootstrap_app:cpp_py_bootstrap_app",
+            "type": "shell",
+            "command": "bazel",
+            "args": [
+                "build",
+                "-c",
+                "dbg",
+                "--config=python3_13_host",
+                "//modules/cpp_py_bootstrap_app:cpp_py_bootstrap_app"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": "$gcc"
+        }
+    ]
+}

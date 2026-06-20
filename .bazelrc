@@ -1,0 +1,278 @@
+# --- BEGIN lang:core ---
+##
+## Generic flags for all languages
+##
+
+# Use GitHub mirror for BCR to work around bcr.bazel.build outages
+# common --registry=https://raw.githubusercontent.com/bazelbuild/bazel-central-registry/main/
+
+# Disabling runfiles links drastically increases performance in slow disk IO situations
+# Do not build runfile trees by default. If an execution strategy relies on runfile
+# symlink tree, the tree is created on-demand. See: https://github.com/bazelbuild/bazel/issues/6627
+# and https://github.com/bazelbuild/bazel/commit/03246077f948f2790a83520e7dccc2625650e6df
+build --nobuild_runfile_links
+test --nobuild_runfile_links
+
+# https://bazel.build/reference/command-line-reference#flag--legacy_external_runfiles
+build --nolegacy_external_runfiles
+test --nolegacy_external_runfiles
+
+test --test_output=errors
+
+# Performance test configuration - shows full test output including throughput stats
+test:perf --test_output=all
+
+# Downloader configuration for URL rewriting and blocking
+# https://bazel.build/versions/8.5.0/reference/command-line-reference#flag--downloader_config
+common --downloader_config=bazel_downloader.cfg
+
+# Enable automatic platform-specific configuration
+# This automatically applies --config=linux, --config=macos, or --config=windows
+# based on the host OS. See:
+# https://bazel.build/reference/command-line-reference#common_options-flag--enable_platform_specific_config
+common --enable_platform_specific_config
+
+##
+## Windows specific flags
+##
+
+# Windows symlink support required for rules_rust crate_universe and buildifier
+# Requires Windows Developer Mode to be enabled (Settings -> For Developers)
+# References:
+# - https://bazel.build/configure/windows
+# - https://github.com/bazelbuild/rules_rust/issues/423
+startup --windows_enable_symlinks
+# --- END lang:core ---
+
+# --- BEGIN feature:publish ---
+# Authenticated downloads from private registries (Artifactory, private BCR, etc.)
+# The credential helper reads ~/.netrc — hosts without an entry get no auth headers.
+common --credential_helper=%workspace%/tools/publish/credential-helper
+
+# Publish configuration — set registry URL and platform for artifact uploads.
+# Override per-developer in user.bazelrc (gitignored).
+# build:publish --//tools/publish:url=https://registry.invalid/artifactory
+# build:publish --//tools/publish:platform=artifactory  # or: nexus, gitea
+# build:publish --//tools/publish:owner=myorg
+# build:publish --//tools/publish:maven_release_repo=libs-release-local
+# build:publish --//tools/publish:maven_snapshot_repo=libs-snapshot-local
+# build:publish --//tools/publish:pypi_repo=pypi-local
+# build:publish --//tools/publish:generic_repo=generic-local
+# --- END feature:publish ---
+
+# --- BEGIN lang:cpp ---
+##
+## C++ specific flags for default toolchain
+##
+
+# Platform-specific C++ compiler flags
+build:linux --cxxopt=-std=c++23 --cxxopt=-Werror
+build:macos --cxxopt=-std=c++23 --cxxopt=-Werror
+# Windows configuration: Uses auto-configured MSVC toolchain from Visual Studio Build Tools
+# Disable default_cpp_std feature to avoid D9025 warning about conflicting /std flags
+build:windows --features=-default_cpp_std --cxxopt=/std:c++23 --cxxopt=/WX
+
+# Hermetic GCC toolchain selection (wiring/rationale in cpp_segment.MODULE.bazel).
+build:gcc_hermetic --extra_toolchains=@gcc_toolchain_x86_64//:cc_toolchain
+build:gcc_hermetic --cxxopt=-Wall
+# The toolchain links via the `gcc` C driver, which does not auto-add the C++
+# runtime; statically link the toolchain's own libstdc++ so C++ binaries resolve
+# std symbols with no libstdc++.so runtime dependency (keeps binaries hermetic).
+build:gcc_hermetic --linkopt=-l:libstdc++.a
+# rules_python's prebuilt CPython (libpython*.so) references openpty/forkpty from
+# libutil; the gcc driver doesn't pull it in, so link it from the hermetic sysroot
+# (needed by the cpp_py_* modules; a harmless no-op for non-Python C++ targets).
+build:gcc_hermetic --linkopt=-lutil
+# The toolchain's `gcc` is a bash wrapper that runs realpath/dirname (to locate the
+# execroot) before it sanitizes PATH. cc_* actions get a PATH from Bazel's C++
+# machinery, but rules_rust seeds rustc's env from default_shell_env (empty here),
+# so its gcc-driver link can't find those tools. Give rustc a PATH in both the
+# target (--action_env) and exec (--host_action_env, used to bootstrap the rules_rust
+# process_wrapper) configurations.
+build:gcc_hermetic --action_env=PATH=/usr/local/bin:/usr/bin:/bin
+build:gcc_hermetic --host_action_env=PATH=/usr/local/bin:/usr/bin:/bin
+
+build:gcc_hermetic_debug --config=gcc_hermetic
+build:gcc_hermetic_debug --subcommands # https://bazel.build/docs/user-manual#subcommands
+build:gcc_hermetic_debug --toolchain_resolution_debug='@bazel_tools//tools/cpp:toolchain_type'
+
+# GCC static analysis — the clang-tidy analog. GCC's built-in -fanalyzer, scoped
+# via --per_file_copt to first-party sources only so external BCR deps don't drown
+# the output. -Werror (from build:linux) turns analyzer findings into a CI gate.
+build:gcc_analyzer --config=gcc_hermetic
+build:gcc_analyzer --per_file_copt=modules/.*\.(cc|cpp|cxx|h|hpp)$@-fanalyzer
+# --- END lang:cpp ---
+
+# --- BEGIN feature:custom_toolchains lang:cpp ---
+# Specific build configurations can be selected via --config=value
+
+# GCC (host compiler)
+
+build:gcc_host_debug --subcommands # https://bazel.build/docs/user-manual#subcommands
+build:gcc_host_debug --toolchain_resolution_debug='@bazel_tools//tools/cpp:toolchain_type'
+build:gcc_host_debug --platforms=//tools/cpp/toolchains:x86_64_linux_platform
+build:gcc_host_debug --extra_toolchains=//tools/cpp/toolchains:host_gcc_cc_toolchain_for_linux_x86_64
+build:gcc_host_debug --cxxopt=-Wall
+
+build:gcc_host --platforms=//tools/cpp/toolchains:x86_64_linux_platform
+build:gcc_host --extra_toolchains=//tools/cpp/toolchains:host_gcc_cc_toolchain_for_linux_x86_64
+build:gcc_host --cxxopt=-Wall
+
+# Clang (host compiler)
+
+build:clang_host --platforms=//tools/cpp/toolchains:x86_64_linux_platform
+build:clang_host --extra_toolchains=//tools/cpp/toolchains:host_clang_cc_toolchain_for_linux_x86_64
+build:clang_host --cxxopt=-Wall
+# --- END feature:custom_toolchains lang:cpp ---
+
+# --- BEGIN lang:python ---
+##
+## Python specific flags
+##
+# --- END lang:python ---
+
+# --- BEGIN feature:custom_toolchains lang:python ---
+# Host Python toolchain
+
+build:python3_13_host --extra_toolchains=@host_python3_13_toolchain//:all
+
+build:python3_13_host_debug --subcommands # https://bazel.build/docs/user-manual#subcommands
+build:python3_13_host_debug --toolchain_resolution_debug='@bazel_tools//tools/python:toolchain_type'
+build:python3_13_host_debug --extra_toolchains=@host_python3_13_toolchain//:all
+# --- END feature:custom_toolchains lang:python ---
+
+# --- BEGIN feature:lint ---
+# Lint tests are tagged "lint". Exclude them from the default test set so
+# `bazel test //...` runs functional tests only. Run lint explicitly with
+# `bazel test --test_tag_filters=lint //...`.
+test --test_tag_filters=-lint
+# `--config=raw` clears the filter to run the full set including lint tests.
+test:raw --test_tag_filters=
+# --- END feature:lint ---
+
+# --- BEGIN feature:lint lang:python ---
+# mypy type-checking aspect (part of the lint feature; aspect defined in
+# tools/python/mypy/, deps via rules_mypy in tools/python/python_segment.MODULE.bazel)
+build --aspects //tools/python/mypy:aspect.bzl%mypy_aspect
+build --output_groups=+mypy
+# --- END feature:lint lang:python ---
+
+# --- BEGIN feature:lint lang:rust ---
+# Run rules_rust clippy non-blocking: capture its output instead of failing the
+# action, so plain builds never break on lint. The clippy_test rule
+# (//tools/lint:linters.bzl) gates on the captured output. Inert for non-clippy
+# targets.
+build --@rules_rust//rust/settings:capture_clippy_output=true
+# --- END feature:lint lang:rust ---
+
+# --- BEGIN lang:python ---
+# Make rules_python's py_binary venvs traversable by packaging rules
+# (tar.bzl, pkg_tar, zip, oci, …). With YES (the rules_python default),
+# the venv's bin/python3 is a declare_link()-style symlink to the
+# toolchain interpreter outside bazel-out, which packaging rules cannot
+# dereference. NO substitutes a real symlink/copy that downstream rules
+# can follow. See rules_python issue #2489. Required for image_publish
+# to work on py_binary kinds.
+
+build --@rules_python//python/config_settings:venvs_use_declare_symlink=no
+# --- END lang:python ---
+
+# --- BEGIN lang:java ---
+##
+## Java specific flags
+##
+
+build --java_language_version=17
+build --tool_java_language_version=17
+build --java_runtime_version=remotejdk_17
+build --tool_java_runtime_version=remotejdk_17
+# --- END lang:java ---
+
+# --- BEGIN feature:custom_toolchains lang:java ---
+# Host Java toolchain
+
+build:java_17_default_host --java_language_version=17
+build:java_17_default_host --tool_java_language_version=17
+build:java_17_default_host --java_runtime_version=local_host_jdk_17_toolchain
+build:java_17_default_host --tool_java_runtime_version=local_host_jdk_17_toolchain
+build:java_17_default_host --extra_toolchains=@local_host_jdk_17_toolchain//:all
+
+# Local custom Java toolchain
+
+build:java_17_local_corretto_jdk --java_language_version=17
+build:java_17_local_corretto_jdk --tool_java_language_version=17
+build:java_17_local_corretto_jdk --java_runtime_version=local_corretto_jdk_17
+build:java_17_local_corretto_jdk --tool_java_runtime_version=local_corretto_jdk_17
+
+build:java_17_local_corretto_jdk_debug --subcommands # https://bazel.build/docs/user-manual#subcommands
+build:java_17_local_corretto_jdk_debug --toolchain_resolution_debug='@bazel_tools//tools/jdk:runtime_toolchain_type'
+build:java_17_local_corretto_jdk_debug --java_language_version=17
+build:java_17_local_corretto_jdk_debug --tool_java_language_version=17
+build:java_17_local_corretto_jdk_debug --java_runtime_version=local_corretto_jdk_17
+build:java_17_local_corretto_jdk_debug --tool_java_runtime_version=local_corretto_jdk_17
+
+build:java_21_local_corretto_jdk --java_language_version=21
+build:java_21_local_corretto_jdk --tool_java_language_version=21
+build:java_21_local_corretto_jdk --java_runtime_version=local_corretto_jdk_21
+build:java_21_local_corretto_jdk --tool_java_runtime_version=local_corretto_jdk_21
+
+build:java_25_local_corretto_jdk --java_language_version=25
+build:java_25_local_corretto_jdk --tool_java_language_version=25
+build:java_25_local_corretto_jdk --java_runtime_version=local_corretto_jdk_25
+build:java_25_local_corretto_jdk --tool_java_runtime_version=local_corretto_jdk_25
+
+# Remote custom Java toolchain
+
+build:java_17_remote_corretto_jdk --java_language_version=17
+build:java_17_remote_corretto_jdk --tool_java_language_version=17
+build:java_17_remote_corretto_jdk --java_runtime_version=remote_corretto_17
+build:java_17_remote_corretto_jdk --tool_java_runtime_version=remote_corretto_17
+build:java_17_remote_corretto_jdk --extra_toolchains=@remote_corretto_jdk17_linux_toolchain_config_repo//:all
+build:java_17_remote_corretto_jdk --extra_toolchains=@remote_corretto_jdk17_linux_aarch64_toolchain_config_repo//:all
+build:java_17_remote_corretto_jdk --extra_toolchains=@remote_corretto_jdk17_macos_toolchain_config_repo//:all
+build:java_17_remote_corretto_jdk --extra_toolchains=@remote_corretto_jdk17_macos_aarch64_toolchain_config_repo//:all
+build:java_17_remote_corretto_jdk --extra_toolchains=@remote_corretto_jdk17_windows_toolchain_config_repo//:all
+# --- END feature:custom_toolchains lang:java ---
+
+# --- BEGIN feature:custom_toolchains lang:go ---
+##
+## Go specific flags
+##
+
+build:go_local_sdk --repo_env=USE_LOCAL_GO_SDK=1
+# --- END feature:custom_toolchains lang:go ---
+
+# --- BEGIN feature:remote_cache ---
+##
+## Remote caching (BuildBuddy)
+##
+## Usage:
+##   Local:  bazel build --config=remote-cache //...
+##   CI:     bazel test  --config=ci //...
+##
+## The API key is supplied via:
+##   - Local developers: user.bazelrc  (see user.bazelrc.template)
+##   - CI:               --remote_header flag injected from GitHub secret
+##
+
+# Remote cache configuration — shared between local and CI
+build:remote-cache --remote_cache=grpcs://remote.buildbuddy.io
+build:remote-cache --remote_cache_compression
+build:remote-cache --remote_timeout=3600
+
+# Build Event Service (BES) — dashboard/analytics at app.buildbuddy.io
+build:remote-cache --bes_results_url=https://app.buildbuddy.io/invocation/
+build:remote-cache --bes_backend=grpcs://remote.buildbuddy.io
+
+# CI configuration — inherits remote cache and adds CI-specific flags
+build:ci --config=remote-cache
+build:ci --remote_download_minimal
+build:ci --color=yes
+# --- END feature:remote_cache ---
+
+# --- BEGIN lang:core ---
+##
+## Local developer overrides (gitignored)
+##
+try-import %workspace%/user.bazelrc
+# --- END lang:core ---

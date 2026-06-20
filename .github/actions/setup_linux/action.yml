@@ -1,0 +1,48 @@
+name: 'Setup Linux for Bazel'
+description: 'Common Linux setup steps for Bazel builds'
+inputs:
+  bazel_startup_opts:
+    description: 'Bazel startup options'
+    required: false
+    default: ''
+runs:
+  using: "composite"
+  steps:
+    - name: Setup Bazel
+      uses: bazel-contrib/setup-bazel@0.19.0
+      with:
+        # Bazel version from .bazelversion
+        bazelisk-cache: true
+        # Enable disk cache (reuses local analysis cache across runs).
+        # Key includes MODULE.bazel and .bazelversion so the cache auto-invalidates
+        # when toolchain versions or Bazel itself changes — stale disk caches
+        # cause extreme slowdowns with --remote_download_minimal.
+        disk-cache: ${{ hashFiles('.bazelversion', 'MODULE.bazel') }}
+        # Enable repository cache (avoids re-downloading Maven/LLVM every run)
+        repository-cache: true
+    - name: Free disk space
+      shell: bash
+      run: |
+        rm -rf /opt/hostedtoolcache        # ~8 GB  — cached language runtimes
+        sudo rm -rf /usr/local/lib/android # ~11 GB — Android SDK
+        sudo rm -rf /usr/share/dotnet      # ~3 GB  — .NET SDK
+        rm -rf /opt/ghc                    # ~2 GB  — Haskell GHC
+        sudo rm -rf /usr/local/.ghcup      #          Haskell ghcup
+        # Unset ANDROID_HOME so rules_android creates an empty stub
+        # instead of failing on the now-deleted SDK directory.
+        echo "ANDROID_HOME=" >> "$GITHUB_ENV"
+    - name: Install libtinfo5 (dependency for clang)
+      shell: bash
+      run: |
+        wget -c https://security.ubuntu.com/ubuntu/pool/universe/n/ncurses/libtinfo5_6.3-2ubuntu0.1_amd64.deb
+        sudo apt install ./libtinfo5_6.3-2ubuntu0.1_amd64.deb
+    - name: Print debug info
+      shell: bash
+      run: |
+        echo "=== Bash version ==="
+        echo "Path: $(which bash)"
+        echo "Version: $BASH_VERSION"
+        echo "=== Bazel version ==="
+        bazel ${{ inputs.bazel_startup_opts }} version
+        echo "=== Bazel info ==="
+        bazel ${{ inputs.bazel_startup_opts }} info

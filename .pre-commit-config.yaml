@@ -1,0 +1,41 @@
+# Pre-commit hooks for fast local feedback (<2s)
+# These run standalone binaries — no Bazel startup overhead.
+#
+# Install:      pip install pre-commit && pre-commit install
+# Run manually: pre-commit run --all-files
+#
+# These hooks use the same config files (.clang-format, .ruff.toml)
+# as the Bazel-based formatters/linters, ensuring consistent results.
+
+repos:
+  # --- BEGIN lang:core ---
+  # Buildifier — formats and lints Bazel/Starlark files
+  - repo: https://github.com/keith/pre-commit-buildifier
+    rev: 8.2.1.1
+    hooks:
+      - id: buildifier
+      - id: buildifier-lint
+  # --- END lang:core ---
+
+  # --- BEGIN lang:python ---
+  # Ruff — Python formatting (and linting when the lint feature is on)
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.14.14
+    hooks:
+  # --- END lang:python ---
+  # --- BEGIN feature:lint lang:python ---
+      - id: ruff
+        args: [--fix]
+  # --- END feature:lint lang:python ---
+  # --- BEGIN lang:python ---
+      - id: ruff-format
+  # --- END lang:python ---
+
+  # --- BEGIN lang:cpp,java ---
+  # clang-format — Java and C++ formatting (uses .clang-format config)
+  - repo: https://github.com/pre-commit/mirrors-clang-format
+    rev: v21.1.8
+    hooks:
+      - id: clang-format
+        types_or: [c, c++, java]
+  # --- END lang:cpp,java ---
