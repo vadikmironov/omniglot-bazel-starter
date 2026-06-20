@@ -29,7 +29,7 @@ jobs:
       contents: read
 
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     - uses: ./.github/actions/setup_linux
     - uses: ./.github/actions/bazel_test
       with:
@@ -44,7 +44,7 @@ jobs:
       contents: read
 
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     - uses: ./.github/actions/setup_linux
     - name: Build and test with hermetic GCC
       uses: ./.github/actions/bazel_test
@@ -64,7 +64,7 @@ jobs:
       contents: read
 
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     - uses: ./.github/actions/setup_macos
     - uses: ./.github/actions/bazel_test
       with:
@@ -79,7 +79,7 @@ jobs:
       contents: read
 
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     - uses: ./.github/actions/setup_linux
     - name: Configure remote cache
       env:
@@ -144,7 +144,7 @@ jobs:
       BAZEL_STARTUP_OPTS: "--output_base=C:/bazel_build"
 
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     - uses: ./.github/actions/setup_windows
       with:
         bazel_startup_opts: ${{ env.BAZEL_STARTUP_OPTS }}
