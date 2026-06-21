@@ -21,11 +21,17 @@ bazel_dep(name = "rules_cc", version = "0.2.21")
 # https://github.com/bazel-contrib/rules_foreign_cc/releases
 #
 bazel_dep(name = "rules_foreign_cc", version = "0.15.1")
-# TODO(#1427): on 0.15.1 the from-source pkg-config bundles a glib that fails to
-# build under GCC 15's C23 default, so --config=gcc_hermetic can't build
-# cmake()/make() targets. Fixed upstream past 0.15.1 (-std=gnu90 pkg-config
-# build). On the next bump, re-test --config=gcc_hermetic and remove this note.
-# https://github.com/bazel-contrib/rules_foreign_cc/issues/1427
+
+# TODO(rules_foreign_cc#1427): git_override pins head for PR #1458 (-std=gnu90
+# pkg-config build), which fixes the from-source pkg-config/glib build under GCC
+# 15's C23 default so --config=gcc_hermetic can build cmake()/make() targets.
+# Switch to a released version and remove this override once a release past 0.15.1
+# ships the fix. https://github.com/bazel-contrib/rules_foreign_cc/issues/1427
+git_override(
+    module_name = "rules_foreign_cc",
+    commit = "d1c7b2be20edfd4a94731077426c42ae8cd8be1e",
+    remote = "https://github.com/bazel-contrib/rules_foreign_cc.git",
+)
 
 #
 # Hermetic GCC toolchain (f0rmiga/gcc-toolchain), complementing the default
