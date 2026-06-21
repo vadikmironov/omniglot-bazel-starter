@@ -10,13 +10,26 @@
 # Please find documentation here:
 # https://github.com/bazel-contrib/toolchains_llvm/releases
 #
-bazel_dep(name = "toolchains_llvm", version = "1.7.0")
+bazel_dep(name = "toolchains_llvm", version = "1.8.0")
+
+# TODO(toolchains_llvm#781): git_override pins master plus a patch that drops the
+# redundant -stdlib=libc++ (unused on compile -> -Wunused, fatal under -Werror).
+# The pinned commit also carries the LLVM 22.1.8 checksums (PR #780) that the
+# llvm_version above needs. Switch to a released version and drop both the override
+# and the patch once #781 ships in a release.
+git_override(
+    module_name = "toolchains_llvm",
+    commit = "c9d30f7a7b9c7aafff46dae79288c450e13c894c",
+    patch_strip = 1,
+    patches = ["//tools/cpp/patches:toolchains_llvm_drop_redundant_stdlib_libcxx.patch"],
+    remote = "https://github.com/bazel-contrib/toolchains_llvm.git",
+)
 
 # Configure and register the toolchain.
 # This toolchain supports: Linux (x86_64, aarch64, armv7) and macOS (x86_64, aarch64).
 llvm = use_extension("@toolchains_llvm//toolchain/extensions:llvm.bzl", "llvm")
 llvm.toolchain(
-    llvm_version = "21.1.8",
+    llvm_version = "22.1.8",
 )
 use_repo(llvm, "llvm_toolchain", "llvm_toolchain_llvm")
 

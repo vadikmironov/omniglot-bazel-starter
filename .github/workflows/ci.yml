@@ -37,7 +37,6 @@ jobs:
 
   # Linux build + test under the hermetic GCC toolchain (compiler-portability leg).
   build-linux-gcc:
-    if: false # disabled until https://github.com/bazel-contrib/rules_foreign_cc/issues/1427 is published
     runs-on: ubuntu-latest
     name: Build & test (Linux x64, hermetic GCC)
     permissions:
