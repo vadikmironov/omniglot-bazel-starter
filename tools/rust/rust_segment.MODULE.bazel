@@ -1,6 +1,6 @@
 # rules_rust block, please find documentation here:
 # https://github.com/bazelbuild/rules_rust/releases
-bazel_dep(name = "rules_rust", version = "0.70.0")
+bazel_dep(name = "rules_rust", version = "0.71.0")
 
 rust = use_extension("@rules_rust//rust:extensions.bzl", "rust")
 
