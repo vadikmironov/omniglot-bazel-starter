@@ -6,7 +6,7 @@
 # Please find documentation here:
 # https://github.com/bazelbuild/rules_cc/releases
 #
-bazel_dep(name = "rules_cc", version = "0.2.19")
+bazel_dep(name = "rules_cc", version = "0.2.20")
 
 #
 # rules_foreign_cc block
