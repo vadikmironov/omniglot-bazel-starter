@@ -1,4 +1,8 @@
 # --- BEGIN lang:core ---
+
+# NOTE: project-wide and per-developer overrides are imported at the end of
+# the file.
+
 ##
 ## Generic flags for all languages
 ##
@@ -272,7 +276,14 @@ build:ci --color=yes
 
 # --- BEGIN lang:core ---
 ##
-## Local developer overrides (gitignored)
+## Project-wide overrides (committed)
+##
+# Create project.bazelrc to layer repo-wide settings on top of this baseline.
+# Unlike the per-developer user.bazelrc below, it is meant to be committed.
+try-import %workspace%/project.bazelrc
+
+##
+## Per-developer overrides (gitignored)
 ##
 try-import %workspace%/user.bazelrc
 # --- END lang:core ---
