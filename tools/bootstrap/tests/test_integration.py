@@ -623,10 +623,15 @@ class TestIntegration(unittest.TestCase):
                 "--test_tag_filters=lint",
                 "//modules/...",
             )
-            self.assertNotEqual(
+            # Exit 3 is Bazel's "build OK, but a test failed" — exactly the lint
+            # gate firing on bad code. A bare `!= 0` would also pass on exit 1
+            # (analysis/build error, e.g. a lint rule referencing a sibling the
+            # scaffold forgot to ship), masking a broken scaffold as a caught
+            # lint. Pin to 3 so only a genuine test failure counts.
+            self.assertEqual(
                 result.returncode,
-                0,
-                f"lint tests should have failed on bad code but passed:\n"
+                3,
+                f"expected lint tests to fail on bad code (exit 3), got exit {result.returncode}:\n"
                 f"STDOUT:\n{result.stdout}\nSTDERR:\n{result.stderr}",
             )
 
