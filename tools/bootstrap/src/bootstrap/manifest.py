@@ -30,6 +30,10 @@ class FeatureConfig:
     files: list[str] = field(default_factory=list)
     directories: list[str] = field(default_factory=list)
     composite_files: list[str] = field(default_factory=list)
+    # Plain (marker-free) per-language files owned by this feature, keyed by
+    # comma-tag (OR over languages). The raw-copy analog of
+    # composite_language_files; shipped when the feature AND a language match.
+    language_files: dict[str, list[str]] = field(default_factory=dict)
     # Per-language composite files owned by this feature, keyed by comma-tag
     # (OR over languages). Shipped only when the feature AND a matching language
     # are both selected — e.g. the lint feature's per-language gazelle generators.
@@ -81,6 +85,7 @@ def load_manifest(manifest_path: Path) -> BootstrapManifest:
             files=value.get("files", []),
             directories=value.get("directories", []),
             composite_files=value.get("composite_files", []),
+            language_files=value.get("language_files", {}),
             composite_language_files=value.get("composite_language_files", {}),
         )
 
@@ -193,6 +198,14 @@ def resolve_files(
             if f not in excluded:
                 resolved.copy.append(f)
         resolved.directories.extend(feat.directories)
+        # Per-language raw-copy files (feature AND language): feature gate is this
+        # loop's membership; language gate is the OR-tag match.
+        for tag, files in feat.language_files.items():
+            tags = [t.strip() for t in tag.split(",")]
+            if any(t in selected_languages for t in tags):
+                for f in files:
+                    if f not in excluded:
+                        resolved.copy.append(f)
         for f in feat.composite_files:
             if f not in excluded:
                 resolved.composite.append(f)

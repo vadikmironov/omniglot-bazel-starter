@@ -13,7 +13,12 @@ import re
 import unittest
 from pathlib import Path
 
-from bootstrap.manifest import BootstrapManifest, load_manifest
+from bootstrap.manifest import (
+    BootstrapManifest,
+    effective_excluded_files,
+    load_manifest,
+    resolve_files,
+)
 from bootstrap.processor import filter_sections, has_user_region
 
 # Expected language keys — any change here is intentional.
@@ -22,6 +27,19 @@ EXPECTED_LANGUAGES = {"python", "cpp", "rust", "java", "go"}
 # Regex patterns matching section markers (mirror processor._BEGIN_RE / _END_RE)
 _BEGIN_RE = re.compile(r"^\s*#\s*---\s*BEGIN\s+((?:lang|feature):\S+|exclude)\s*---\s*$", re.MULTILINE)
 _END_RE = re.compile(r"^\s*#\s*---\s*END\s+((?:lang|feature):\S+|exclude)\s*---\s*$", re.MULTILINE)
+
+# `exports_files([...])` with a literal list (glob() forms are skipped) and the
+# quoted filenames inside it — used to verify exported siblings are shipped.
+_EXPORTS_RE = re.compile(r"exports_files\(\s*\[([^\]]*)\]")
+_QUOTED_RE = re.compile(r"""["']([^"']+)["']""")
+
+
+def _exported_filenames(content: str) -> list[str]:
+    """Package-relative names exported via ``exports_files([...])`` in *content*."""
+    names: list[str] = []
+    for match in _EXPORTS_RE.finditer(content):
+        names.extend(_QUOTED_RE.findall(match.group(1)))
+    return names
 
 
 def _find_source_root() -> Path:
@@ -93,6 +111,60 @@ class TestManifestFilesExist(unittest.TestCase):
                 (self.source_root / f).exists(),
                 f"excluded file missing from repo: {f}",
             )
+
+
+class TestExportedFilesShipped(unittest.TestCase):
+    """Files a shipped BUILD exports must themselves be shipped.
+
+    The reverse of :class:`TestManifestFilesExist`: that class checks every
+    *listed* path exists; this checks the manifest does not *forget* a file that
+    a curated BUILD references. ``tools/lint/BUILD`` exporting
+    ``clippy_assert_empty.sh`` without the script being in the manifest is the
+    bug this guards — the scaffold built fine until a rust ``.lint`` target tried
+    to consume the absent input.
+    """
+
+    source_root: Path
+    manifest: BootstrapManifest
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.source_root = _find_source_root()
+        cls.manifest = load_manifest(cls.source_root / "tools" / "bootstrap" / "bootstrap_manifest.toml")
+
+    def test_exported_files_are_shipped(self) -> None:
+        # The full selection renders every section, so each exports_files block is
+        # present and every exported sibling must resolve into the shipped set.
+        all_features = set(self.manifest.features)
+        resolved = resolve_files(self.manifest, EXPECTED_LANGUAGES, all_features)
+        excluded = effective_excluded_files(self.manifest, all_features)
+        listed = set(resolved.copy) | set(resolved.composite)
+        directories = resolved.directories
+
+        def is_shipped(rel: str) -> bool:
+            if rel in listed:
+                return True
+            # Files under a copied tool directory ride along unless excluded.
+            under_dir = any(rel == d or rel.startswith(f"{d}/") for d in directories)
+            return under_dir and rel not in excluded
+
+        # Only individually-curated BUILDs can drift: a directory copytree ships
+        # its exports alongside it, so the "forgot to list it" gap can't occur.
+        build_files = [f for f in (*resolved.composite, *resolved.copy) if Path(f).name in ("BUILD", "BUILD.bazel")]
+        for build in build_files:
+            content = filter_sections(
+                (self.source_root / build).read_text(),
+                EXPECTED_LANGUAGES,
+                all_features,
+                filename=build,
+            )
+            package = Path(build).parent
+            for name in _exported_filenames(content):
+                rel = name if package == Path(".") else f"{package}/{name}"
+                self.assertTrue(
+                    is_shipped(rel),
+                    f"{build} exports '{name}' but {rel} is not shipped — add it to the manifest",
+                )
 
 
 class TestMarkerIntegrity(unittest.TestCase):

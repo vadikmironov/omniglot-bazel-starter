@@ -70,6 +70,7 @@ directories = ["tools/go"]
 #   requires          - list of language keys auto-promoted when selected
 #   directories       - tool directories copied when feature is selected
 #   files             - individual files copied when feature is selected
+#   language_files    - raw-copy files added when feature AND a language match
 #   composite_files   - section-filtered files added when feature is selected
 # Section markers use the form: # --- BEGIN feature:<name> --- / END
 # ---------------------------------------------------------------------------
@@ -120,6 +121,13 @@ composite_files = [
     "tools/gazelle/vocab/vocab.go",
     "tools/gazelle/vocab/BUILD",
 ]
+
+# Marker-free per-language files: clippy_assert_empty.sh is the rust clippy
+# gate's assertion script, referenced by tools/lint/BUILD (exports_files) and
+# linters.bzl (clippy_test). It carries no section markers, so it ships as a raw
+# copy gated on lint AND rust (pruned on re-bootstrap when either is dropped).
+[features.lint.language_files]
+rust = ["tools/lint/clippy_assert_empty.sh"]
 
 # Single-language gazelle generators: shipped only when the lint feature AND the
 # named language are both selected, so an omitted language's generator file is

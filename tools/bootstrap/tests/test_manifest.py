@@ -141,6 +141,8 @@ class TestLoadManifest(unittest.TestCase):
         self.assertEqual(clf.get("rust"), ["tools/lint/gazelle/rust.go"])
         self.assertEqual(clf.get("java"), ["tools/lint/gazelle/java.go"])
         self.assertEqual(clf.get("python"), ["tools/lint/gazelle/python.go"])
+        # Marker-free raw-copy gated on feature AND language: the rust clippy gate.
+        self.assertEqual(feat.language_files.get("rust"), ["tools/lint/clippy_assert_empty.sh"])
 
     def test_remote_cache_feature(self) -> None:
         """remote_cache is a file-less feature that gates BuildBuddy wiring via markers."""
@@ -348,6 +350,17 @@ class TestResolveFiles(unittest.TestCase):
         # Python selected — .ruff.toml should be in composite (not plain copy)
         self.assertIn(".ruff.toml", resolved.composite)
         self.assertNotIn(".ruff.toml", resolved.copy)
+
+    def test_resolve_feature_language_files(self) -> None:
+        """A feature's per-language raw-copy file ships only when feature AND language match."""
+        script = "tools/lint/clippy_assert_empty.sh"
+        # lint + rust → shipped as a plain copy (not composite).
+        resolved = resolve_files(self.manifest, {"rust"}, {"lint"})
+        self.assertIn(script, resolved.copy)
+        self.assertNotIn(script, resolved.composite)
+        # lint without rust, and rust without lint → absent.
+        self.assertNotIn(script, resolve_files(self.manifest, {"python"}, {"lint"}).copy)
+        self.assertNotIn(script, resolve_files(self.manifest, {"rust"}, set()).copy)
 
     def test_resolve_clang_format_gated_on_cpp_or_java(self) -> None:
         """.clang-format ships when C++ or Java is selected, and only then."""
