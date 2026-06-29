@@ -235,7 +235,7 @@ maven.install(
         # --- END exclude ---
         # --- BEGIN feature:lint ---
         # PMD and SpotBugs back the Java lint_test aspects (see tools/lint/BUILD).
-        "net.sourceforge.pmd:pmd-core:7.25.0",
+        "net.sourceforge.pmd:pmd-core:7.26.0",
         "net.sourceforge.pmd:pmd-java:7.25.0",
         "net.sourceforge.pmd:pmd-cli:7.25.0",
         "com.github.spotbugs:spotbugs:4.10.2",
