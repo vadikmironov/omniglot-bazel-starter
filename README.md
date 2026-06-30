@@ -141,16 +141,16 @@ The installer script is Linux-only; on macOS use `brew install bazelisk`, on Win
 ### Common Commands
 
 ```bash
+# List runnable targets — apps, buildifier, venv (plain `//...` lists everything)
+bazel query 'kind("(py|cc|go|java|rust)_binary|buildifier|_venv", //...)'
+
 # Build / test everything
 bazel build //...
 bazel test //...                     # excludes lint tests — run lint separately
 
-# List runnable targets — apps, buildifier, venv (plain `//...` lists everything)
-bazel query 'kind("(py|cc|go|java|rust)_binary|buildifier|_venv", //...)'
-
 # Format source (all languages), then Bazel/Starlark files
-bazel run //:format
 bazel run //:buildifier.fix          # Windows: tools\buildifier.bat fix
+bazel run //:format
 
 # Lint: (re)generate per-target lint rules, then run them as tests
 bazel run //:lint_gen                # preview without writing: -- -mode diff
