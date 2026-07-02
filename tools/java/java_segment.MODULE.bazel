@@ -244,10 +244,10 @@ maven.install(
         # log4j — a general logging dependency (exposed via log4j_build_deps in
         # tools/java/package_defs.bzl). The PMD/SpotBugs binaries reuse it, but
         # it is left ungated because most Java projects want logging available.
-        "org.apache.logging.log4j:log4j-core:2.26.0",
-        "org.apache.logging.log4j:log4j-api:2.26.0",
-        "org.apache.logging.log4j:log4j-slf4j-impl:2.26.0",
-        "org.apache.logging.log4j:log4j-slf4j2-impl:2.26.0",
+        "org.apache.logging.log4j:log4j-core:2.26.1",
+        "org.apache.logging.log4j:log4j-api:2.26.1",
+        "org.apache.logging.log4j:log4j-slf4j-impl:2.26.1",
+        "org.apache.logging.log4j:log4j-slf4j2-impl:2.26.1",
 
         # JUnit 5
         "org.junit.platform:junit-platform-console:6.1.1",
