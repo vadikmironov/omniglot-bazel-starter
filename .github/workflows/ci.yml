@@ -218,7 +218,7 @@ jobs:
     steps:
     - name: Deploy to GitHub Pages
       id: deployment
-      uses: actions/deploy-pages@v4
+      uses: actions/deploy-pages@v5
 
   # Windows build - currently disabled. Remove the `if: false` below to re-enable
   # (it will then run on every PR and push like the other jobs).
