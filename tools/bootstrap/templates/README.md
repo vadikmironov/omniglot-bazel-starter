@@ -125,6 +125,31 @@ bazel build --config=remote-cache //...
 `user.bazelrc` is gitignored. See `user.bazelrc.template` for the full list of
 flags it documents.
 # --- END feature:remote_cache ---
+# --- BEGIN feature:coverage ---
+
+## Code Coverage
+
+Coverage works across all languages through `bazel coverage`, merged into one LCOV
+report and rendered to HTML by the hermetic lcov `genhtml` (no system `lcov` needed):
+
+```bash
+# Collect coverage across the repo (merged LCOV)
+bazel coverage --combined_report=lcov //...
+
+# Render the HTML report to ./coverage-html/, then open index.html
+bazel run //tools/coverage:report
+```
+# --- END feature:coverage ---
+# --- BEGIN feature:coverage lang:cpp ---
+
+C++ uses LLVM source-based coverage on the default Clang toolchain; add
+`--config=gcc_hermetic` to measure the GCC build (gcov) instead.
+# --- END feature:coverage lang:cpp ---
+# --- BEGIN feature:coverage ---
+
+The `coverage-html/` output is ready to publish to GitHub Pages or a self-hosted
+TeamCity instance — wire it into your CI.
+# --- END feature:coverage ---
 # --- BEGIN lang:python ---
 
 ## Pre-commit Hooks

@@ -1,0 +1,31 @@
+#
+# rules_perl block
+#
+# Hermetic Perl toolchain used to run lcov's genhtml (a Perl script) that
+# renders the merged LCOV report to HTML. rules_perl registers its own perl
+# toolchains, so a plain bazel_dep is all that is required.
+#
+# https://github.com/bazel-contrib/rules_perl/releases
+#
+bazel_dep(name = "rules_perl", version = "1.1.1")
+
+#
+# lcov block
+#
+# genhtml renders the merged LCOV report (produced by `bazel coverage
+# --combined_report=lcov`) into a browsable HTML tree. Pinned to 1.16, whose
+# genhtml runs on core Perl only (no CPAN modules), keeping the renderer fully
+# hermetic through rules_perl.
+#
+# Included from the root MODULE.bazel (included files cannot themselves call
+# include(), so the wiring lives there).
+#
+http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+
+http_archive(
+    name = "lcov",
+    build_file = "//tools/coverage:lcov.BUILD.bazel",
+    sha256 = "987031ad5528c8a746d4b52b380bc1bffe412de1f2b9c2ba5224995668e3240b",
+    strip_prefix = "lcov-1.16",
+    urls = ["https://github.com/linux-test-project/lcov/releases/download/v1.16/lcov-1.16.tar.gz"],
+)

@@ -59,6 +59,13 @@ bazel_dep(name = "aspect_rules_lint", version = "2.7.2")
 include("//tools/publish:publish_segment.MODULE.bazel")
 # --- END feature:publish ---
 
+# --- BEGIN feature:coverage ---
+#
+# Coverage infrastructure (rules_perl + lcov genhtml renderer)
+#
+include("//tools/coverage:coverage_segment.MODULE.bazel")
+# --- END feature:coverage ---
+
 # --- BEGIN lang:python ---
 #
 # Python bazel modules shard

@@ -135,6 +135,21 @@ bazel test //modules/java_lib:java_lib_test
 ### Test Output
 Tests are configured to show errors only (`--test_output=errors` in .bazelrc).
 
+## Code Coverage
+
+```bash
+# Collect coverage across all languages (merged LCOV report)
+bazel coverage --combined_report=lcov //...
+
+# Render the combined report to HTML at ./coverage-html/ (hermetic lcov genhtml)
+bazel run //tools/coverage:report
+
+# Measure the C++ GCC build (gcov) instead of the default Clang LLVM coverage
+bazel coverage --config=gcc_hermetic --combined_report=lcov //modules/cpp_library:cpp_library_test
+```
+
+C++ uses LLVM source-based coverage on the default Clang toolchain (no flags needed — wired in `.bazelrc`); Python capture requires `configure_coverage_tool` on the toolchain (already set); Go, Java (JaCoCo), and Rust work out of the box. In CI, the `coverage` job publishes the latest `main` report to GitHub Pages and comments coverage on PRs. Renderer and per-language wiring live in `tools/coverage/` and are gated behind the `coverage` bootstrap feature.
+
 ## Publishing
 
 ```bash
