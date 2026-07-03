@@ -1,0 +1,11 @@
+load("@rules_perl//perl:perl.bzl", "perl_binary")
+
+# genhtml renders a merged LCOV report into an HTML tree. In lcov 1.16 it is a
+# self-contained Perl script (core modules only), so a single-source perl_binary
+# run through the hermetic rules_perl toolchain suffices.
+perl_binary(
+    name = "genhtml",
+    srcs = ["bin/genhtml"],
+    main = "bin/genhtml",
+    visibility = ["//visibility:public"],
+)

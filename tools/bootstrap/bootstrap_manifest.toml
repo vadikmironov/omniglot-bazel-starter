@@ -155,6 +155,17 @@ label = "Custom/local toolchains (per selected language)"
 # `feature:custom_toolchains` markers; the whole `tools/*/toolchains` dirs are
 # dropped via `[exclude.when_feature_absent]` below.
 
+[features.coverage]
+label = "Code coverage (bazel coverage -> LCOV -> genhtml HTML report)"
+directories = ["tools/coverage"]
+# Owns the tools/coverage renderer (rules_perl + hermetic lcov genhtml). No
+# `requires` — the renderer is language-agnostic. The per-language capture wiring
+# is gated by `feature:coverage` markers in composite files: the C++ LLVM-coverage
+# config in .bazelrc (feature:coverage lang:cpp), the coverage_tool arg in the
+# python segment, the include in MODULE.bazel, and the /coverage-html/ entry in
+# .gitignore. The GitHub Actions coverage job is not bootstrapped — CI lives
+# outside the manifest, like the lint/publish jobs.
+
 # ---------------------------------------------------------------------------
 # Language-specific files in shared directories
 #

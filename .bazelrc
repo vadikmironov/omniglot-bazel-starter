@@ -274,6 +274,17 @@ build:ci --remote_download_minimal
 build:ci --color=yes
 # --- END feature:remote_cache ---
 
+# --- BEGIN feature:coverage lang:cpp ---
+##
+## C++ coverage (LLVM source-based)
+##
+# The hermetic Clang toolchain does not wire up gcov, so Bazel's default C++
+# coverage yields empty reports. Use LLVM source-based coverage instead: Bazel
+# resolves llvm-cov/llvm-profdata from the cc_toolchain and emits LCOV.
+coverage --experimental_generate_llvm_lcov
+coverage --action_env=BAZEL_USE_LLVM_NATIVE_COVERAGE=1
+# --- END feature:coverage lang:cpp ---
+
 # --- BEGIN lang:core ---
 ##
 ## Project-wide overrides (committed)

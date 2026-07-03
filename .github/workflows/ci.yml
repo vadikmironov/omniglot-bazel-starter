@@ -129,6 +129,97 @@ jobs:
       # drift gate above can't see.
       run: bazel run //tools/publish:mint -- --mode dev --include-pub-targets all --dry-run
 
+  # Code coverage: builds the merged LCOV across all languages, renders it to HTML
+  # with the hermetic lcov genhtml, uploads it as a workflow artifact, and posts
+  # the overall line coverage on pull requests. The latest report is published to
+  # GitHub Pages by the deploy-coverage-pages job (main only). Report-only — it
+  # does not gate the build on a coverage threshold.
+  coverage:
+    runs-on: ubuntu-latest
+    name: Coverage (Linux x64)
+    permissions:
+      contents: read
+      pull-requests: write # post the PR coverage comment
+
+    steps:
+    - uses: actions/checkout@v7
+    - uses: ./.github/actions/setup_linux
+    - name: Configure remote cache
+      env:
+        BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
+      run: |
+        if [ -n "$BUILDBUDDY_API_KEY" ]; then
+          echo "build:remote-cache --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" > user.bazelrc
+          echo "build --config=remote-cache" >> user.bazelrc
+          echo "Remote cache enabled for coverage"
+        fi
+    - name: Collect coverage
+      # Inherits `test --test_tag_filters=-lint` from .bazelrc (coverage extends
+      # the test command), so lint_test rules are excluded. Uses remote-cache
+      # rather than --config=ci so outputs stay downloaded and the combined
+      # report is available to render.
+      run: bazel coverage --combined_report=lcov //...
+    - name: Compute coverage summary
+      id: cov
+      run: |
+        report=bazel-out/_coverage/_coverage_report.dat
+        pct=$(awk -F: '/^LH:/{h+=$2} /^LF:/{f+=$2} END{if (f > 0) printf "%.1f", 100*h/f; else print "0.0"}' "$report")
+        echo "pct=$pct" >> "$GITHUB_OUTPUT"
+        echo "Overall line coverage: ${pct}%"
+    - name: Render HTML report
+      run: bazel run //tools/coverage:report
+    - name: Upload coverage HTML artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-html
+        path: coverage-html/
+    - name: Upload Pages artifact
+      if: github.ref == 'refs/heads/main'
+      uses: actions/upload-pages-artifact@v3
+      with:
+        path: coverage-html/
+    - name: Post coverage summary on PR
+      # Same-repo PRs only — fork PRs lack a write token.
+      if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+      uses: actions/github-script@v7
+      env:
+        COV_PCT: ${{ steps.cov.outputs.pct }}
+      with:
+        script: |
+          const marker = '<!-- coverage-report -->';
+          const body = `${marker}\n### 📊 Coverage\n\nOverall line coverage: **${process.env.COV_PCT}%**\n\n`
+            + `<sub>Full HTML report is attached as the \`coverage-html\` workflow artifact; `
+            + `the latest report publishes to GitHub Pages on merge to \`main\`.</sub>`;
+          const {owner, repo} = context.repo;
+          const issue_number = context.issue.number;
+          const comments = await github.paginate(github.rest.issues.listComments, {owner, repo, issue_number});
+          const existing = comments.find(c => c.body && c.body.includes(marker));
+          if (existing) {
+            await github.rest.issues.updateComment({owner, repo, comment_id: existing.id, body});
+          } else {
+            await github.rest.issues.createComment({owner, repo, issue_number, body});
+          }
+
+  # Publishes the latest coverage HTML to GitHub Pages (main only). Split from the
+  # coverage job because Pages deployment needs its own environment. Prerequisite:
+  # in repo Settings -> Pages, set the source to "GitHub Actions".
+  deploy-coverage-pages:
+    if: github.ref == 'refs/heads/main'
+    needs: coverage
+    runs-on: ubuntu-latest
+    name: Deploy coverage to Pages
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+    - name: Deploy to GitHub Pages
+      id: deployment
+      uses: actions/deploy-pages@v4
+
   # Windows build - currently disabled. Remove the `if: false` below to re-enable
   # (it will then run on every PR and push like the other jobs).
   build-windows:
