@@ -307,3 +307,8 @@ poetry.toml
 # Go workspace file
 go.work
 # --- END lang:go ---
+
+# --- BEGIN feature:coverage ---
+# Local HTML coverage report (bazel run //tools/coverage:report)
+/coverage-html/
+# --- END feature:coverage ---

@@ -26,6 +26,11 @@ python = use_extension("@rules_python//python/extensions:python.bzl", "python")
 # Please see the following documentation on using different Python toolchains:
 # https://github.com/bookingcom/rules_python/blob/main/docs/_includes/py_console_script_binary.md#using-a-specific-python-version-directly-from-a-toolchain
 python.toolchain(
+    # --- BEGIN feature:coverage ---
+    # Register rules_python's bundled coverage.py so `bazel coverage` collects
+    # line data for py_* targets (the report is empty without it).
+    configure_coverage_tool = True,
+    # --- END feature:coverage ---
     is_default = True,
     python_version = PYTHON_VERSION,
 )

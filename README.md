@@ -204,6 +204,29 @@ bazel run //tools/python:generate_virtual_env
 - BuildBuddy remote caching speeds up both CI and local builds (each configured with its own API key)
 - Stale CI runs are automatically cancelled when new commits are pushed
 - Trigger a manual run via GitHub Actions `workflow_dispatch`
+- The `coverage` job publishes the latest `main` report to GitHub Pages and comments coverage on PRs (see [Code Coverage](#code-coverage))
+
+### Code Coverage
+
+Coverage works across all languages through `bazel coverage`, merged into a single LCOV report and rendered to HTML by the hermetic lcov `genhtml` (no system `lcov` needed):
+
+```bash
+# 1. Collect coverage across the repo (merged LCOV)
+bazel coverage --combined_report=lcov //...
+
+# 2. Render the HTML report to ./coverage-html/, then open index.html
+bazel run //tools/coverage:report
+```
+
+- **C++** uses LLVM source-based coverage on the default Clang toolchain; add `--config=gcc_hermetic` to measure the GCC build (gcov) instead.
+- In CI, the `coverage` job publishes the latest `main` report to **GitHub Pages** and posts the overall line coverage on pull requests. Enable Pages with source **"GitHub Actions"** (Settings → Pages).
+
+**TeamCity (optional self-hosted sink):** the same LCOV / `genhtml` output feeds a private TeamCity instance (the free self-hosted Professional edition):
+
+1. Run `bazel coverage --combined_report=lcov //...` then `bazel run //tools/coverage:report` as a build step.
+2. Publish `coverage-html/` as a build artifact and add a **report tab** with start page `index.html`.
+3. Emit the coverage statistic so TeamCity tracks the trend and can gate on a threshold: `##teamcity[buildStatisticValue key='CodeCoverageL' value='<pct>']`.
+4. Add the **Commit Status Publisher** build feature to post the coverage build status back to the GitHub PR.
 
 ## Publishing
 
