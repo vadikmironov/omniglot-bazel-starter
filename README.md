@@ -219,7 +219,7 @@ bazel run //tools/coverage:report
 ```
 
 - **C++** uses LLVM source-based coverage on the default Clang toolchain; add `--config=gcc_hermetic` to measure the GCC build (gcov) instead.
-- In CI, the `coverage` job publishes the latest `main` report to **GitHub Pages** and posts the overall line coverage on pull requests. Enable Pages with source **"GitHub Actions"** (Settings → Pages).
+- In CI, the `coverage` job publishes the latest `main` report to **GitHub Pages** and posts the overall line coverage on pull requests, along with the delta against the current `main` baseline. Enable Pages with source **"GitHub Actions"** (Settings → Pages).
 
 **TeamCity (optional self-hosted sink):** the same LCOV / `genhtml` output feeds a private TeamCity instance (the free self-hosted Professional edition):
 
