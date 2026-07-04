@@ -131,9 +131,10 @@ jobs:
 
   # Code coverage: builds the merged LCOV across all languages, renders it to HTML
   # with the hermetic lcov genhtml, uploads it as a workflow artifact, and posts
-  # the overall line coverage on pull requests. The latest report is published to
-  # GitHub Pages by the deploy-coverage-pages job (main only). Report-only — it
-  # does not gate the build on a coverage threshold.
+  # the overall line coverage on pull requests — with a delta against the latest
+  # main baseline (published to Pages as coverage.json). The report itself is
+  # published to GitHub Pages by the deploy-coverage-pages job (main only).
+  # Report-only — it does not gate the build on a coverage threshold.
   coverage:
     runs-on: ubuntu-latest
     name: Coverage (Linux x64)
@@ -168,6 +169,12 @@ jobs:
         echo "Overall line coverage: ${pct}%"
     - name: Render HTML report
       run: bazel run //tools/coverage:report
+    - name: Publish coverage baseline for delta
+      # Emits the overall % as JSON next to the HTML so it deploys to Pages at
+      # <pages-url>/coverage.json. Pull requests fetch it to show a delta vs main.
+      if: github.ref == 'refs/heads/main'
+      run: |
+        printf '{"pct": "%s"}\n' "${{ steps.cov.outputs.pct }}" > coverage-html/coverage.json
     - name: Upload coverage HTML artifact
       uses: actions/upload-artifact@v7
       with:
@@ -178,16 +185,40 @@ jobs:
       uses: actions/upload-pages-artifact@v5
       with:
         path: coverage-html/
+    - name: Fetch main coverage baseline
+      # Reads the % published to Pages by the last main run. Absent (first run,
+      # Pages down) → empty output and the comment falls back to absolute only.
+      id: baseline
+      if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+      run: |
+        url="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/coverage.json"
+        pct=$(curl -fsSL "$url" | jq -r '.pct // empty' 2>/dev/null || true)
+        echo "pct=${pct}" >> "$GITHUB_OUTPUT"
+        echo "main baseline: ${pct:-<none>}"
     - name: Post coverage summary on PR
       # Same-repo PRs only — fork PRs lack a write token.
       if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
       uses: actions/github-script@v9
       env:
         COV_PCT: ${{ steps.cov.outputs.pct }}
+        BASE_PCT: ${{ steps.baseline.outputs.pct }}
       with:
         script: |
           const marker = '<!-- coverage-report -->';
-          const body = `${marker}\n### 📊 Coverage\n\nOverall line coverage: **${process.env.COV_PCT}%**\n\n`
+          const cur = parseFloat(process.env.COV_PCT);
+          const base = process.env.BASE_PCT ? parseFloat(process.env.BASE_PCT) : NaN;
+          let delta;
+          if (!Number.isNaN(base)) {
+            const d = cur - base;
+            const emoji = d > 0.05 ? '🔼' : d < -0.05 ? '🔽' : '➖';
+            const sign = d > 0 ? '+' : '';
+            delta = `Change vs \`main\`: ${emoji} **${sign}${d.toFixed(1)} pp** _(main: ${base.toFixed(1)}%)_`;
+          } else {
+            delta = `_No coverage baseline on \`main\` yet; the delta appears once \`main\` publishes a report._`;
+          }
+          const body = `${marker}\n### 📊 Coverage\n\n`
+            + `Overall line coverage: **${cur.toFixed(1)}%**\n\n`
+            + `${delta}\n\n`
             + `<sub>Full HTML report is attached as the \`coverage-html\` workflow artifact; `
             + `the latest report publishes to GitHub Pages on merge to \`main\`.</sub>`;
           const {owner, repo} = context.repo;
