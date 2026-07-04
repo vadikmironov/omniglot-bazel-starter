@@ -12,16 +12,13 @@
 #
 bazel_dep(name = "toolchains_llvm", version = "1.8.0")
 
-# TODO(toolchains_llvm#781): git_override pins master plus a patch that drops the
-# redundant -stdlib=libc++ (unused on compile -> -Wunused, fatal under -Werror).
-# The pinned commit also carries the LLVM 22.1.8 checksums (PR #780) that the
-# llvm_version above needs. Switch to a released version and drop both the override
-# and the patch once #781 ships in a release.
+# TODO(toolchains_llvm#791): git_override pins the commit that drops the redundant
+# -stdlib=libc++ (unused on compile -> -Wunused, fatal under -Werror; PR #791). It
+# also carries the LLVM 22.1.8 checksums (PR #780) that the llvm_version above needs.
+# Switch to a released version and drop the override once both ship in a release.
 git_override(
     module_name = "toolchains_llvm",
-    commit = "c9d30f7a7b9c7aafff46dae79288c450e13c894c",
-    patch_strip = 1,
-    patches = ["//tools/cpp/patches:toolchains_llvm_drop_redundant_stdlib_libcxx.patch"],
+    commit = "c3ac93f5c61cb78487765d2e81e7485ad3f8bf2c",
     remote = "https://github.com/bazel-contrib/toolchains_llvm.git",
 )
 
