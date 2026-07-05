@@ -160,14 +160,15 @@ class TestLoadManifest(unittest.TestCase):
         """Lint-only static-analysis artifacts are registered for conditional drop."""
         absent = self.manifest.excluded_when_feature_absent
         self.assertIn("lint", absent)
-        self.assertIn(".mypy.ini", absent["lint"])
         self.assertIn(".nogo_config.json", absent["lint"])
         self.assertIn(".pmd.xml", absent["lint"])
         self.assertIn(".spotbugs-exclude.xml", absent["lint"])
-        self.assertIn("tools/python/mypy", absent["lint"])
-        # C++/Rust lint configs are intentionally NOT feature-gated.
+        # Lint configs whose tools are bundled (rules_lint / toolchain, no dep
+        # to gate) are intentionally NOT feature-gated: C++/Rust, and Python's
+        # ty.toml.
         self.assertNotIn(".clang-tidy", absent["lint"])
         self.assertNotIn(".clippy.toml", absent["lint"])
+        self.assertNotIn("ty.toml", absent["lint"])
 
     def test_custom_toolchains_feature(self) -> None:
         """The custom_toolchains feature exists, requires no language, and drops
@@ -244,10 +245,10 @@ class TestResolveFiles(unittest.TestCase):
         # Python-specific files present (.ruff.toml is composite-routed for section filtering)
         self.assertIn(".ruff.toml", resolved.composite)
         self.assertIn("tools/python", resolved.directories)
-        # .mypy.ini is lint-gated (feature-conditional exclude): absent without
-        # lint, present once lint is also selected.
-        self.assertNotIn(".mypy.ini", resolved.copy)
-        self.assertIn(".mypy.ini", resolve_files(self.manifest, {"python"}, {"lint"}).copy)
+        # ty.toml is ungated (bundled ty tool, no dep to gate): ships with
+        # Python whether or not lint is selected.
+        self.assertIn("ty.toml", resolved.copy)
+        self.assertIn("ty.toml", resolve_files(self.manifest, {"python"}, {"lint"}).copy)
 
         # Other languages absent
         self.assertNotIn(".clang-tidy", resolved.copy)
@@ -420,14 +421,10 @@ class TestResolveFiles(unittest.TestCase):
         """Lint artifacts are excluded without lint, kept with it; the
         unconditional excludes apply either way."""
         without = effective_excluded_files(self.manifest, set())
-        self.assertIn(".mypy.ini", without)
         self.assertIn(".nogo_config.json", without)
-        self.assertIn("tools/python/mypy", without)
 
         with_lint = effective_excluded_files(self.manifest, {"lint"})
-        self.assertNotIn(".mypy.ini", with_lint)
         self.assertNotIn(".nogo_config.json", with_lint)
-        self.assertNotIn("tools/python/mypy", with_lint)
 
         # Unconditional excludes are present regardless of features.
         self.assertIn(PALANTIR_FILE, without)

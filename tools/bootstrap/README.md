@@ -22,7 +22,7 @@ bazel run //tools/bootstrap -- --review
 2. **Repository name** — substituted for `omniglot-bazel-starter` throughout (module name, labels, repo names).
 3. **Languages** — any subset of Python, Rust, C++, Java, Go.
 4. **Optional features:**
-   - `lint` — the full static-analysis pipeline (the `rules_lint` aspects, mypy, bandit, Go `nogo`) plus the `lint_gen` rule generator.
+   - `lint` — the full static-analysis pipeline (the `rules_lint` aspects incl. ty, bandit, Go `nogo`) plus the `lint_gen` rule generator.
    - `publish` — the `publish_gen` Gazelle extension that emits `:publish` targets for Maven / PyPI / generic registries.
    - `custom_toolchains` — the non-default host/local toolchains for each selected language (host GCC/Clang, host Python, local Go SDK, and all Corretto JDKs). These are machine-specific, so they're opt-in; the hermetic defaults always ship. No-op for Rust.
 

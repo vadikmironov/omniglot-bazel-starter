@@ -8,7 +8,7 @@ An opinionated template for teams standing up a new Bazel monorepo and immediate
 
 - **Hermetic toolchains** for every language, with swappable variants (GCC/Clang, Corretto 17/21/25, Python 3.13, …)
 - **Cross-language interop** — working examples of C++ extensions embedded in Python, and Python runtimes bootstrapped from C++
-- **Unified lint / format** pipeline via [`aspect_rules_lint`](https://github.com/aspect-build/rules_lint) — ruff, mypy, clippy, clang-tidy, clang-format, PMD, spotbugs, rustfmt, gofumpt, buildifier
+- **Unified lint / format** pipeline via [`aspect_rules_lint`](https://github.com/aspect-build/rules_lint) — ruff, ty, clippy, clang-tidy, clang-format, PMD, spotbugs, rustfmt, gofumpt, buildifier
 - **Publishing infrastructure** — a Gazelle extension auto-generates `:publish` targets for Maven / PyPI / generic registries (Artifactory, Nexus, Gitea)
 - **Cross-platform CI** — Linux, macOS arm64, Windows — with [BuildBuddy](https://www.buildbuddy.io/) remote caching
 - **`bzlmod`-first** — `MODULE.bazel` is segmented by language for easy pruning
@@ -261,7 +261,6 @@ Contributions and feedback are welcome! Feel free to open a pull request for any
 - Rust ⇄ C/C++ interop example with working BUILD targets
 - Python extension module written in Rust (PyO3)
 - Possible additions: `rules_kotlin`, `rules_csharp`
-- Replace mypy with `ty` (via `aspect_rules_lint`)
 
 ## License
 

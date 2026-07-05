@@ -23,9 +23,9 @@ func generatePmdTests(args language.GenerateArgs) []*rule.Rule {
 
 // generateSpotbugsTests emits a spotbugs_test sibling for each
 // java_binary or java_library in the package, named
-// "<src_name>.spotbugs_lint". Java is the only language with two
-// linters per source rule; the suffix differentiates the test names
-// so they coexist in the same BUILD without collision.
+// "<src_name>.spotbugs_lint". Java and Python are the two-linter
+// languages; the suffix differentiates the test names so they coexist
+// in the same BUILD without collision.
 func generateSpotbugsTests(args language.GenerateArgs) []*rule.Rule {
 	return generateJavaLintTests(args, kindSpotbugsTest, ".spotbugs_lint")
 }

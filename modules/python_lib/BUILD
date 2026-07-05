@@ -1,5 +1,5 @@
 load("@rules_python//python:defs.bzl", "py_library", "py_test")
-load("//tools/lint:linters.bzl", "ruff_test")
+load("//tools/lint:linters.bzl", "ruff_test", "ty_test")
 load("//tools/publish/lang:python_publish_defs.bzl", "python_publish")
 
 package(default_visibility = ["//visibility:public"])
@@ -26,6 +26,13 @@ py_test(
 
 ruff_test(
     name = "python_lib.lint",
+    size = "small",
+    srcs = [":python_lib"],
+    tags = ["lint"],
+)
+
+ty_test(
+    name = "python_lib.ty",
     size = "small",
     srcs = [":python_lib"],
     tags = ["lint"],

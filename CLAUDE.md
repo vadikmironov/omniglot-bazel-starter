@@ -98,7 +98,7 @@ Per-target opt-out: `tags = ["no-lint"]` on the source rule.
 Auto-fix workflow and full reference: [tools/lint/README.md](tools/lint/README.md).
 
 ### Language-Specific Linting
-- **Python**: ruff (linting), mypy (type checking), ruff (formatting)
+- **Python**: ruff (linting), ty (type checking), ruff (formatting)
 - **Rust**: clippy (linting), rustfmt (formatting)
 - **C++**: clang-tidy (linting), clang-format (formatting)
 - **Java**: PMD (linting), spotbugs (static analysis), clang-format (formatting)

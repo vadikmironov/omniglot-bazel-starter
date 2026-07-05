@@ -3,7 +3,8 @@
 // driven by the source-rule kind of each package's canonical target.
 //
 // Each linter's lint_test factory lives in //tools/lint:linters.bzl
-// (clang_tidy_test, clippy_test, pmd_test, spotbugs_test, ruff_test).
+// (clang_tidy_test, clippy_test, pmd_test, spotbugs_test, ruff_test,
+// ty_test).
 // This extension emits one or more *_test targets per package based on
 // the source-rule kinds present, tagging each with "lint" so CI can
 // select them via --test_tag_filters=lint.

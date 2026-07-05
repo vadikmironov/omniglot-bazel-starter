@@ -4,7 +4,7 @@ load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
 load("@rules_cc//cc:cc_library.bzl", "cc_library")
 load("@rules_cc//cc:cc_test.bzl", "cc_test")
 load("@rules_python//python:py_library.bzl", "py_library")
-load("//tools/lint:linters.bzl", "clang_tidy_test", "ruff_test")
+load("//tools/lint:linters.bzl", "clang_tidy_test", "ruff_test", "ty_test")
 load(":python_interpreter_path_header.bzl", "python_interpreter_path_header")
 
 package(default_visibility = ["//visibility:public"])
@@ -169,5 +169,12 @@ clang_tidy_test(
     name = "_cpp_py_bootstrap_app_test_utils.lint",
     size = "small",
     srcs = [":_cpp_py_bootstrap_app_test_utils"],
+    tags = ["lint"],
+)
+
+ty_test(
+    name = "_cpp_py_bootstrap_app_py_test_lib.ty",
+    size = "small",
+    srcs = [":_cpp_py_bootstrap_app_py_test_lib"],
     tags = ["lint"],
 )

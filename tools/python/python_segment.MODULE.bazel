@@ -1,6 +1,8 @@
 ##
 ## Toolchain versions configuration
 ##
+# When changing this, also update `python-version` in //:ty.toml so the ty
+# type checker targets the same Python version as the build toolchain.
 PYTHON_VERSION = "3.14"
 
 PYTHON_VERSION_SNAKE = PYTHON_VERSION.replace(".", "_")
@@ -78,26 +80,6 @@ local_runtime_toolchains_repo(
 # so it will take precedence over other registered toolchains.
 #register_toolchains("@local_toolchains//:all", dev_dependency = True)
 # --- END feature:custom_toolchains ---
-
-# --- BEGIN feature:lint ---
-#
-# rules_mypy block
-#
-# An aspect to instrument py_* targets with mypy type-checking. Part of the lint
-# feature; the aspect is wired in .bazelrc and defined in tools/python/mypy/.
-#
-# Please find documentation here:
-# https://github.com/theoremlp/rules_mypy/releases
-bazel_dep(name = "rules_mypy", version = "0.41.0")
-
-types = use_extension("@rules_mypy//mypy:types.bzl", "types")
-types.requirements(
-    name = "mypy_pip_types",
-    pip_requirements = "@omniglot-bazel-starter_pip_dependencies//:requirements.bzl",
-    requirements_txt = "//tools/python:requirements_lock.txt",
-)
-use_repo(types, "mypy_pip_types")
-# --- END feature:lint ---
 
 #
 # rules_uv block

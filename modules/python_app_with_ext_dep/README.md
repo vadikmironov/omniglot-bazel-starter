@@ -37,7 +37,7 @@ py_binary(
    bazel run //tools/python:generate_requirements_lock.update
 ```
 
-3. Use `requirement("package-name")` in your BUILD file. For type checking, add type stubs too (e.g., `types-requests` for `requests`).
+3. Use `requirement("package-name")` in your BUILD file. The `ty` type checker bundles typeshed stubs for common packages (e.g. `requests`), so a separate stub package is usually not needed.
 
 ## Building and Running
 

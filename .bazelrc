@@ -154,13 +154,6 @@ test --test_tag_filters=-lint
 test:raw --test_tag_filters=
 # --- END feature:lint ---
 
-# --- BEGIN feature:lint lang:python ---
-# mypy type-checking aspect (part of the lint feature; aspect defined in
-# tools/python/mypy/, deps via rules_mypy in tools/python/python_segment.MODULE.bazel)
-build --aspects //tools/python/mypy:aspect.bzl%mypy_aspect
-build --output_groups=+mypy
-# --- END feature:lint lang:python ---
-
 # --- BEGIN feature:lint lang:rust ---
 # Run rules_rust clippy non-blocking: capture its output instead of failing the
 # action, so plain builds never break on lint. The clippy_test rule

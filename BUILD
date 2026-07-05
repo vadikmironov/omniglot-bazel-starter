@@ -85,22 +85,13 @@ exports_files(
 # --- END feature:lint lang:java ---
 
 # --- BEGIN feature:lint lang:python ---
-# Mypy Bazel integration - define Mypy config at the top level to be able
-# to use $MYPY_CONFIG_FILE_DIR expansion. Part of the lint feature; .ruff.toml is
-# exported here for the ruff lint aspect (the formatter reads the file directly).
-filegroup(
-    name = "mypy_ini",
-    srcs = [".mypy.ini"],
-)
-
-alias(
-    name = "mypy_config",
-    actual = ":mypy_ini",
-    visibility = ["//visibility:public"],
-)
-
+# Config files for the Python lint aspects, exported so the ruff and ty aspects
+# (and the formatter, which reads the file directly) can reference them.
 exports_files(
-    [".ruff.toml"],
+    [
+        ".ruff.toml",
+        "ty.toml",
+    ],
     visibility = ["//visibility:public"],
 )
 # --- END feature:lint lang:python ---

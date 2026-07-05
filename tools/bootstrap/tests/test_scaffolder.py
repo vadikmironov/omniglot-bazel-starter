@@ -117,7 +117,7 @@ class TestScaffolder(unittest.TestCase):
 
     def _assert_language_files(self, target: Path, selected: set[str], features: set[str] | None = None) -> None:
         """Language config files are present iff the language is selected AND the
-        file is not feature-conditionally excluded (e.g. .mypy.ini needs lint)."""
+        file is not feature-conditionally excluded (e.g. .pmd.xml needs lint)."""
         features = features or set()
         excluded = effective_excluded_files(self.manifest, features)
         for lang, config in self.manifest.languages.items():
@@ -360,28 +360,22 @@ class TestScaffolder(unittest.TestCase):
     def _assert_lint_off_clean(self, target: Path, selected: set[str]) -> None:
         """Lint feature off: no analyzer aspects, deps, or wiring leak in.
 
-        Per-language config files (.mypy.ini, .pmd.xml, …) are covered by
+        Per-language config files (.pmd.xml, .nogo_config.json, …) are covered by
         _assert_language_files; this focuses on the composite-file gating.
         """
         # Linter aspect definitions/binaries are lint-owned — never present otherwise.
         self.assertFalse((target / "tools" / "lint" / "linters.bzl").exists(), "linters.bzl leaked without lint")
         self.assertFalse((target / "tools" / "lint" / "BUILD").exists(), "tools/lint/BUILD leaked without lint")
-        # No mypy aspect wiring in .bazelrc, no nogo rule in root BUILD.
-        self.assertNotIn("mypy:aspect.bzl", (target / ".bazelrc").read_text(), "mypy aspect leaked into .bazelrc")
+        # No nogo rule in root BUILD.
         self.assertNotIn("nogo", (target / "BUILD").read_text(), "nogo rule leaked into root BUILD")
         if "python" in selected:
             req = (target / "tools" / "python" / "requirements.in").read_text()
-            for tool in ("ruff", "bandit", "mypy"):
+            for tool in ("ruff", "bandit", "ty"):
                 self.assertNotIn(tool, req, f"{tool} leaked into requirements.in without lint")
             self.assertIn("pre-commit", req, "pre-commit should remain (not lint-only)")
-            self.assertFalse((target / "tools" / "python" / "mypy").exists(), "tools/python/mypy leaked without lint")
             ruff = (target / ".ruff.toml").read_text()
             self.assertIn("line-length", ruff, ".ruff.toml should keep its formatter config")
             self.assertNotIn("[lint]", ruff, ".ruff.toml [lint] block leaked without lint")
-            self.assertNotIn(
-                "rules_mypy",
-                (target / "tools" / "python" / "python_segment.MODULE.bazel").read_text(),
-            )
         if "java" in selected:
             seg = (target / "tools" / "java" / "java_segment.MODULE.bazel").read_text()
             self.assertNotIn("pmd-core", seg, "PMD dep leaked without lint")
@@ -503,13 +497,10 @@ class TestScaffolder(unittest.TestCase):
         self.assertTrue((target / "tools" / "lint" / "BUILD").exists())
         # Python analyzers: deps, aspect wiring, configs.
         req = (target / "tools" / "python" / "requirements.in").read_text()
-        for tool in ("ruff", "bandit", "mypy"):
+        for tool in ("ruff", "bandit", "ty"):
             self.assertIn(tool, req)
-        self.assertIn("mypy:aspect.bzl", (target / ".bazelrc").read_text())
-        self.assertTrue((target / ".mypy.ini").exists())
-        self.assertTrue((target / "tools" / "python" / "mypy").is_dir())
+        self.assertTrue((target / "ty.toml").exists())
         self.assertIn("[lint]", (target / ".ruff.toml").read_text())
-        self.assertIn("rules_mypy", (target / "tools" / "python" / "python_segment.MODULE.bazel").read_text())
         # Java analyzers: deps + rulesets.
         seg = (target / "tools" / "java" / "java_segment.MODULE.bazel").read_text()
         self.assertIn("pmd-core", seg)

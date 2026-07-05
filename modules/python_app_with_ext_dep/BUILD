@@ -1,6 +1,6 @@
 load("@omniglot-bazel-starter_pip_dependencies//:requirements.bzl", "requirement")
 load("@rules_python//python:defs.bzl", "py_binary", "py_library")
-load("//tools/lint:linters.bzl", "ruff_test")
+load("//tools/lint:linters.bzl", "ruff_test", "ty_test")
 load("//tools/publish/lang:generic_publish_defs.bzl", "binary_bundle_publish")
 load("//tools/publish/lang:image_publish_defs.bzl", "image_publish")
 
@@ -52,4 +52,18 @@ image_publish(
     binary_target = ":python_app_with_ext_dep",
     entrypoint = ["/app/python_app_with_ext_dep"],
     strip_prefix = "modules/python_app_with_ext_dep",
+)
+
+ty_test(
+    name = "python_app_with_ext_dep_lib.ty",
+    size = "small",
+    srcs = [":python_app_with_ext_dep_lib"],
+    tags = ["lint"],
+)
+
+ty_test(
+    name = "python_app_with_ext_dep.ty",
+    size = "small",
+    srcs = [":python_app_with_ext_dep"],
+    tags = ["lint"],
 )

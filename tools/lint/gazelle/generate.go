@@ -48,6 +48,7 @@ func (p *lintLang) GenerateRules(args language.GenerateArgs) language.GenerateRe
 		// --- END lang:java ---
 		// --- BEGIN lang:python ---
 		rules = append(rules, generateRuffTests(args)...)
+		rules = append(rules, generateTyTests(args)...)
 		// --- END lang:python ---
 	}
 

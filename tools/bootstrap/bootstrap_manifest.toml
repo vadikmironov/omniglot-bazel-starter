@@ -40,7 +40,7 @@ directories = ["tools/setup"]
 # ---------------------------------------------------------------------------
 [languages.python]
 label = "Python"
-files = [".mypy.ini"]
+files = ["ty.toml"]
 directories = ["tools/python"]
 
 [languages.cpp]
@@ -205,7 +205,8 @@ files = [
 python = [
     ".ruff.toml",
     "tools/python/requirements.in",
-    # Section-filtered so the rules_mypy block can be gated behind feature:lint.
+    # Section-filtered so its feature:coverage and feature:custom_toolchains
+    # blocks can be gated by feature selection.
     "tools/python/python_segment.MODULE.bazel",
     # pre-commit itself is installed from the Python .venv, so its hook config
     # rides with Python; the inner clang-format/ruff sections still filter by
@@ -256,18 +257,16 @@ files = [
 # layered on top of each file's normal language ownership. These are static-
 # analysis artifacts with no section markers (plain config files / a tool dir),
 # so they ride with their language but only make sense under the lint feature:
-#   .mypy.ini, tools/python/mypy/  → Python type-checking (rules_mypy aspect)
 #   .nogo_config.json              → Go nogo static analysis
 #   .pmd.xml, .spotbugs-exclude.xml → Java PMD / SpotBugs aspects
-# (.clang-tidy / .clippy.toml are intentionally left ungated — their tools come
-#  from the toolchain / rules_lint with no dep to gate, so they ride with C++/Rust.)
+# (.clang-tidy / .clippy.toml / ty.toml are intentionally left ungated — their
+#  tools come from the toolchain / rules_lint with no dep to gate, so they ride
+#  with their language.)
 [exclude.when_feature_absent]
 lint = [
-    ".mypy.ini",
     ".nogo_config.json",
     ".pmd.xml",
     ".spotbugs-exclude.xml",
-    "tools/python/mypy",
 ]
 # Each tools/<lang>/toolchains dir holds only the language's custom/local
 # toolchain examples (host gcc/clang, local Go SDK, local + remote Corretto),
