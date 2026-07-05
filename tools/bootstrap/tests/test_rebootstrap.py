@@ -101,7 +101,7 @@ class TestRebootstrap(_ScaffoldHarness):
         self._scaffold_into(target, {"python"})  # re-bootstrap
         result = req.read_text()
         self.assertIn("flask==3.0.0", result, "user dependency lost on re-bootstrap")
-        # pre-commit is an unconditional starter dep (ruff/mypy are lint-gated now);
+        # pre-commit is an unconditional starter dep (ruff/ty are lint-gated now);
         # its presence proves the baseline was refreshed alongside the user region.
         self.assertIn("pre-commit", result, "starter baseline lost on re-bootstrap")
 
@@ -259,11 +259,9 @@ class TestComputePruneSet(_ScaffoldHarness):
             "tools/gazelle/vocab/vocab.go",
             "tools/gazelle/vocab/BUILD",
             # when_feature_absent.lint configs (gated term) — independent of language
-            ".mypy.ini",
             ".nogo_config.json",
             ".pmd.xml",
             ".spotbugs-exclude.xml",
-            "tools/python/mypy",
         }
         self.assertEqual(prune, expected)
 
@@ -310,15 +308,14 @@ class TestFeatureOverride(_ScaffoldHarness):
         self._scaffold_into(target, {"python", "go"}, features={"lint"})
         self.assertTrue((target / "go.mod").exists())
         self.assertTrue((target / "tools" / "lint" / "linters.bzl").exists())
-        self.assertTrue((target / ".mypy.ini").exists())
         # Lint deps are now present in requirements.in (re-rendered with lint on).
-        self.assertIn("mypy", (target / "tools" / "python" / "requirements.in").read_text())
+        self.assertIn("ty", (target / "tools" / "python" / "requirements.in").read_text())
 
     def test_remove_features_prunes_orphans_and_self_heals_composites(self) -> None:
         target = self._fresh_target()
         self._scaffold_into(target, {"python", "go"}, features={"publish", "lint"})
         # Owner-specific artifacts are present after the first scaffold.
-        for rel in ("tools/publish", ".publish.toml", "tools/lint/linters.bzl", ".mypy.ini", "tools/python/mypy"):
+        for rel in ("tools/publish", ".publish.toml", "tools/lint/linters.bzl"):
             self.assertTrue((target / rel).exists(), f"{rel} should exist before pruning")
 
         # Simulate the CLI: compute the prune set, delete existing paths, re-scaffold.
@@ -327,7 +324,7 @@ class TestFeatureOverride(_ScaffoldHarness):
         self._scaffold_into(target, {"python", "go"}, features=set())
 
         # Owner-specific artifacts are gone.
-        for rel in ("tools/publish", ".publish.toml", "tools/lint/linters.bzl", ".mypy.ini", "tools/python/mypy"):
+        for rel in ("tools/publish", ".publish.toml", "tools/lint/linters.bzl"):
             self.assertFalse((target / rel).exists(), f"{rel} should be pruned")
         # Language tooling survives (python is still selected).
         self.assertTrue((target / "tools" / "python").is_dir())
@@ -335,7 +332,7 @@ class TestFeatureOverride(_ScaffoldHarness):
         # Composite files self-heal: lint deps stripped, unconditional dep kept.
         req = (target / "tools" / "python" / "requirements.in").read_text()
         self.assertIn("pre-commit", req)
-        self.assertNotIn("mypy", req)
+        self.assertNotIn("ty", req)
 
 
 class TestBootstrapMarker(_ScaffoldHarness):

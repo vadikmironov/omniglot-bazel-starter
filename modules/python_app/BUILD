@@ -1,5 +1,5 @@
 load("@rules_python//python:defs.bzl", "py_binary", "py_library")
-load("//tools/lint:linters.bzl", "ruff_test")
+load("//tools/lint:linters.bzl", "ruff_test", "ty_test")
 load("//tools/publish/lang:generic_publish_defs.bzl", "binary_bundle_publish")
 load("//tools/publish/lang:image_publish_defs.bzl", "image_publish")
 
@@ -25,8 +25,9 @@ py_binary(
     name = "python_app",
     srcs = glob(["src/**/__main__.py"]),
     main = "__main__.py",
-    # please see https://github.com/theoremlp/rules_mypy?tab=readme-ov-file#skipping-targets for more information
-    #tags = ["no-mypy"],
+    # To exclude this target from lint (ruff + ty), add tags = ["no-lint"];
+    # see tools/lint/README.md for the opt-out mechanisms.
+    # tags = ["no-lint"],
     deps = ["//modules/python_app:python_app_lib"],
 )
 
@@ -52,4 +53,18 @@ image_publish(
     binary_target = ":python_app",
     entrypoint = ["/app/python_app"],
     strip_prefix = "modules/python_app",
+)
+
+ty_test(
+    name = "python_app_lib.ty",
+    size = "small",
+    srcs = [":python_app_lib"],
+    tags = ["lint"],
+)
+
+ty_test(
+    name = "python_app.ty",
+    size = "small",
+    srcs = [":python_app"],
+    tags = ["lint"],
 )

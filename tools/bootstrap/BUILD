@@ -1,5 +1,5 @@
 load("@rules_python//python:defs.bzl", "py_binary", "py_library")
-load("//tools/lint:linters.bzl", "ruff_test")
+load("//tools/lint:linters.bzl", "ruff_test", "ty_test")
 
 py_library(
     name = "bootstrap_lib",
@@ -38,6 +38,20 @@ ruff_test(
 
 ruff_test(
     name = "bootstrap.lint",
+    size = "small",
+    srcs = [":bootstrap"],
+    tags = ["lint"],
+)
+
+ty_test(
+    name = "bootstrap_lib.ty",
+    size = "small",
+    srcs = [":bootstrap_lib"],
+    tags = ["lint"],
+)
+
+ty_test(
+    name = "bootstrap.ty",
     size = "small",
     srcs = [":bootstrap"],
     tags = ["lint"],

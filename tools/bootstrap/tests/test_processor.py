@@ -194,21 +194,21 @@ class TestMultiConditionAnd(unittest.TestCase):
 
     CONTENT = textwrap.dedent("""\
         # --- BEGIN feature:lint lang:python ---
-        mypy_line
+        ty_line
         # --- END feature:lint lang:python ---
     """)
 
     def test_both_conditions_met(self) -> None:
-        self.assertIn("mypy_line", filter_sections(self.CONTENT, {"python"}, {"lint"}))
+        self.assertIn("ty_line", filter_sections(self.CONTENT, {"python"}, {"lint"}))
 
     def test_feature_missing(self) -> None:
-        self.assertNotIn("mypy_line", filter_sections(self.CONTENT, {"python"}, set()))
+        self.assertNotIn("ty_line", filter_sections(self.CONTENT, {"python"}, set()))
 
     def test_language_missing(self) -> None:
-        self.assertNotIn("mypy_line", filter_sections(self.CONTENT, {"go"}, {"lint"}))
+        self.assertNotIn("ty_line", filter_sections(self.CONTENT, {"go"}, {"lint"}))
 
     def test_neither_met(self) -> None:
-        self.assertNotIn("mypy_line", filter_sections(self.CONTENT, {"go"}, set()))
+        self.assertNotIn("ty_line", filter_sections(self.CONTENT, {"go"}, set()))
 
     def test_feature_and_feature(self) -> None:
         content = textwrap.dedent("""\
@@ -759,7 +759,7 @@ class TestSpliceUserRegion(unittest.TestCase):
     def test_starter_baseline_refreshed_with_user_body_kept(self) -> None:
         rendered = textwrap.dedent("""\
             ruff
-            mypy
+            ty
             # --- BEGIN user-managed ---
             seed
             # --- END user-managed ---
@@ -771,7 +771,7 @@ class TestSpliceUserRegion(unittest.TestCase):
             # --- END user-managed ---
         """)
         result = splice_user_region(rendered, existing)
-        self.assertIn("mypy", result)  # refreshed starter baseline
+        self.assertIn("ty", result)  # refreshed starter baseline
         self.assertIn("flask", result)  # preserved user body
         self.assertNotIn("seed", result)
 

@@ -51,7 +51,7 @@ old_feats, new_langs, new_feats)` returns the orphaned paths — the
 `copy ∪ directories ∪ composite` diff (owner-exclusive files/dirs/composite;
 *always-shipped* composite like `MODULE.bazel` stays in both sets and is merely
 re-rendered) **plus** the `effective_excluded_files` delta (for
-`when_feature_absent` configs like `tools/python/mypy` that hide inside a
+`when_feature_absent` configs like `tools/cpp/toolchains` that hide inside a
 surviving language dir). `run` filters that to on-disk paths and, after an
 explicit confirm (or per-path `--review` selector), deletes them via
 `scaffolder.prune_paths` before scaffolding. Composite files that *survive*
@@ -130,9 +130,9 @@ definitions stay template-managed.
 - **Formatters** (ruff-format, clang-format, rustfmt, gofumpt) come from toolchains /
   Bazel binaries — always on per language, no external deps.
 - The **`lint` feature** owns *all* static analysis: the rules_lint aspects
-  (ruff / clang-tidy / clippy / pmd / spotbugs), bandit, mypy (rules_mypy), Go `nogo`,
+  (ruff / ty / clang-tidy / clippy / pmd / spotbugs), bandit, Go `nogo`,
   and the gazelle `lint_gen` autogen. Lint OFF ⇒ none of those and none of their deps
-  (no pmd/spotbugs Maven, no ruff/bandit/mypy pip, no rules_mypy, no nogo registration).
+  (no pmd/spotbugs Maven, no ruff/bandit/ty pip, no nogo registration).
   The gazelle extension itself ships as **composite files**, not a verbatim `directories`
   copy: `gazelle/{lang.go,BUILD,kinds.go,generate.go}` are section-filtered to the selection
   and the single-language `gazelle/{cpp,rust,java,python}.go` generators ride in
@@ -162,10 +162,10 @@ definitions stay template-managed.
 - A composite file ships only when its language is selected; a `feature:` section inside
   it adds the feature condition. For **always-shipped** files (`.bazelrc`, root `BUILD`)
   that need *both*, use a multi-condition tag (`feature:lint lang:python`). For whole,
-  marker-less config files (`.mypy.ini`, `.nogo_config.json`, `.pmd.xml`,
+  marker-less config files (`.nogo_config.json`, `.pmd.xml`,
   `.spotbugs-exclude.xml`) use `[exclude.when_feature_absent].lint`.
-- `.clang-tidy` / `.clippy.toml` are intentionally left ungated (their tools come from
-  the toolchain / rules_lint — no dep to gate). `.ruff.toml` ships for the formatter; only
+- `.clang-tidy` / `.clippy.toml` / `ty.toml` are intentionally left ungated (their tools
+  come from the toolchain / rules_lint — no dep to gate). `.ruff.toml` ships for the formatter; only
   its `[lint]` block is gated.
 
 ## Gazelle-generated lint rules (important)

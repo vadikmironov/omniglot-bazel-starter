@@ -113,8 +113,8 @@ def effective_excluded_files(
     Combines the unconditional ``[exclude] files`` with any
     ``[exclude.when_feature_absent]`` group whose feature is not selected. This
     layers a feature condition on top of a file's existing language ownership:
-    e.g. ``.mypy.ini`` (a Python file) is dropped unless ``lint`` is selected,
-    so it ships only when Python *and* lint are both on.
+    e.g. ``.pmd.xml`` (a Java file) is dropped unless ``lint`` is selected,
+    so it ships only when Java *and* lint are both on.
     """
     excluded = set(manifest.excluded_files)
     for feature, files in manifest.excluded_when_feature_absent.items():
@@ -253,7 +253,7 @@ def compute_prune_set(
       under both selections — is not (it is merely re-rendered, not deleted).
     * ``gated`` — files newly excluded via ``[exclude.when_feature_absent]``.
       These can be sub-paths of a still-shipped directory
-      (``tools/python/mypy`` lives under the surviving ``tools/python``), which
+      (``tools/cpp/toolchains`` lives under the surviving ``tools/cpp``), which
       the ``owned`` directory-level difference cannot see.
 
     Pure: returns relative path strings and never touches the filesystem, so the

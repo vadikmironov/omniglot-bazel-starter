@@ -12,7 +12,7 @@ ruff
 # security linter
 bandit
 # type checker
-mypy
+ty
 # --- END feature:lint ---
 # git pre-commit hooks framework
 pre-commit
@@ -33,5 +33,4 @@ questionary
 ###############################################################################
 
 requests
-types-requests
 # --- END exclude ---

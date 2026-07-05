@@ -21,6 +21,7 @@ const (
 	// --- END lang:java ---
 	// --- BEGIN lang:python ---
 	kindRuffTest = "ruff_test"
+	kindTyTest   = "ty_test"
 	// --- END lang:python ---
 )
 
@@ -61,6 +62,11 @@ var lintKinds = map[string]rule.KindInfo{
 		NonEmptyAttrs:  map[string]bool{"srcs": true},
 		MergeableAttrs: map[string]bool{"srcs": true, "tags": true},
 	},
+	kindTyTest: {
+		MatchAttrs:     []string{"srcs"},
+		NonEmptyAttrs:  map[string]bool{"srcs": true},
+		MergeableAttrs: map[string]bool{"srcs": true, "tags": true},
+	},
 	// --- END lang:python ---
 }
 
@@ -86,6 +92,7 @@ var lintLoads = []rule.LoadInfo{
 			// --- END lang:java ---
 			// --- BEGIN lang:python ---
 			kindRuffTest,
+			kindTyTest,
 			// --- END lang:python ---
 		},
 	},

@@ -1,6 +1,6 @@
 load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
 load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
-load("//tools/lint:linters.bzl", "clang_tidy_test", "ruff_test")
+load("//tools/lint:linters.bzl", "clang_tidy_test", "ruff_test", "ty_test")
 load("//tools/publish/lang:generic_publish_defs.bzl", "binary_bundle_publish")
 load("//tools/publish/lang:image_publish_defs.bzl", "image_publish")
 
@@ -94,11 +94,13 @@ alias(
 #
 py_library(
     name = "_cpp_py_ext_module_impl_py_lib",
-    data = [
-        "src/cpp_py_ext_module_impl.pyi",
-        ":_cpp_py_ext_module_impl",
-    ],
+    data = [":_cpp_py_ext_module_impl"],
     imports = ["."],
+    # The type stub is a pyi_src (not data) so it flows through PyInfo as a
+    # typed source that the type checker resolves; the compiled extension
+    # (cpp_py_ext_module_impl.so, emitted at the package root) stays data,
+    # loaded at runtime.
+    pyi_srcs = ["src/cpp_py_ext_module_impl.pyi"],
 )
 
 py_test(
@@ -145,4 +147,25 @@ image_publish(
     binary_target = ":cpp_py_ext_module",
     entrypoint = ["/app/cpp_py_ext_module"],
     strip_prefix = "modules/cpp_py_ext_module",
+)
+
+ty_test(
+    name = "cpp_py_ext_module_lib.ty",
+    size = "small",
+    srcs = [":cpp_py_ext_module_lib"],
+    tags = ["lint"],
+)
+
+ty_test(
+    name = "cpp_py_ext_module.ty",
+    size = "small",
+    srcs = [":cpp_py_ext_module"],
+    tags = ["lint"],
+)
+
+ty_test(
+    name = "_cpp_py_ext_module_impl_py_lib.ty",
+    size = "small",
+    srcs = [":_cpp_py_ext_module_impl_py_lib"],
+    tags = ["lint"],
 )

@@ -10,9 +10,9 @@ The module uses a two-layer structure to avoid naming conflicts and enable prope
 
 - **`cpp_py_ext_module_impl`** - The C++ extension module (`.so`/`.pyd`)
 - **`cpp_py_ext_module`** - Python package that imports and re-exports from the impl module
-- **`cpp_py_ext_module_impl.pyi`** - Type stubs for mypy support
+- **`cpp_py_ext_module_impl.pyi`** - Type stubs for the type checker
 
-This separation allows mypy to properly type-check code that imports the extension.
+This separation allows ty to properly type-check code that imports the extension.
 
 ## Key BUILD Concepts
 
@@ -21,7 +21,7 @@ Building a Python C extension requires:
 1. **cc_binary with linkshared=True** - Builds the native extension as `cpp_py_ext_module_impl`
 2. **genrule + alias** - Provides platform-correct extension (`.pyd` on Windows, `.so` elsewhere)
 3. **py_library with imports** - Makes the extension importable from Python
-4. **Type stubs (.pyi)** - Provides type information for mypy
+4. **Type stubs (.pyi)** - Provides type information for the type checker (ty)
 
 ### Platform Notes
 

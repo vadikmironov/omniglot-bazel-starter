@@ -25,6 +25,10 @@ load("@aspect_rules_lint//lint:ruff.bzl", "lint_ruff_aspect")
 load("@aspect_rules_lint//lint:spotbugs.bzl", "lint_spotbugs_aspect")
 # --- END lang:java ---
 
+# --- BEGIN lang:python ---
+load("@aspect_rules_lint//lint:ty.bzl", "lint_ty_aspect")
+# --- END lang:python ---
+
 # --- BEGIN lang:rust ---
 # Rust clippy uses rules_rust natively, not aspect_rules_lint. aspect_rules_lint
 # dropped its umbrella clippy after 2.5.2; the replacement aspect_rules_lint_rust
@@ -107,4 +111,11 @@ ruff = lint_ruff_aspect(
 )
 
 ruff_test = lint_test(aspect = ruff)
+
+ty = lint_ty_aspect(
+    binary = Label("@aspect_rules_lint//lint:ty_bin"),
+    config = Label("//:ty.toml"),
+)
+
+ty_test = lint_test(aspect = ty)
 # --- END lang:python ---
