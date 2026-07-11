@@ -150,6 +150,40 @@ C++ uses LLVM source-based coverage on the default Clang toolchain; add
 The `coverage-html/` output is ready to publish to GitHub Pages or a self-hosted
 TeamCity instance — wire it into your CI.
 # --- END feature:coverage ---
+# --- BEGIN feature:profiling ---
+
+## Profiling
+
+CPU and memory profiling driven by tagged benchmark targets, rendered to
+flamegraphs by a fully hermetic toolchain (in-process capture → pprof → folded
+stacks → inferno SVG — no system tools needed):
+
+```bash
+# List profilable targets (tags: profiling-cpu / profiling-mem)
+bazel run //tools/profile -- --list
+
+# Profile a target: SVG flamegraph + top-N table into ./profile-out/
+bazel run //tools/profile -- //path/to:bench_target
+
+# Real benchmark timings — no profiler attached (CPU benches only)
+bazel run //tools/profile -- //path/to:bench_target --measure
+
+# Terminal flamegraph viewer; --all profiles every discovered target
+bazel run //tools/profile -- //path/to:bench_target --view
+```
+
+To make a target profilable:
+
+- **CPU**: a criterion-bench `rust_binary` configured with pprof-rs's
+  `PProfProfiler(Output::Protobuf)`, tagged `profiling-cpu`.
+- **Memory**: a one-shot `rust_binary` that links `tikv-jemallocator`
+  (`profiling` feature) as the global allocator and dumps a `jemalloc_pprof`
+  profile to `$MEMPROF_OUT`, tagged `profiling-mem`.
+
+Never quote timings from profile runs — use `--measure`; profiling distorts
+timing. Memory observations describe jemalloc (the heap profiler lives in the
+allocator), and heap profiles record live allocations at dump time.
+# --- END feature:profiling ---
 # --- BEGIN lang:python ---
 
 ## Pre-commit Hooks

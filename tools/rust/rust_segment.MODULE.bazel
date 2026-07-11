@@ -23,4 +23,20 @@ crate.from_cargo(
     cargo_lockfile = "//tools/rust:Cargo.lock",
     manifests = ["//tools/rust:Cargo.toml"],
 )
+
+# --- BEGIN feature:profiling ---
+# crate_universe builds library targets only; the profiling renderer tools are
+# bin crates, so their binaries must be requested explicitly.
+crate.annotation(
+    crate = "inferno",
+    gen_binaries = ["inferno-flamegraph"],
+    repositories = ["crates"],
+)
+crate.annotation(
+    crate = "flamelens",
+    gen_binaries = ["flamelens"],
+    repositories = ["crates"],
+)
+# --- END feature:profiling ---
+
 use_repo(crate, "crates")

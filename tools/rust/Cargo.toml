@@ -15,6 +15,23 @@ path = "fake.rs"
 # --- BEGIN user-managed ---
 # Your crates here (members of [dependencies]). Preserved across re-bootstrap.
 # --- END user-managed ---
+# --- BEGIN feature:profiling ---
+# Workload inputs (seeded, deterministic)
+rand = { version = "0.9" }
+# CPU capture: criterion benches profiled in-process by pprof-rs
+# (pprof's `criterion` feature is built against criterion 0.5; keep majors in sync).
+# protobuf-codec is the pure-Rust codegen path — prost-codec needs a host protoc.
+criterion = { version = "0.5" }
+pprof = { version = "0.15", features = ["criterion", "protobuf-codec"] }
+# Memory capture: jemalloc heap profiling dumped as pprof
+tikv-jemallocator = { version = "0.7", features = ["profiling", "unprefixed_malloc_on_supported_platforms"] }
+jemalloc_pprof = { version = "0.9", features = ["symbolize"] }
+# Renderer toolchain (bin crates; built via gen_binaries annotations in
+# rust_segment.MODULE.bazel): folded stacks -> SVG, and a terminal flamegraph
+# viewer.
+inferno = { version = "0.12" }
+flamelens = { version = "0.3" }
+# --- END feature:profiling ---
 # --- BEGIN exclude ---
 # opting for simplicity sake to use rustls to avoid the dependency on openssl-dev package
 reqwest = { version = "0.13.4", default-features = false, features = ["http2"] }

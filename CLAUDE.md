@@ -150,6 +150,26 @@ bazel coverage --config=gcc_hermetic --combined_report=lcov //modules/cpp_librar
 
 C++ uses LLVM source-based coverage on the default Clang toolchain (no flags needed — wired in `.bazelrc`); Python capture requires `configure_coverage_tool` on the toolchain (already set); Go, Java (JaCoCo), and Rust work out of the box. In CI, the `coverage` job publishes the latest `main` report to GitHub Pages and comments coverage on PRs. Renderer and per-language wiring live in `tools/coverage/` and are gated behind the `coverage` bootstrap feature.
 
+## Profiling
+
+```bash
+# List profilable targets (tags: profiling-cpu / profiling-mem)
+bazel run //tools/profile -- --list
+
+# Profile a CPU bench (criterion + pprof) or a memory workload (jemalloc heap)
+bazel run //tools/profile -- //modules/rust_workloads:bench_matmul
+bazel run //tools/profile -- //modules/rust_workloads:mem_retained_growth
+
+# Batch, measure mode (real timings, no profiler), terminal flamegraph viewer
+bazel run //tools/profile -- --all
+bazel run //tools/profile -- //modules/rust_workloads:bench_matmul --measure
+bazel run //tools/profile -- //modules/rust_workloads:bench_matmul --view
+
+# Options: --size N (WORKLOAD_N), --profile-seconds S, --scope PATTERN, --out DIR
+```
+
+Artifacts: `profile-out/<pkg>/<target>/{cpu|mem}/` — SVG flamegraph, `.folded` stacks, top-N text. Targets are discovered by tag (`profiling-cpu` = criterion benches, `profiling-mem` = one-shot memory binaries); Rust example workloads live in `modules/rust_workloads`. Never quote timings from profile runs — use `--measure`. Runner and rendering spine live in `tools/profile/`, gated behind the `profiling` bootstrap feature (requires rust + go + python toolchains).
+
 ## Publishing
 
 ```bash

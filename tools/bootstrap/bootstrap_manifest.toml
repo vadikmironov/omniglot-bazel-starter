@@ -166,6 +166,24 @@ directories = ["tools/coverage"]
 # .gitignore. The GitHub Actions coverage job is not bootstrapped — CI lives
 # outside the manifest, like the lint/publish jobs.
 
+[features.profiling]
+label = "Profiling (CPU + memory benches -> flamegraphs)"
+# rust: the inferno/flamelens renderer bin-crates (plus the capture crates);
+# go: the pprofutils pprof->folded converter; python: the //tools/profile
+# runner (rules_python ships only with lang:python).
+requires = ["rust", "go", "python"]
+directories = ["tools/profile"]
+# Section-filtered so its ruff/ty lint rules gate behind feature:lint (same
+# pattern as tools/publish/BUILD).
+composite_files = ["tools/profile/BUILD"]
+# Cross-cutting wiring gated by feature:profiling markers in composite files:
+# the build:profile config in .bazelrc (+ its lang:rust debuginfo flags), the
+# crate deps in tools/rust/Cargo.toml and the gen_binaries annotations in
+# rust_segment.MODULE.bazel, the pprofutils require/tool lines in go.mod and
+# its use_repo in the go segment, the ruff per-file-ignores, and the
+# /profile-out/ entry in .gitignore. Example workloads live in
+# modules/rust_workloads — example modules never ship, so no manifest entry.
+
 # ---------------------------------------------------------------------------
 # Language-specific files in shared directories
 #
@@ -219,7 +237,12 @@ cpp = [
     # gated behind feature:custom_toolchains (the rules_cc dep stays).
     "tools/cpp/cpp_segment.MODULE.bazel",
 ]
-rust = ["tools/rust/Cargo.toml"]
+rust = [
+    "tools/rust/Cargo.toml",
+    # Section-filtered so its feature:profiling crate.annotation block can be
+    # gated by feature selection.
+    "tools/rust/rust_segment.MODULE.bazel",
+]
 java = [
     "tools/java/java_segment.MODULE.bazel",
     "tools/java/package_defs.bzl",

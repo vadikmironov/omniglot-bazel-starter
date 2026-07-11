@@ -19,6 +19,11 @@ unfixable = ["B"]
 "tools/publish/src/mint/*.py" = ["S603", "S607"]
 "tools/publish/tests/**/*.py" = ["S603", "S607"]
 # --- END feature:lint feature:publish ---
+# --- BEGIN feature:lint feature:profiling ---
+# S603 (subprocess with non-literal): all subprocess calls use list form (no shell injection).
+# S607 (partial executable path): bazel is the only external binary; it must be on PATH.
+"tools/profile/src/profiling/*.py" = ["S603", "S607"]
+# --- END feature:lint feature:profiling ---
 
 # --- BEGIN user-managed ---
 # Project-specific ruff entries (continues the per-file-ignores table above;
