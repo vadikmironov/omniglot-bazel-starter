@@ -38,6 +38,8 @@ rust_binary(
     ],
 )
 
+# Memory workloads are Linux-only: jemalloc_pprof supports only Linux, and
+# jemalloc's autotools build fails under the hermetic toolchain on macOS.
 rust_binary(
     name = "mem_retained_growth",
     srcs = [
@@ -46,6 +48,7 @@ rust_binary(
     ],
     crate_root = "mem/mem_retained_growth.rs",
     tags = ["profiling-mem"],
+    target_compatible_with = ["@platforms//os:linux"],
     deps = [
         ":rust_workloads",
         "@crates//:jemalloc_pprof",
@@ -61,6 +64,7 @@ rust_binary(
     ],
     crate_root = "mem/mem_string_churn.rs",
     tags = ["profiling-mem"],
+    target_compatible_with = ["@platforms//os:linux"],
     deps = [
         ":rust_workloads",
         "@crates//:jemalloc_pprof",
@@ -76,6 +80,7 @@ rust_binary(
     ],
     crate_root = "mem/mem_fragmentation.rs",
     tags = ["profiling-mem"],
+    target_compatible_with = ["@platforms//os:linux"],
     deps = [
         ":rust_workloads",
         "@crates//:jemalloc_pprof",

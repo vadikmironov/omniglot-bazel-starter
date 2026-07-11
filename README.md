@@ -255,6 +255,7 @@ To profile your own code, tag a criterion-bench `rust_binary` with `profiling-cp
 
 - **Profile runs are not measurement runs.** Quote timings only from `--measure` runs; profiling distorts them.
 - **The memory story is jemalloc's.** Memory workloads link jemalloc (the heap profiler lives in the allocator), so allocator observations — fragmentation especially — describe jemalloc, not glibc malloc. Heap profiles record *live* allocations at dump time, sampled every 32 KiB by default (`MALLOC_CONF` env overrides); transient churn shows up through its allocation sites, not its peak volume.
+- **Memory profiling is Linux-only** (`jemalloc_pprof` supports only Linux); the `mem_*` targets are constrained accordingly and skip automatically elsewhere. CPU profiling works on Linux and macOS.
 
 ## Publishing
 

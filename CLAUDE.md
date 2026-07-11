@@ -168,7 +168,7 @@ bazel run //tools/profile -- //modules/rust_workloads:bench_matmul --view
 # Options: --size N (WORKLOAD_N), --profile-seconds S, --scope PATTERN, --out DIR
 ```
 
-Artifacts: `profile-out/<pkg>/<target>/{cpu|mem}/` — SVG flamegraph, `.folded` stacks, top-N text. Targets are discovered by tag (`profiling-cpu` = criterion benches, `profiling-mem` = one-shot memory binaries); Rust example workloads live in `modules/rust_workloads`. Never quote timings from profile runs — use `--measure`. Runner and rendering spine live in `tools/profile/`, gated behind the `profiling` bootstrap feature (requires rust + go + python toolchains).
+Artifacts: `profile-out/<pkg>/<target>/{cpu|mem}/` — SVG flamegraph, `.folded` stacks, top-N text. Targets are discovered by tag (`profiling-cpu` = criterion benches, `profiling-mem` = one-shot memory binaries); Rust example workloads live in `modules/rust_workloads`. Never quote timings from profile runs — use `--measure`. Memory profiling is Linux-only (jemalloc_pprof upstream limit); the `mem_*` targets carry `target_compatible_with` and skip automatically on other platforms. Runner and rendering spine live in `tools/profile/`, gated behind the `profiling` bootstrap feature (requires rust + go + python toolchains).
 
 ## Publishing
 

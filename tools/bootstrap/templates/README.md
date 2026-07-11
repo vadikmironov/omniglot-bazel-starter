@@ -178,7 +178,9 @@ To make a target profilable:
   `PProfProfiler(Output::Protobuf)`, tagged `profiling-cpu`.
 - **Memory**: a one-shot `rust_binary` that links `tikv-jemallocator`
   (`profiling` feature) as the global allocator and dumps a `jemalloc_pprof`
-  profile to `$MEMPROF_OUT`, tagged `profiling-mem`.
+  profile to `$MEMPROF_OUT`, tagged `profiling-mem`. Memory profiling is
+  Linux-only (`jemalloc_pprof` supports only Linux) — constrain such targets
+  with `target_compatible_with = ["@platforms//os:linux"]`.
 
 Never quote timings from profile runs — use `--measure`; profiling distorts
 timing. Memory observations describe jemalloc (the heap profiler lives in the
