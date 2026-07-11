@@ -19,6 +19,7 @@ from python.runfiles import Runfiles
 class Tools:
     pprofutils: Path
     inferno: Path
+    collapse_perf: Path
     flamelens: Path | None
 
 
@@ -42,19 +43,41 @@ def resolve_tools() -> Tools:
 
     pprofutils = rlocation("PROFILE_PPROFUTILS")
     inferno = rlocation("PROFILE_INFERNO")
-    if pprofutils is None or inferno is None:
+    collapse_perf = rlocation("PROFILE_COLLAPSE_PERF")
+    if pprofutils is None or inferno is None or collapse_perf is None:
         raise ProfileError("hermetic spine tools missing from runfiles; run via bazel run //tools/profile")
 
     flamelens = rlocation("PROFILE_FLAMELENS")
     if flamelens is None and (host := shutil.which("flamelens")):
         flamelens = Path(host)
-    return Tools(pprofutils=pprofutils, inferno=inferno, flamelens=flamelens)
+    return Tools(pprofutils=pprofutils, inferno=inferno, collapse_perf=collapse_perf, flamelens=flamelens)
 
 
 def pprof_to_folded(tools: Tools, pb: Path, folded: Path, *, trim_jemalloc: bool = False) -> None:
     _run([str(tools.pprofutils), "folded", str(pb), str(folded)])
     if trim_jemalloc:
         folded.write_text(_trim_jemalloc_frames(folded.read_text()))
+
+
+def perf_to_folded(tools: Tools, perf_data: Path, folded: Path) -> None:
+    """`perf script` piped through inferno-collapse-perf."""
+    perf_script = subprocess.Popen(
+        ["perf", "script", "-i", str(perf_data)],
+        stdout=subprocess.PIPE,
+    )
+    with folded.open("wb") as out:
+        collapse = subprocess.run(
+            [str(tools.collapse_perf)],
+            stdin=perf_script.stdout,
+            stdout=out,
+            check=False,
+        )
+    if perf_script.stdout is not None:
+        perf_script.stdout.close()
+    if perf_script.wait() != 0:
+        raise ProfileError("perf script failed to read the recording")
+    if collapse.returncode != 0:
+        raise ProfileError(f"inferno-collapse-perf failed with exit code {collapse.returncode}")
 
 
 def folded_to_svg(tools: Tools, folded: Path, svg: Path, *, title: str, countname: str) -> None:
