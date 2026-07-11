@@ -133,6 +133,10 @@ build:clang_host --cxxopt=-Wall
 ##
 ## Python specific flags
 ##
+# Require explicit __init__.py files (all packages ship them) instead of
+# rules_python's deprecated implicit creation; this silences its warning and
+# pre-empts the upstream default flip (rules_python issue #2945).
+build --incompatible_default_to_explicit_init_py
 # --- END lang:python ---
 
 # --- BEGIN feature:custom_toolchains lang:python ---
@@ -277,6 +281,19 @@ build:ci --color=yes
 coverage --experimental_generate_llvm_lcov
 coverage --action_env=BAZEL_USE_LLVM_NATIVE_COVERAGE=1
 # --- END feature:coverage lang:cpp ---
+
+# --- BEGIN feature:profiling ---
+##
+## Profiling builds (bazel run //tools/profile)
+##
+# Optimized code with symbols: profiles of -c fastbuild binaries mislead, and
+# stripped frames render as hex addresses in flamegraphs.
+build:profile --compilation_mode=opt
+# --- END feature:profiling ---
+
+# --- BEGIN feature:profiling lang:rust ---
+build:profile --@rules_rust//rust/settings:extra_rustc_flags=-Cdebuginfo=2,-Cforce-frame-pointers=yes
+# --- END feature:profiling lang:rust ---
 
 # --- BEGIN lang:core ---
 ##

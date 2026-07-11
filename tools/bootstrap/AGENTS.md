@@ -77,9 +77,10 @@ the feature is selected.
 - `[features.X]` — opt-in capabilities. May declare `requires` (languages auto-promoted),
   `directories`, `files`, `composite_files`, and `[features.X.composite_language_files]`
   (per-language composite files gated on feature **AND** language — e.g. lint's per-language
-  gazelle generators). Current: `publish`, `lint` (both require `go`), `custom_toolchains`
-  and `remote_cache` (the last two take no `requires` and own no files — they gate via
-  markers/excludes only; see below).
+  gazelle generators). Current: `publish`, `lint` (both require `go`), `coverage`,
+  `profiling` (requires `rust`+`go`+`python`), `custom_toolchains` and `remote_cache`
+  (the last two take no `requires` and own no files — they gate via markers/excludes
+  only; see below).
 - `[language_files]` — individual files in shared dirs, keyed by comma-tag (OR over languages).
 - `[composite]` — files always run through the section filter (always shipped).
 - `[composite_language_files]` — composite files shipped only when their language is

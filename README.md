@@ -228,6 +228,35 @@ bazel run //tools/coverage:report
 3. Emit the coverage statistic so TeamCity tracks the trend and can gate on a threshold: `##teamcity[buildStatisticValue key='CodeCoverageL' value='<pct>']`.
 4. Add the **Commit Status Publisher** build feature to post the coverage build status back to the GitHub PR.
 
+### Profiling
+
+CPU and memory profiling driven by tagged benchmark targets, rendered to flamegraphs by a fully hermetic toolchain (in-process capture → pprof → folded stacks → inferno SVG — no system tools needed). Rust example workloads live in `modules/rust_workloads`:
+
+```bash
+# List profilable targets (tags: profiling-cpu / profiling-mem)
+bazel run //tools/profile -- --list
+
+# Profile a criterion bench: SVG flamegraph + top-N table per bench function
+bazel run //tools/profile -- //modules/rust_workloads:bench_matmul
+
+# Profile a one-shot memory workload (jemalloc heap profile)
+bazel run //tools/profile -- //modules/rust_workloads:mem_retained_growth
+
+# Real benchmark timings — no profiler attached
+bazel run //tools/profile -- //modules/rust_workloads:bench_matmul --measure
+
+# Browse the captured stacks in the terminal (flamelens TUI)
+bazel run //tools/profile -- //modules/rust_workloads:bench_matmul --view
+```
+
+Artifacts land in `profile-out/<package>/<target>/{cpu|mem}/` as self-contained `.svg` flamegraphs (click-to-zoom, Ctrl-F search — open in any browser), `.folded` stacks, and `top.txt` summaries. `--all` profiles every discovered target; `--size N` rescales a workload (exported as `WORKLOAD_N`); `--profile-seconds S` adjusts capture length.
+
+To profile your own code, tag a criterion-bench `rust_binary` with `profiling-cpu`, or a one-shot binary with `profiling-mem` (jemalloc global allocator + `jemalloc_pprof` dump — see `modules/rust_workloads/mem/prof_dump.rs` for the shim).
+
+- **Profile runs are not measurement runs.** Quote timings only from `--measure` runs; profiling distorts them.
+- **The memory story is jemalloc's.** Memory workloads link jemalloc (the heap profiler lives in the allocator), so allocator observations — fragmentation especially — describe jemalloc, not glibc malloc. Heap profiles record *live* allocations at dump time, sampled every 32 KiB by default (`MALLOC_CONF` env overrides); transient churn shows up through its allocation sites, not its peak volume.
+- **Memory profiling is Linux-only** (`jemalloc_pprof` supports only Linux); the `mem_*` targets are constrained accordingly and skip automatically elsewhere. CPU profiling works on Linux and macOS.
+
 ## Publishing
 
 Artifact publishing is managed by `mint`, a publish orchestrator that handles version resolution via git tags and `.publish.toml`. Supports Artifactory, Nexus, and Gitea registries.

@@ -187,6 +187,21 @@ class TestLoadManifest(unittest.TestCase):
         # cpp_segment is section-filtered so its host register block can be gated.
         self.assertIn("tools/cpp/cpp_segment.MODULE.bazel", self.manifest.composite_language_files.get("cpp", []))
 
+    def test_profiling_feature(self) -> None:
+        """The profiling feature owns the runner and requires its toolchains:
+        rust (renderer bin-crates), go (pprof->folded converter), python (the
+        //tools/profile runner)."""
+        self.assertIn("profiling", self.manifest.features)
+        feat = self.manifest.features["profiling"]
+        self.assertEqual(feat.requires, ["rust", "go", "python"])
+        self.assertIn("tools/profile", feat.directories)
+        # tools/profile/BUILD is section-filtered so its lint rules are gated.
+        self.assertIn("tools/profile/BUILD", feat.composite_files)
+        # Example workloads (modules/rust_workloads) never ship — no entry.
+        # Everything else is marker-gated in already-composite files; the rust
+        # segment joined them for its gen_binaries annotation block.
+        self.assertIn("tools/rust/rust_segment.MODULE.bazel", self.manifest.composite_language_files.get("rust", []))
+
     def test_composite_files_list(self) -> None:
         """All known always-shipped composite files are present.
 

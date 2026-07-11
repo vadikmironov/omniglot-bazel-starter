@@ -512,6 +512,35 @@ class TestScaffolder(unittest.TestCase):
         self.assertIn("nogo", (target / "BUILD").read_text())
         self.assertTrue((target / ".nogo_config.json").exists())
 
+    def test_profiling_feature_on(self) -> None:
+        """Profiling on: the runner ships and every wiring block lands."""
+        target = self._scaffold({"rust", "go", "python"}, features={"profiling"})
+        self.assertTrue((target / "tools" / "profile" / "BUILD").exists())
+        self.assertTrue((target / "tools" / "profile" / "src" / "profiling" / "cli.py").exists())
+        self.assertIn("build:profile", (target / ".bazelrc").read_text())
+        self.assertIn("inferno", (target / "tools" / "rust" / "Cargo.toml").read_text())
+        self.assertIn("gen_binaries", (target / "tools" / "rust" / "rust_segment.MODULE.bazel").read_text())
+        self.assertIn("pprofutils", (target / "go.mod").read_text())
+        self.assertIn(
+            "com_github_felixge_pprofutils_v2",
+            (target / "tools" / "go" / "go_segment.MODULE.bazel").read_text(),
+        )
+        self.assertIn("/profile-out/", (target / ".gitignore").read_text())
+        self.assertIn("## Profiling", (target / "README.md").read_text())
+        self._assert_no_markers(target)
+
+    def test_profiling_feature_off(self) -> None:
+        """Profiling off: no tools/profile dir and no wiring leaks anywhere."""
+        target = self._scaffold({"rust", "go", "python"})
+        self.assertFalse((target / "tools" / "profile").exists())
+        self.assertNotIn("build:profile", (target / ".bazelrc").read_text())
+        self.assertNotIn("inferno", (target / "tools" / "rust" / "Cargo.toml").read_text())
+        self.assertNotIn("gen_binaries", (target / "tools" / "rust" / "rust_segment.MODULE.bazel").read_text())
+        self.assertNotIn("pprofutils", (target / "go.mod").read_text())
+        self.assertNotIn("pprofutils", (target / "tools" / "go" / "go_segment.MODULE.bazel").read_text())
+        self.assertNotIn("/profile-out/", (target / ".gitignore").read_text())
+        self.assertNotIn("## Profiling", (target / "README.md").read_text())
+
     def test_lint_gazelle_section_filtered(self) -> None:
         """The gazelle extension is section-filtered, not raw-copied.
 

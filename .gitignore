@@ -312,3 +312,8 @@ go.work
 # Local HTML coverage report (bazel run //tools/coverage:report)
 /coverage-html/
 # --- END feature:coverage ---
+
+# --- BEGIN feature:profiling ---
+# Local profiling artifacts (bazel run //tools/profile)
+/profile-out/
+# --- END feature:profiling ---
