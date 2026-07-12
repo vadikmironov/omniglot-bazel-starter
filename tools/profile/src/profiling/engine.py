@@ -116,7 +116,67 @@ def view(*, target: str | None, out_root: Path, cwd: Path) -> None:
     spine.view(tools, path)
 
 
+# Bench flavors: how a CPU bench target's framework is driven. Keyed by
+# rule kind; each language's bench framework has its own CLI and profile
+# output shape, while everything downstream of the pprof file is shared.
+# A kind listed here but without a flavor implementation below fails
+# with "not yet supported" rather than "unsupported kind".
+_BENCH_FLAVORS = {
+    # --- BEGIN lang:rust ---
+    "rust_binary": "criterion",
+    # --- END lang:rust ---
+    # --- BEGIN lang:go ---
+    "go_test": "gotest",
+    # --- END lang:go ---
+    # --- BEGIN lang:cpp ---
+    "cc_binary": "google_benchmark",
+    # --- END lang:cpp ---
+    # --- BEGIN lang:python ---
+    "py_test": "pytest_benchmark",
+    # --- END lang:python ---
+    # --- BEGIN lang:java ---
+    "java_binary": "jmh",
+    # --- END lang:java ---
+}
+
+
+def _bench_flavor(label: str, cwd: Path) -> str:
+    kind = _rule_kind(label, cwd)
+    flavor = _BENCH_FLAVORS.get(kind)
+    if flavor is None:
+        supported = ", ".join(sorted(_BENCH_FLAVORS))
+        raise ProfileError(f"{label} has unsupported bench kind {kind}; supported kinds: {supported}")
+    return flavor
+
+
+def _unsupported_flavor(flavor: str) -> ProfileError:
+    return ProfileError(f"the {flavor} bench flavor is not yet supported by the runner")
+
+
 def _run_cpu_profile(
+    label: str,
+    outdir: Path,
+    cwd: Path,
+    tools: spine.Tools,
+    size: int | None,
+    profile_seconds: int,
+) -> None:
+    flavor = _bench_flavor(label, cwd)
+    # --- BEGIN lang:rust ---
+    if flavor == "criterion":
+        _run_cpu_profile_criterion(label, outdir, cwd, tools, size, profile_seconds)
+        return
+    # --- END lang:rust ---
+    # --- BEGIN lang:go ---
+    if flavor == "gotest":
+        _run_cpu_profile_gotest(label, outdir, cwd, tools, size, profile_seconds)
+        return
+    # --- END lang:go ---
+    raise _unsupported_flavor(flavor)
+
+
+# --- BEGIN lang:rust ---
+def _run_cpu_profile_criterion(
     label: str,
     outdir: Path,
     cwd: Path,
@@ -128,12 +188,58 @@ def _run_cpu_profile(
     env = _env(size, CRITERION_HOME=str(criterion_home))
     _bazel_run(
         label,
-        ["--", "--bench", "--profile-time", str(profile_seconds)],
+        ["--", *_criterion_args(profile_seconds)],
         cwd,
         env,
         config="profile",
     )
     _render_criterion_profiles(label, criterion_home, outdir, tools)
+
+
+def _criterion_args(profile_seconds: int | None) -> list[str]:
+    if profile_seconds is None:
+        return ["--bench"]
+    return ["--bench", "--profile-time", str(profile_seconds)]
+
+
+# --- END lang:rust ---
+
+
+# --- BEGIN lang:go ---
+def _run_cpu_profile_gotest(
+    label: str,
+    outdir: Path,
+    cwd: Path,
+    tools: spine.Tools,
+    size: int | None,
+    profile_seconds: int,
+) -> None:
+    pb = outdir / "profile.pb"
+    _bazel_run(label, ["--", *_gotest_args(pb, profile_seconds)], cwd, _env(size), config="profile")
+    _render_go_profile(label, pb, outdir, tools)
+
+
+def _gotest_args(pb: Path | None, profile_seconds: int | None) -> list[str]:
+    args = ["-test.run=^$", "-test.bench=."]
+    if profile_seconds is not None:
+        args.append(f"-test.benchtime={profile_seconds}s")
+    if pb is not None:
+        args.append(f"-test.cpuprofile={pb}")
+    return args
+
+
+def _render_go_profile(label: str, pb: Path, outdir: Path, tools: spine.Tools) -> None:
+    if not pb.is_file():
+        raise ProfileError(f"{label} did not write a CPU profile to {pb}")
+    name = _target_name(label)
+    folded = outdir / f"{name}.folded"
+    svg = outdir / f"{name}.svg"
+    spine.pprof_to_folded(tools, pb, folded)
+    spine.folded_to_svg(tools, folded, svg, title=f"{label} (CPU)", countname="samples")
+    _report(folded, svg, outdir / f"{name}.top.txt")
+
+
+# --- END lang:go ---
 
 
 def _run_cpu_profile_perf(
@@ -152,24 +258,36 @@ def _run_cpu_profile_perf(
     alongside as `<bench>.{folded,svg}` next to the `-perf` artifacts.
     """
     _check_perf_available()
+    flavor = _bench_flavor(label, cwd)
+    # --- BEGIN lang:rust ---
+    if flavor == "criterion":
+        criterion_home = outdir / "criterion"
+        env = _env(size, CRITERION_HOME=str(criterion_home))
+        _perf_record_and_render(label, _criterion_args(profile_seconds), env, outdir, cwd, tools)
+        _render_criterion_profiles(label, criterion_home, outdir, tools)
+        return
+    # --- END lang:rust ---
+    # --- BEGIN lang:go ---
+    if flavor == "gotest":
+        pb = outdir / "profile.pb"
+        _perf_record_and_render(label, _gotest_args(pb, profile_seconds), _env(size), outdir, cwd, tools)
+        _render_go_profile(label, pb, outdir, tools)
+        return
+    # --- END lang:go ---
+    raise _unsupported_flavor(flavor)
+
+
+def _perf_record_and_render(
+    label: str,
+    bench_args: list[str],
+    env: dict[str, str],
+    outdir: Path,
+    cwd: Path,
+    tools: spine.Tools,
+) -> None:
     binary = _built_binary(label, cwd)
-    criterion_home = outdir / "criterion"
-    env = _env(size, CRITERION_HOME=str(criterion_home))
     perf_data = outdir / "perf.data"
-    cmd = [
-        "perf",
-        "record",
-        "-F",
-        "997",
-        "-g",
-        "-o",
-        str(perf_data),
-        "--",
-        str(binary),
-        "--bench",
-        "--profile-time",
-        str(profile_seconds),
-    ]
+    cmd = ["perf", "record", "-F", "997", "-g", "-o", str(perf_data), "--", str(binary), *bench_args]
     result = subprocess.run(cmd, cwd=cwd, env=env, check=False)
     if result.returncode != 0:
         raise ProfileError(f"perf record failed with exit code {result.returncode}")
@@ -181,9 +299,9 @@ def _run_cpu_profile_perf(
     spine.folded_to_svg(tools, folded, svg, title=f"{label} (CPU, perf)", countname="samples")
     _report(folded, svg, outdir / f"{name}-perf.top.txt")
     perf_data.unlink(missing_ok=True)
-    _render_criterion_profiles(label, criterion_home, outdir, tools)
 
 
+# --- BEGIN lang:rust ---
 def _render_criterion_profiles(label: str, criterion_home: Path, outdir: Path, tools: spine.Tools) -> None:
     profiles = sorted(criterion_home.glob("**/profile/profile.pb"))
     if not profiles:
@@ -196,6 +314,9 @@ def _render_criterion_profiles(label: str, criterion_home: Path, outdir: Path, t
         spine.pprof_to_folded(tools, pb, folded)
         spine.folded_to_svg(tools, folded, svg, title=f"{label} {bench_id} (CPU)", countname="samples")
         _report(folded, svg, outdir / f"{bench_id}.top.txt")
+
+
+# --- END lang:rust ---
 
 
 def _check_perf_available() -> None:
@@ -256,7 +377,19 @@ def _run_mem_profile(
 
 
 def _run_measure(label: str, cwd: Path, size: int | None) -> None:
-    _bazel_run(label, ["--", "--bench"], cwd, _env(size), config=None)
+    flavor = _bench_flavor(label, cwd)
+    args: list[str] | None = None
+    # --- BEGIN lang:rust ---
+    if flavor == "criterion":
+        args = _criterion_args(None)
+    # --- END lang:rust ---
+    # --- BEGIN lang:go ---
+    if flavor == "gotest":
+        args = _gotest_args(None, None)
+    # --- END lang:go ---
+    if args is None:
+        raise _unsupported_flavor(flavor)
+    _bazel_run(label, ["--", *args], cwd, _env(size), config=None)
     print("\nreminder: quote timings from --measure runs only; profile runs distort them")
 
 
@@ -277,6 +410,15 @@ def _infer_mode(label: str, cwd: Path) -> str:
         if _discover(tag, label, cwd):
             return mode
     raise ProfileError(f"{label} is not tagged {_TAGS[CPU]} or {_TAGS[MEM]}")
+
+
+def _rule_kind(label: str, cwd: Path) -> str:
+    cmd = ["bazel", "query", "--output=label_kind", label]
+    result = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, check=False)
+    if result.returncode != 0:
+        raise ProfileError(f"bazel query failed:\n{result.stderr.strip()}")
+    # "<kind> rule <label>"
+    return result.stdout.split()[0]
 
 
 def _bazel_query(query: str, cwd: Path) -> str:

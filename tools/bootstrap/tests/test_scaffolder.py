@@ -517,6 +517,8 @@ class TestScaffolder(unittest.TestCase):
         target = self._scaffold({"rust", "go", "python"}, features={"profiling"})
         self.assertTrue((target / "tools" / "profile" / "BUILD").exists())
         self.assertTrue((target / "tools" / "profile" / "src" / "profiling" / "cli.py").exists())
+        self.assertTrue((target / "tools" / "profile" / "gazelle" / "rust.go").exists())
+        self.assertIn("profile_gen", (target / "BUILD").read_text())
         self.assertIn("build:profile", (target / ".bazelrc").read_text())
         self.assertIn("inferno", (target / "tools" / "rust" / "Cargo.toml").read_text())
         self.assertIn("gen_binaries", (target / "tools" / "rust" / "rust_segment.MODULE.bazel").read_text())
