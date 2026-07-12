@@ -163,6 +163,38 @@ CARGO_BAZEL_REPIN=1 bazel sync --only=crates                          # Rust   �
 bazel run @rules_go//go -- mod tidy                                   # Go     — go.mod / go.sum
 ```
 
+### Dependency Updates
+
+[Renovate](https://docs.renovatebot.com/) watches every manifest — `bazel_dep` versions in the MODULE segments, `tools/rust/Cargo.toml`, `go.mod`, the Maven artifact list, `tools/python/requirements.in`, and the `oci.pull` image digests — and opens a PR per update. CI validates each one like any other change; merge when green. To try one locally first:
+
+```bash
+gh pr checkout <number>       # e.g. gh pr checkout 49
+bazel test //...              # or just the affected module's tests
+```
+
+For a manual bump (or to take over a Renovate PR that needs extra work):
+
+```bash
+git switch -c build/<dep>-<version> main
+
+# 1. Edit the version where it lives:
+#    Bazel modules — bazel_dep(...) in the tools/<lang>/*.MODULE.bazel segments
+#    Rust          — tools/rust/Cargo.toml           Python — tools/python/requirements.in
+#    Go            — bazel run @rules_go//go -- get <module>@<version>
+#    Java          — artifacts in tools/java/java_segment.MODULE.bazel
+#    OCI images    — oci.pull digests in tools/publish/publish_segment.MODULE.bazel
+# 2. Regenerate the matching lock ("Regenerate dependency locks" above)
+
+bazel test //...
+bazel test --test_tag_filters=lint //...
+
+git add -A && git commit -m "Bump <dep> to <version>"
+git push -u origin build/<dep>-<version>
+gh pr create --base main --fill
+```
+
+**Distroless image PRs carry no changelog by nature**: the images are digest pins on floating tags (`:nonroot`) that upstream rebuilds continuously without versioned releases, so there is no release to link a digest to. Renovate instead injects a note and the upstream commit-history link into those PR bodies (configured in `renovate.json`); review them by checking the [distroless commit log](https://github.com/GoogleContainerTools/distroless/commits/main) and letting CI exercise the images.
+
 ### Remote Cache (BuildBuddy)
 
 Local builds can use a BuildBuddy remote cache for faster builds (bring your own API key):

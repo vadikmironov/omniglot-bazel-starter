@@ -7,5 +7,15 @@
       "fileMatch":[
          ".*\\.MODULE\\.bazel$"
       ]
-   }
+   },
+   "packageRules":[
+      {
+         "description":"Distroless images are digest pins on floating tags rebuilt continuously upstream — no versioned releases exist to render a changelog from. Link the source and say so in the PR body instead.",
+         "matchPackageNames":["/^gcr_io_distroless_/"],
+         "sourceUrl":"https://github.com/GoogleContainerTools/distroless",
+         "prBodyNotes":[
+            "**No changelog available**: distroless publishes digest-pinned floating tags with no versioned releases, so this digest cannot be mapped to release notes. Recent upstream changes: https://github.com/GoogleContainerTools/distroless/commits/main"
+         ]
+      }
+   ]
 }
