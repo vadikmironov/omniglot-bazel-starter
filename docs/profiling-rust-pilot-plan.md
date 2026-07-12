@@ -135,10 +135,30 @@ All three shipped together as PR #52.
 - **Heap sampling default is `lg_prof_sample:15`** (32 KiB), not 19 — 512 KiB sampling missed small live heaps (string-churn's final string).
 - **Extras pulled in**: `--incompatible_default_to_explicit_init_py` repo-wide (the runner surfaced rules_python's implicit-init deprecation warning, shared by mint/bootstrap), and slow benches use `sample_size(10)` to fit criterion's 5s window.
 
-## Next phases (not started)
+## Next phases
 
-1. **`perf` sampler path** — non-hermetic system sampling on the same runner (`inferno-collapse-perf` already ships with inferno); design doc phase 2.
-2. **Replication** — first PR: the opt-in gazelle workload-target generator (decided during planning); then Go → C++ (gperftools probe) → Python (folded adapters) → Java (JMH wiring).
+1. **`perf` sampler path** — SHIPPED (PR #54, 2026-07-12): `--sampler=perf` on CPU
+   benches; prereq checks (host perf, `perf_event_paranoid` ≤ 2); perf wraps the
+   built binary directly; `perf script | inferno-collapse-perf` into the shared
+   spine; `<target>-perf.*` artifacts beside the in-process per-function SVGs.
+2. **Replication opener — gazelle generator + Go** — SHIPPED with this doc update:
+   - Opt-in `# gazelle:profiling` package directive; `bazel run //:profile_gen`
+     generates `bench_*`/`mem_*` targets from `benches/` + `mem/` sources and
+     reaps orphans (ownership = name prefix + tag, so hand-written rules
+     survive); `-profiling_remove` teardown wired into bootstrap; CI convergence
+     check beside lint_gen/publish_gen. `modules/rust_workloads` converted to
+     generated form (reproduces the hand-written rules attribute-for-attribute).
+   - `modules/go_workloads`: 5 workloads (no fragmentation — manual-allocator
+     languages only). CPU = `testing.B` benches captured via `-test.cpuprofile`;
+     memory = `runtime/pprof` heap dumps, cross-platform (no Linux gate).
+   - Runner dispatches bench flavors by rule kind for all five languages
+     (criterion + gotest implemented; google_benchmark / pytest_benchmark / jmh
+     bail as not yet supported); per-language branches carry `lang:` bootstrap
+     markers and `engine.py` is a composite file.
+   - Docs rewritten language-independent: shared contract + per-language capture
+     table (template rows lang-gated).
+3. **Remaining** — C++ (gperftools packaging probe) → Python (pyinstrument/memray
+   folded adapters) → Java (JMH wiring); dtrace/macOS sampler deferred.
 
 ## Verification
 
