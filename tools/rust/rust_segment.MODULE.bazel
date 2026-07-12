@@ -29,7 +29,10 @@ crate.from_cargo(
 # bin crates, so their binaries must be requested explicitly.
 crate.annotation(
     crate = "inferno",
-    gen_binaries = ["inferno-flamegraph"],
+    gen_binaries = [
+        "inferno-collapse-perf",
+        "inferno-flamegraph",
+    ],
     repositories = ["crates"],
 )
 crate.annotation(

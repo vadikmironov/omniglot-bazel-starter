@@ -1,9 +1,10 @@
 # feature:profiling — Phase 1: Rust pilot — implementation plan
 
-> Status: **approved, execution in progress.** Companion to
-> [profiling-feature-design.md](profiling-feature-design.md); execution tracked
-> in the PR breakdown checkboxes below. Local planning notes — not user-facing
-> product docs.
+> Status: **shipped.** Merged into `main` as PR #52 (2026-07-11) — the three
+> planned PRs landed as one chunk. Companion to
+> [profiling-feature-design.md](profiling-feature-design.md). Local planning
+> notes — not user-facing product docs. See "Execution outcomes" at the end
+> for where reality diverged from the plan.
 
 ## Context
 
@@ -119,9 +120,25 @@ Docs (what/how only, no rationale) in root `README.md` "## Profiling", `CLAUDE.m
 
 ## PR breakdown (each independently green; user drives git/gh)
 
-- [ ] **PR 1 — workloads + capture deps** (absorbs Spikes B, C): `modules/rust_workloads/**`, Cargo.toml block (criterion/pprof/jemalloc crates) + repin, `.bazelrc` + `.gitignore` blocks. Demoable by hand (`bazel run --config=profile …:bench_matmul -- --bench --profile-time 5`; `mem_*` dump `.pb`). Markers referencing a not-yet-declared feature are harmless.
-- [ ] **PR 2 — spine + runner** (absorbs Spikes A, D): inferno/flamelens entries + annotations + repin, pprofutils go dep, `tools/profile/**`, end-to-end demo.
-- [ ] **PR 3 — bootstrap feature + docs**: manifest, mirror tests, three doc surfaces, scaffold smoke test.
+- [x] **PR 1 — workloads + capture deps** (absorbs Spikes B, C): `modules/rust_workloads/**`, Cargo.toml block (criterion/pprof/jemalloc crates) + repin, `.bazelrc` + `.gitignore` blocks. Demoable by hand (`bazel run --config=profile …:bench_matmul -- --bench --profile-time 5`; `mem_*` dump `.pb`). Markers referencing a not-yet-declared feature are harmless.
+- [x] **PR 2 — spine + runner** (absorbs Spikes A, D): inferno/flamelens entries + annotations + repin, pprofutils go dep, `tools/profile/**`, end-to-end demo.
+- [x] **PR 3 — bootstrap feature + docs**: manifest, mirror tests, three doc surfaces, scaffold smoke test.
+
+All three shipped together as PR #52.
+
+## Execution outcomes (deviations from the plan above)
+
+- **Spikes**: all four passed. Generated-binary labels are `@crates//:inferno__inferno-flamegraph` / `@crates//:flamelens__flamelens`; no flamelens degradation needed. `tikv-jemalloc-sys` autotools builds sandboxed on Linux. pprof 0.15 pairs with criterion 0.5 (`protobuf-codec`, not prost — prost needs host protoc).
+- **pprofutils** must be a go.mod **`tool` directive** (`go get -tool …`) — plain requires get dropped by `go mod tidy`. Its transitive `purego` needed bumping to 0.10.1 (0.6.0-alpha.5 ICEs the Go 1.26 compiler). `bazel mod tidy` auto-merged the `use_repo` into the `exclude` marker block; it lives in its own `feature:profiling` block now.
+- **Memory profiling is Linux-only** — `jemalloc_pprof` upstream supports only Linux, and jemalloc's autotools build fails under the hermetic toolchain on macOS (surfaced by macOS CI). `mem_*` targets carry `target_compatible_with = ["@platforms//os:linux"]`; macOS keeps CPU profiling. The design doc's dtrace sampler phase is the designed macOS memory story.
+- **Python package is `profiling`**, not `profile` (stdlib module shadowing); versions landed as tikv-jemallocator 0.7 / jemalloc_pprof 0.9 (0.6/0.8 conflict on the `links = "jemalloc"` sys crate).
+- **Heap sampling default is `lg_prof_sample:15`** (32 KiB), not 19 — 512 KiB sampling missed small live heaps (string-churn's final string).
+- **Extras pulled in**: `--incompatible_default_to_explicit_init_py` repo-wide (the runner surfaced rules_python's implicit-init deprecation warning, shared by mint/bootstrap), and slow benches use `sample_size(10)` to fit criterion's 5s window.
+
+## Next phases (not started)
+
+1. **`perf` sampler path** — non-hermetic system sampling on the same runner (`inferno-collapse-perf` already ships with inferno); design doc phase 2.
+2. **Replication** — first PR: the opt-in gazelle workload-target generator (decided during planning); then Go → C++ (gperftools probe) → Python (folded adapters) → Java (JMH wiring).
 
 ## Verification
 

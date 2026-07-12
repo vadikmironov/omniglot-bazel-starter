@@ -247,6 +247,9 @@ bazel run //tools/profile -- //modules/rust_workloads:bench_matmul --measure
 
 # Browse the captured stacks in the terminal (flamelens TUI)
 bazel run //tools/profile -- //modules/rust_workloads:bench_matmul --view
+
+# Sample with the host system profiler instead (non-hermetic; Linux perf)
+bazel run //tools/profile -- //modules/rust_workloads:bench_matmul --sampler=perf
 ```
 
 Artifacts land in `profile-out/<package>/<target>/{cpu|mem}/` as self-contained `.svg` flamegraphs (click-to-zoom, Ctrl-F search — open in any browser), `.folded` stacks, and `top.txt` summaries. `--all` profiles every discovered target; `--size N` rescales a workload (exported as `WORKLOAD_N`); `--profile-seconds S` adjusts capture length.
@@ -256,6 +259,7 @@ To profile your own code, tag a criterion-bench `rust_binary` with `profiling-cp
 - **Profile runs are not measurement runs.** Quote timings only from `--measure` runs; profiling distorts them.
 - **The memory story is jemalloc's.** Memory workloads link jemalloc (the heap profiler lives in the allocator), so allocator observations — fragmentation especially — describe jemalloc, not glibc malloc. Heap profiles record *live* allocations at dump time, sampled every 32 KiB by default (`MALLOC_CONF` env overrides); transient churn shows up through its allocation sites, not its peak volume.
 - **Memory profiling is Linux-only** (`jemalloc_pprof` supports only Linux); the `mem_*` targets are constrained accordingly and skip automatically elsewhere. CPU profiling works on Linux and macOS.
+- **`--sampler=perf` uses the host `perf`** (not Bazel-provided): install your distribution's linux-tools package and ensure `kernel.perf_event_paranoid` ≤ 2. Unlike in-process capture it sees kernel/syscall frames, and `perf stat`/hardware counters explain what flamegraphs can't (e.g. the matmul loop-order gap is `LLC-load-misses`, the pointer-chase gap is stalled cycles). One recording covers the whole bench binary and renders as `<target>-perf.svg` next to the per-function in-process SVGs. On WSL2, sampling works via software clock but hardware PMU counters are typically unavailable.
 
 ## Publishing
 

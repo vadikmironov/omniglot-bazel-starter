@@ -2,6 +2,7 @@
 capture, then the shared rendering spine over the captured profiles."""
 
 import os
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -32,10 +33,14 @@ def run_all(
     cwd: Path,
     size: int | None,
     profile_seconds: int,
+    sampler: str | None = None,
 ) -> None:
     failures = []
     ran = 0
-    for m in [CPU, MEM] if mode is None else [mode]:
+    modes = [CPU, MEM] if mode is None else [mode]
+    if sampler is not None:
+        modes = [CPU] if CPU in modes else []
+    for m in modes:
         for label in _discover(_TAGS[m], scope, cwd):
             ran += 1
             try:
@@ -47,6 +52,7 @@ def run_all(
                     cwd=cwd,
                     size=size,
                     profile_seconds=profile_seconds,
+                    sampler=sampler,
                 )
             except ProfileError as err:
                 failures.append((label, str(err)))
@@ -66,6 +72,7 @@ def run_one(
     cwd: Path,
     size: int | None,
     profile_seconds: int,
+    sampler: str | None = None,
 ) -> None:
     actual = _infer_mode(label, cwd)
     if mode is not None and mode != actual:
@@ -74,13 +81,20 @@ def run_one(
     if measure:
         if actual == MEM:
             raise ProfileError("--measure applies to CPU benches only; memory workloads run once")
+        if sampler is not None:
+            raise ProfileError("--measure and --sampler are mutually exclusive")
         _run_measure(label, cwd, size)
         return
+
+    if sampler is not None and actual == MEM:
+        raise ProfileError("--sampler applies to CPU benches only; memory capture is in-process")
 
     outdir = _outdir(out_root, label, actual)
     outdir.mkdir(parents=True, exist_ok=True)
     tools = spine.resolve_tools()
-    if actual == CPU:
+    if actual == CPU and sampler is not None:
+        _run_cpu_profile_perf(label, outdir, cwd, tools, size, profile_seconds)
+    elif actual == CPU:
         _run_cpu_profile(label, outdir, cwd, tools, size, profile_seconds)
     else:
         _run_mem_profile(label, outdir, cwd, tools, size)
@@ -119,7 +133,58 @@ def _run_cpu_profile(
         env,
         config="profile",
     )
+    _render_criterion_profiles(label, criterion_home, outdir, tools)
 
+
+def _run_cpu_profile_perf(
+    label: str,
+    outdir: Path,
+    cwd: Path,
+    tools: spine.Tools,
+    size: int | None,
+    profile_seconds: int,
+) -> None:
+    """Sample the bench binary with the host `perf` (non-hermetic opt-in).
+
+    perf wraps the built binary directly — wrapping `bazel run` would profile
+    the bazel client. One recording covers every bench function in the target;
+    the in-process profiler still runs, so its per-function view is rendered
+    alongside as `<bench>.{folded,svg}` next to the `-perf` artifacts.
+    """
+    _check_perf_available()
+    binary = _built_binary(label, cwd)
+    criterion_home = outdir / "criterion"
+    env = _env(size, CRITERION_HOME=str(criterion_home))
+    perf_data = outdir / "perf.data"
+    cmd = [
+        "perf",
+        "record",
+        "-F",
+        "997",
+        "-g",
+        "-o",
+        str(perf_data),
+        "--",
+        str(binary),
+        "--bench",
+        "--profile-time",
+        str(profile_seconds),
+    ]
+    result = subprocess.run(cmd, cwd=cwd, env=env, check=False)
+    if result.returncode != 0:
+        raise ProfileError(f"perf record failed with exit code {result.returncode}")
+
+    name = _target_name(label)
+    folded = outdir / f"{name}-perf.folded"
+    svg = outdir / f"{name}-perf.svg"
+    spine.perf_to_folded(tools, perf_data, folded)
+    spine.folded_to_svg(tools, folded, svg, title=f"{label} (CPU, perf)", countname="samples")
+    _report(folded, svg, outdir / f"{name}-perf.top.txt")
+    perf_data.unlink(missing_ok=True)
+    _render_criterion_profiles(label, criterion_home, outdir, tools)
+
+
+def _render_criterion_profiles(label: str, criterion_home: Path, outdir: Path, tools: spine.Tools) -> None:
     profiles = sorted(criterion_home.glob("**/profile/profile.pb"))
     if not profiles:
         raise ProfileError(f"{label} produced no profile.pb under {criterion_home}")
@@ -131,6 +196,43 @@ def _run_cpu_profile(
         spine.pprof_to_folded(tools, pb, folded)
         spine.folded_to_svg(tools, folded, svg, title=f"{label} {bench_id} (CPU)", countname="samples")
         _report(folded, svg, outdir / f"{bench_id}.top.txt")
+
+
+def _check_perf_available() -> None:
+    if shutil.which("perf") is None:
+        raise ProfileError(
+            "perf not found on PATH; the system sampler is non-hermetic — "
+            "install it via your distribution's linux-tools package"
+        )
+    paranoid = Path("/proc/sys/kernel/perf_event_paranoid")
+    try:
+        level = int(paranoid.read_text().strip())
+    except (OSError, ValueError):
+        return
+    if level > 2:
+        raise ProfileError(
+            f"kernel.perf_event_paranoid={level} blocks unprivileged sampling; "
+            "lower it, e.g. sudo sysctl kernel.perf_event_paranoid=2"
+        )
+
+
+def _built_binary(label: str, cwd: Path) -> Path:
+    """Build the target and return its output binary path (workspace-relative)."""
+    build = subprocess.run(["bazel", "build", "--config=profile", label], cwd=cwd, check=False)
+    if build.returncode != 0:
+        raise ProfileError(f"bazel build {label} failed with exit code {build.returncode}")
+    files = _bazel_cquery_files(label, cwd)
+    if len(files) != 1:
+        raise ProfileError(f"{label} produced {len(files)} output files; expected a single binary")
+    return cwd / files[0]
+
+
+def _bazel_cquery_files(label: str, cwd: Path) -> list[str]:
+    cmd = ["bazel", "cquery", "--config=profile", "--output=files", label]
+    result = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, check=False)
+    if result.returncode != 0:
+        raise ProfileError(f"bazel cquery failed:\n{result.stderr.strip()}")
+    return [line for line in result.stdout.splitlines() if line]
 
 
 def _run_mem_profile(
@@ -211,8 +313,11 @@ def _env(size: int | None, **extra: str) -> dict[str, str]:
     return env
 
 
-def _outdir(out_root: Path, label: str, mode: str) -> Path:
+def _target_name(label: str) -> str:
     pkg, _, name = label.replace("@", "").lstrip("/").partition(":")
-    if not name:
-        name = pkg.rsplit("/", 1)[-1]
-    return out_root / pkg.replace("/", "_") / name / mode
+    return name or pkg.rsplit("/", 1)[-1]
+
+
+def _outdir(out_root: Path, label: str, mode: str) -> Path:
+    pkg, _, _ = label.replace("@", "").lstrip("/").partition(":")
+    return out_root / pkg.replace("/", "_") / _target_name(label) / mode

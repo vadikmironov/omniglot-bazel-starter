@@ -41,9 +41,11 @@ py_binary(
     data = [
         "@com_github_felixge_pprofutils_v2//cmd/pprofutils",
         "@crates//:flamelens__flamelens",
+        "@crates//:inferno__inferno-collapse-perf",
         "@crates//:inferno__inferno-flamegraph",
     ],
     env = {
+        "PROFILE_COLLAPSE_PERF": "$(rlocationpath @crates//:inferno__inferno-collapse-perf)",
         "PROFILE_FLAMELENS": "$(rlocationpath @crates//:flamelens__flamelens)",
         "PROFILE_INFERNO": "$(rlocationpath @crates//:inferno__inferno-flamegraph)",
         "PROFILE_PPROFUTILS": "$(rlocationpath @com_github_felixge_pprofutils_v2//cmd/pprofutils)",

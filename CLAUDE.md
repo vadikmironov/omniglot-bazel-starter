@@ -165,6 +165,9 @@ bazel run //tools/profile -- --all
 bazel run //tools/profile -- //modules/rust_workloads:bench_matmul --measure
 bazel run //tools/profile -- //modules/rust_workloads:bench_matmul --view
 
+# System sampler (non-hermetic; needs host perf, kernel.perf_event_paranoid <= 2)
+bazel run //tools/profile -- //modules/rust_workloads:bench_matmul --sampler=perf
+
 # Options: --size N (WORKLOAD_N), --profile-seconds S, --scope PATTERN, --out DIR
 ```
 

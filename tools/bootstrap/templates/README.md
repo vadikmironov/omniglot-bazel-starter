@@ -170,6 +170,10 @@ bazel run //tools/profile -- //path/to:bench_target --measure
 
 # Terminal flamegraph viewer; --all profiles every discovered target
 bazel run //tools/profile -- //path/to:bench_target --view
+
+# Sample with the host system profiler instead (non-hermetic; Linux perf,
+# CPU benches only; needs kernel.perf_event_paranoid <= 2)
+bazel run //tools/profile -- //path/to:bench_target --sampler=perf
 ```
 
 To make a target profilable:

@@ -17,9 +17,6 @@ def main(argv: list[str] | None = None) -> None:
     parser = _build_parser()
     args = parser.parse_args(argv)
 
-    if args.sampler:
-        sys.exit("--sampler is not yet implemented; only in-process capture is available")
-
     workspace = _resolve_workspace()
     out_root = args.out or workspace / "profile-out"
 
@@ -36,6 +33,7 @@ def main(argv: list[str] | None = None) -> None:
                 cwd=workspace,
                 size=args.size,
                 profile_seconds=args.profile_seconds,
+                sampler=args.sampler,
             )
         elif args.target:
             engine.run_one(
@@ -46,6 +44,7 @@ def main(argv: list[str] | None = None) -> None:
                 cwd=workspace,
                 size=args.size,
                 profile_seconds=args.profile_seconds,
+                sampler=args.sampler,
             )
         else:
             parser.error("a target label is required (or use --list / --all)")
@@ -89,7 +88,12 @@ def _build_parser() -> argparse.ArgumentParser:
         help="per-bench profiling duration for CPU targets (default: 5)",
     )
     parser.add_argument("--out", type=Path, help="artifact directory (default: <workspace>/profile-out)")
-    parser.add_argument("--sampler", help="reserved for the external system sampler")
+    parser.add_argument(
+        "--sampler",
+        choices=["perf"],
+        help="sample with the host system profiler instead of in-process capture "
+        "(non-hermetic; Linux perf only, CPU benches only)",
+    )
     return parser
 
 
