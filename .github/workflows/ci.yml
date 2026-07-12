@@ -122,6 +122,13 @@ jobs:
           echo "ERROR: :publish targets are out of date. Run: bazel run //:publish_gen" >&2
           exit 1
         fi
+    - name: Check profiling workload targets up-to-date
+      run: |
+        bazel run //:profile_gen
+        if ! git diff --exit-code -- '**/BUILD' '**/BUILD.bazel'; then
+          echo "ERROR: workload targets are out of date. Run: bazel run //:profile_gen" >&2
+          exit 1
+        fi
     - name: Mint dry-run smoke test
       # Exercises the mint engine end-to-end (scope resolution, version
       # planning, :publish_image discovery via bazel query) without

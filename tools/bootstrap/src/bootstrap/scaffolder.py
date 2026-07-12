@@ -470,6 +470,12 @@ _FEATURE_FINALIZERS: list[tuple[str, str, list[str], dict[str, str]]] = [
         ["bazel", "run", "//:lint_gen"],
         {},
     ),
+    (
+        "profiling",
+        "Generate profiling workload targets via gazelle",
+        ["bazel", "run", "//:profile_gen"],
+        {},
+    ),
 ]
 
 
@@ -549,6 +555,12 @@ _FEATURE_REMOVERS: list[tuple[str, str, list[str], dict[str, str]]] = [
         "publish",
         "Strip generated publish targets",
         ["bazel", "run", "//:publish_gen", "--", "-publish_remove"],
+        {},
+    ),
+    (
+        "profiling",
+        "Strip generated profiling workload targets",
+        ["bazel", "run", "//:profile_gen", "--", "-profiling_remove"],
         {},
     ),
 ]

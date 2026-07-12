@@ -156,7 +156,10 @@ TeamCity instance — wire it into your CI.
 
 CPU and memory profiling driven by tagged benchmark targets, rendered to
 flamegraphs by a fully hermetic toolchain (in-process capture → pprof → folded
-stacks → inferno SVG — no system tools needed):
+stacks → inferno SVG — no system tools needed). The contract is
+language-independent: targets tagged `profiling-cpu` are framework benches,
+targets tagged `profiling-mem` are one-shot memory workload binaries, and the
+runner drives either:
 
 ```bash
 # List profilable targets (tags: profiling-cpu / profiling-mem)
@@ -176,19 +179,27 @@ bazel run //tools/profile -- //path/to:bench_target --view
 bazel run //tools/profile -- //path/to:bench_target --sampler=perf
 ```
 
-To make a target profilable:
+To make a package profilable, add `# gazelle:profiling` to its BUILD file and
+run `bazel run //:profile_gen` — workload sources under `benches/` (CPU) and
+`mem/` (one-shot memory) get tagged targets generated, wired to the package's
+library, and reaped when sources disappear. Hand-written targets carrying the
+tags work equally; packages without the directive are never touched.
 
-- **CPU**: a criterion-bench `rust_binary` configured with pprof-rs's
-  `PProfProfiler(Output::Protobuf)`, tagged `profiling-cpu`.
-- **Memory**: a one-shot `rust_binary` that links `tikv-jemallocator`
-  (`profiling` feature) as the global allocator and dumps a `jemalloc_pprof`
-  profile to `$MEMPROF_OUT`, tagged `profiling-mem`. Memory profiling is
-  Linux-only (`jemalloc_pprof` supports only Linux) — constrain such targets
-  with `target_compatible_with = ["@platforms//os:linux"]`.
+Capture is per-language; the rendering spine and the runner are shared:
+
+| Language | CPU bench (`benches/`) | Memory workload (`mem/`) |
+|---|---|---|
+# --- END feature:profiling ---
+# --- BEGIN feature:profiling lang:rust ---
+| Rust | criterion + pprof-rs (`PProfProfiler(Output::Protobuf)`) | `tikv-jemallocator` (`profiling` feature) as global allocator + `jemalloc_pprof` dump to `$MEMPROF_OUT`, via a `mem/prof_dump.rs` shim; Linux-only (`jemalloc_pprof` upstream limit) — constrain with `target_compatible_with = ["@platforms//os:linux"]` |
+# --- END feature:profiling lang:rust ---
+# --- BEGIN feature:profiling lang:go ---
+| Go | `testing.B` benches in `benches/bench_*_test.go` (stdlib capture via `-test.cpuprofile`) | `runtime/pprof` heap profile dumped to `$MEMPROF_OUT` after `runtime.GC()`, via a `mem/prof_dump.go` shim; cross-platform |
+# --- END feature:profiling lang:go ---
+# --- BEGIN feature:profiling ---
 
 Never quote timings from profile runs — use `--measure`; profiling distorts
-timing. Memory observations describe jemalloc (the heap profiler lives in the
-allocator), and heap profiles record live allocations at dump time.
+timing.
 # --- END feature:profiling ---
 # --- BEGIN lang:python ---
 

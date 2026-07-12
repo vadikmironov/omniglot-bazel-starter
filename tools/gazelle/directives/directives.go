@@ -52,6 +52,14 @@ const (
 	// publish_gen neither generates nor reaps publish rules.
 	PublishIgnoreKeep = "publish_ignore_keep"
 	// --- END feature:publish ---
+
+	// --- BEGIN feature:profiling ---
+
+	// Profiling is the per-package opt-in (# gazelle:profiling): generate
+	// tagged workload targets from the package's benches/ and mem/ source
+	// files. Packages without the directive are never touched.
+	Profiling = "profiling"
+	// --- END feature:profiling ---
 )
 
 // All returns the repo-wide directive vocabulary: the union of every
@@ -68,5 +76,8 @@ func All() []string {
 	// --- BEGIN feature:publish ---
 	d = append(d, PublishIgnore, PublishIgnoreArtifact, PublishIgnoreImage, PublishIgnoreKeep)
 	// --- END feature:publish ---
+	// --- BEGIN feature:profiling ---
+	d = append(d, Profiling)
+	// --- END feature:profiling ---
 	return d
 }

@@ -146,3 +146,15 @@ gazelle(
     gazelle = "//tools/lint/gazelle:gazelle_lint",
 )
 # --- END feature:lint ---
+
+# --- BEGIN feature:profiling ---
+# Gazelle driver for the profiling extension. Generates tagged workload
+# targets from benches/ and mem/ sources in packages opted in via
+# # gazelle:profiling (see tools/profile/gazelle/).
+#   bazel run //:profile_gen                  # apply
+#   bazel run //:profile_gen -- -mode diff    # preview
+gazelle(
+    name = "profile_gen",
+    gazelle = "//tools/profile/gazelle:gazelle_profiling",
+)
+# --- END feature:profiling ---

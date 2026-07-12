@@ -2,91 +2,9 @@ load("@rules_rust//rust:defs.bzl", "rust_binary", "rust_library", "rust_test")
 load("//tools/lint:linters.bzl", "clippy_test")
 
 # gazelle:publish_ignore
+# gazelle:profiling
 
 package(default_visibility = ["//visibility:public"])
-
-rust_binary(
-    name = "bench_matmul",
-    srcs = ["benches/bench_matmul.rs"],
-    tags = ["profiling-cpu"],
-    deps = [
-        ":rust_workloads",
-        "@crates//:criterion",
-        "@crates//:pprof",
-    ],
-)
-
-rust_binary(
-    name = "bench_quicksort",
-    srcs = ["benches/bench_quicksort.rs"],
-    tags = ["profiling-cpu"],
-    deps = [
-        ":rust_workloads",
-        "@crates//:criterion",
-        "@crates//:pprof",
-    ],
-)
-
-rust_binary(
-    name = "bench_pointer_chase",
-    srcs = ["benches/bench_pointer_chase.rs"],
-    tags = ["profiling-cpu"],
-    deps = [
-        ":rust_workloads",
-        "@crates//:criterion",
-        "@crates//:pprof",
-    ],
-)
-
-# Memory workloads are Linux-only: jemalloc_pprof supports only Linux, and
-# jemalloc's autotools build fails under the hermetic toolchain on macOS.
-rust_binary(
-    name = "mem_retained_growth",
-    srcs = [
-        "mem/mem_retained_growth.rs",
-        "mem/prof_dump.rs",
-    ],
-    crate_root = "mem/mem_retained_growth.rs",
-    tags = ["profiling-mem"],
-    target_compatible_with = ["@platforms//os:linux"],
-    deps = [
-        ":rust_workloads",
-        "@crates//:jemalloc_pprof",
-        "@crates//:tikv-jemallocator",
-    ],
-)
-
-rust_binary(
-    name = "mem_string_churn",
-    srcs = [
-        "mem/mem_string_churn.rs",
-        "mem/prof_dump.rs",
-    ],
-    crate_root = "mem/mem_string_churn.rs",
-    tags = ["profiling-mem"],
-    target_compatible_with = ["@platforms//os:linux"],
-    deps = [
-        ":rust_workloads",
-        "@crates//:jemalloc_pprof",
-        "@crates//:tikv-jemallocator",
-    ],
-)
-
-rust_binary(
-    name = "mem_fragmentation",
-    srcs = [
-        "mem/mem_fragmentation.rs",
-        "mem/prof_dump.rs",
-    ],
-    crate_root = "mem/mem_fragmentation.rs",
-    tags = ["profiling-mem"],
-    target_compatible_with = ["@platforms//os:linux"],
-    deps = [
-        ":rust_workloads",
-        "@crates//:jemalloc_pprof",
-        "@crates//:tikv-jemallocator",
-    ],
-)
 
 rust_library(
     name = "rust_workloads",
@@ -156,4 +74,85 @@ clippy_test(
     size = "small",
     srcs = [":rust_workloads_test"],
     tags = ["lint"],
+)
+
+rust_binary(
+    name = "bench_matmul",
+    srcs = ["benches/bench_matmul.rs"],
+    tags = ["profiling-cpu"],
+    deps = [
+        ":rust_workloads",
+        "@crates//:criterion",
+        "@crates//:pprof",
+    ],
+)
+
+rust_binary(
+    name = "bench_pointer_chase",
+    srcs = ["benches/bench_pointer_chase.rs"],
+    tags = ["profiling-cpu"],
+    deps = [
+        ":rust_workloads",
+        "@crates//:criterion",
+        "@crates//:pprof",
+    ],
+)
+
+rust_binary(
+    name = "bench_quicksort",
+    srcs = ["benches/bench_quicksort.rs"],
+    tags = ["profiling-cpu"],
+    deps = [
+        ":rust_workloads",
+        "@crates//:criterion",
+        "@crates//:pprof",
+    ],
+)
+
+rust_binary(
+    name = "mem_fragmentation",
+    srcs = [
+        "mem/mem_fragmentation.rs",
+        "mem/prof_dump.rs",
+    ],
+    crate_root = "mem/mem_fragmentation.rs",
+    tags = ["profiling-mem"],
+    target_compatible_with = ["@platforms//os:linux"],
+    deps = [
+        ":rust_workloads",
+        "@crates//:jemalloc_pprof",
+        "@crates//:tikv-jemallocator",
+    ],
+)
+
+rust_binary(
+    name = "mem_retained_growth",
+    srcs = [
+        "mem/mem_retained_growth.rs",
+        "mem/prof_dump.rs",
+    ],
+    crate_root = "mem/mem_retained_growth.rs",
+    tags = ["profiling-mem"],
+    target_compatible_with = ["@platforms//os:linux"],
+    deps = [
+        ":rust_workloads",
+        "@crates//:jemalloc_pprof",
+        "@crates//:tikv-jemallocator",
+    ],
+)
+
+rust_binary(
+    name = "mem_string_churn",
+    srcs = [
+        "mem/mem_string_churn.rs",
+        "mem/prof_dump.rs",
+    ],
+    crate_root = "mem/mem_string_churn.rs",
+    tags = ["profiling-mem"],
+    target_compatible_with = ["@platforms//os:linux"],
+    deps = [
+        ":rust_workloads",
+        "@crates//:jemalloc_pprof",
+        "@crates//:tikv-jemallocator",
+    ],
 )

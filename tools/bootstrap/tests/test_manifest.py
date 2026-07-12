@@ -197,6 +197,29 @@ class TestLoadManifest(unittest.TestCase):
         self.assertIn("tools/profile", feat.directories)
         # tools/profile/BUILD is section-filtered so its lint rules are gated.
         self.assertIn("tools/profile/BUILD", feat.composite_files)
+        # The gazelle extension's multi-language files are composite so their
+        # lang: markers filter; per-language generators (and their tests) are
+        # gated on feature AND language, like lint's.
+        for f in (
+            "tools/profile/src/profiling/engine.py",
+            "tools/profile/gazelle/BUILD",
+            "tools/profile/gazelle/lang.go",
+            "tools/profile/gazelle/kinds.go",
+            "tools/profile/gazelle/generate.go",
+        ):
+            self.assertIn(f, feat.composite_files)
+        clf = feat.composite_language_files
+        self.assertEqual(
+            clf.get("rust"),
+            ["tools/profile/gazelle/rust.go", "tools/profile/gazelle/generate_test.go"],
+        )
+        self.assertEqual(clf.get("go"), ["tools/profile/gazelle/go.go"])
+        # The shared gazelle vocabulary ships under lint OR publish OR profiling.
+        for f in (
+            "tools/gazelle/directives/directives.go",
+            "tools/gazelle/vocab/vocab.go",
+        ):
+            self.assertIn(f, feat.composite_files)
         # Example workloads (modules/rust_workloads) never ship — no entry.
         # Everything else is marker-gated in already-composite files; the rust
         # segment joined them for its gen_binaries annotation block.
