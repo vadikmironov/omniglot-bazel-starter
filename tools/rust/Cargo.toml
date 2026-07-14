@@ -17,7 +17,7 @@ path = "fake.rs"
 # --- END user-managed ---
 # --- BEGIN feature:profiling ---
 # Workload inputs (seeded, deterministic)
-rand = { version = "0.9" }
+rand = { version = "0.10" }
 # CPU capture: criterion benches profiled in-process by pprof-rs
 # (pprof's `criterion` feature is built against criterion 0.5; keep majors in sync).
 # protobuf-codec is the pure-Rust codegen path — prost-codec needs a host protoc.
