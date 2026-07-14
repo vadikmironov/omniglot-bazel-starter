@@ -203,6 +203,14 @@ state it so consumers never quote timings from a profiled run.
    it via google/pprof (a go.mod `tool`, like pprofutils) with `PPROF_TOOLS` pointed at the
    toolchain's own `llvm-symbolizer`, keeping the pipeline hermetic.
 
+   macOS-build addendum (2026-07-14, caught by CI on the PR): gperftools has platform-conditional
+   dead code — `/proc`-parsing helpers (`readlink_strdup`, `CopyStringUntilChar`,
+   `StringToIntegerUntilCharWithCheck`) that are live on Linux but unused on Darwin, so
+   `-Wunused-function` fires only on macOS and the repo-wide `-Werror` makes it fatal (a Linux-only
+   local build never sees it). Rather than chase a per-warning, per-OS suppression list for a
+   vendored library we don't maintain, the `.bazelrc` scopes `-Wno-error` to `external/gperftools.*`
+   — its own warnings become non-fatal while first-party `-Werror` is untouched.
+
    **FOLLOW-UP — report (a) upstream to gperftools**: the pid-suffixing looks like a bug, not a
    design choice. `GetUniquePathFromEnv` (src/base/sysinfo.cc) sets `CPUPROFILE_USE_PID=1` in its
    own environment so that *forked children* uniquify their profile names — but profiler.cc
