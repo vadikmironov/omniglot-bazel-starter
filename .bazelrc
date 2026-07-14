@@ -305,6 +305,13 @@ build:profile --@rules_rust//rust/settings:extra_rustc_flags=-Cdebuginfo=2,-Cfor
 # -Werror also escalates "unrecognized command-line option" — if a
 # gcc_hermetic build of google_benchmark ever starts failing, look here.
 build --per_file_copt=external/google_benchmark.*@-Wno-thread-safety-analysis
+# gperftools is a large vendored C library with platform-conditional dead
+# code (e.g. /proc helpers unused on Darwin -> -Wunused-function); under the
+# repo-wide -Werror its own warnings would gate our build, and they differ
+# per platform so a narrow per-warning list churns across OSes. We don't own
+# or fix this source, so demote all of its warnings back to non-fatal rather
+# than police a third-party TU. First-party -Werror is unaffected.
+build --per_file_copt=external/gperftools.*@-Wno-error
 # Debug info for inline-frame symbolization and frame pointers for reliable
 # in-process stack capture (the C++ counterpart of the rust settings above).
 build:profile --copt=-g --copt=-fno-omit-frame-pointer
