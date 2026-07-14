@@ -257,6 +257,15 @@ maven.install(
         "org.junit.jupiter:junit-jupiter-params:6.1.1",
         "org.junit.jupiter:junit-jupiter-engine:6.1.1",
 
+        # --- BEGIN feature:profiling ---
+        # JMH bench framework (the annotation processor generates the harness)
+        # and async-profiler's JFR -> collapsed-stacks converter, both driven
+        # by bazel run //tools/profile.
+        "org.openjdk.jmh:jmh-core:1.37",
+        "org.openjdk.jmh:jmh-generator-annprocess:1.37",
+        "tools.profiler:jfr-converter:4.0",
+        # --- END feature:profiling ---
+
         # --- BEGIN user-managed ---
         # Your Maven coordinates here. Preserved across re-bootstrap.
         # --- END user-managed ---

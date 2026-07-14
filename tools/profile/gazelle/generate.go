@@ -41,6 +41,15 @@ func (p *profilingLang) GenerateRules(args language.GenerateArgs) language.Gener
 		// --- BEGIN lang:go ---
 		rules = append(rules, generateGoWorkloads(args)...)
 		// --- END lang:go ---
+		// --- BEGIN lang:cpp ---
+		rules = append(rules, generateCppWorkloads(args)...)
+		// --- END lang:cpp ---
+		// --- BEGIN lang:python ---
+		rules = append(rules, generatePythonWorkloads(args)...)
+		// --- END lang:python ---
+		// --- BEGIN lang:java ---
+		rules = append(rules, generateJavaWorkloads(args)...)
+		// --- END lang:java ---
 	}
 
 	imports := make([]interface{}, len(rules))
@@ -49,6 +58,21 @@ func (p *profilingLang) GenerateRules(args language.GenerateArgs) language.Gener
 		Imports: imports,
 		Empty:   computeEmpty(args, rules),
 	}
+}
+
+// reapKinds is every rule kind any language's generator may ever have
+// emitted, as literal strings and deliberately NOT gated by lang markers
+// (unlike profilingKinds): a scaffold that drops a language after
+// generating its workloads must still recognize the leftover rules for
+// deletion, or they dangle against the language's pruned dependencies.
+var reapKinds = map[string]bool{
+	"cc_binary":   true,
+	"go_binary":   true,
+	"go_test":     true,
+	"java_binary": true,
+	"py_binary":   true,
+	"py_test":     true,
+	"rust_binary": true,
 }
 
 // computeEmpty walks the existing BUILD for generated-looking workload
@@ -66,7 +90,7 @@ func computeEmpty(args language.GenerateArgs, generated []*rule.Rule) []*rule.Ru
 	}
 	var empty []*rule.Rule
 	for _, r := range args.File.Rules {
-		if _, owned := profilingKinds[r.Kind()]; !owned {
+		if !reapKinds[r.Kind()] {
 			continue
 		}
 		if !looksGenerated(r) || keep[r.Name()] {

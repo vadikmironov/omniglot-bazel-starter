@@ -157,21 +157,21 @@ C++ uses LLVM source-based coverage on the default Clang toolchain (no flags nee
 bazel run //tools/profile -- --list
 
 # Profile a CPU bench or a one-shot memory workload
-bazel run //tools/profile -- //modules/{rust|go}_workloads:bench_matmul
-bazel run //tools/profile -- //modules/{rust|go}_workloads:mem_retained_growth
+bazel run //tools/profile -- //modules/{rust|go|cpp|python|java}_workloads:bench_matmul
+bazel run //tools/profile -- //modules/{rust|go|cpp|python|java}_workloads:mem_retained_growth
 
 # Batch, measure mode (real timings, no profiler), terminal flamegraph viewer
 bazel run //tools/profile -- --all
-bazel run //tools/profile -- //modules/{rust|go}_workloads:bench_matmul --measure
-bazel run //tools/profile -- //modules/{rust|go}_workloads:bench_matmul --view
+bazel run //tools/profile -- //modules/{rust|go|cpp|python|java}_workloads:bench_matmul --measure
+bazel run //tools/profile -- //modules/{rust|go|cpp|python|java}_workloads:bench_matmul --view
 
 # System sampler (non-hermetic; needs host perf, kernel.perf_event_paranoid <= 2)
-bazel run //tools/profile -- //modules/{rust|go}_workloads:bench_matmul --sampler=perf
+bazel run //tools/profile -- //modules/{rust|go|cpp|python|java}_workloads:bench_matmul --sampler=perf
 
 # Options: --size N (WORKLOAD_N), --profile-seconds S, --scope PATTERN, --out DIR
 ```
 
-Artifacts: `profile-out/<pkg>/<target>/{cpu|mem}/` — SVG flamegraph, `.folded` stacks, top-N text. The contract is language-independent: targets are discovered by tag (`profiling-cpu` = framework benches, `profiling-mem` = one-shot memory binaries); capture is per-language while the rendering spine and runner are shared (per-language capture matrix: README.md "Profiling"). Workload targets are gazelle-generated: add `# gazelle:profiling` to a package's BUILD and run `bazel run //:profile_gen` — sources under `benches/` and `mem/` map to tagged targets (opt-in; packages without the directive are never touched). Never quote timings from profile runs — use `--measure`. Example workloads live in `modules/rust_workloads` and `modules/go_workloads`. Runner and rendering spine live in `tools/profile/`, gated behind the `profiling` bootstrap feature (requires rust + go + python toolchains).
+Artifacts: `profile-out/<pkg>/<target>/{cpu|mem}/` — SVG flamegraph, `.folded` stacks, top-N text. The contract is language-independent: targets are discovered by tag (`profiling-cpu` = framework benches, `profiling-mem` = one-shot memory binaries); capture is per-language while the rendering spine and runner are shared (per-language capture matrix: README.md "Profiling"). Workload targets are gazelle-generated: add `# gazelle:profiling` to a package's BUILD and run `bazel run //:profile_gen` — sources under `benches/` and `mem/` map to tagged targets (opt-in; packages without the directive are never touched). Never quote timings from profile runs — use `--measure`. Example workloads live in `modules/{rust,go,cpp,python,java}_workloads`. Runner and rendering spine live in `tools/profile/`, gated behind the `profiling` bootstrap feature (requires rust + go + python toolchains).
 
 ## Publishing
 

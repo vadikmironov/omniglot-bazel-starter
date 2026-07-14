@@ -187,22 +187,41 @@ state it so consumers never quote timings from a profiled run.
 
 ## Open de-risking items
 
-1. **Python folded adapters** — the residue of what was "per-language conversion is fiddly"
-   after the pprof interchange model consolidated everything else. Two small in-repo pieces:
-   pyinstrument → folded (~20-line renderer on its Session/Frame API) and memray → folded
-   (~30-line adapter on its documented reader API). Closure: write both against a toy capture.
-2. **gperftools Bazel packaging** — not cleanly in BCR (`com_google_tcmalloc` is a different thing).
-   The C++ in-process CPU/heap profiler needs an `http_archive` / custom build. Named fallback if
-   packaging fails: C/C++ in-process CPU documents the `perf` sampler as its only CPU path, and
-   heap falls back to jemalloc's profiler (same pprof-readable output as the Rust path).
+1. **Python folded adapters** — **RESOLVED (Python phase, 2026-07)**: both adapters shipped at
+   roughly the predicted size — pyinstrument → folded walks `Session.root_frame()` weighting
+   stacks by `total_self_time` (synthetic `[self]` frames folded into their parents), and
+   memray → folded sums `get_leaked_allocation_records()` sizes per stack (live-at-exit =
+   the retained heap). They live in the workload package as the shared `benches/conftest.py`
+   and `mem/prof_dump.py` shims, not in the runner — capture stays workload-side, folded is
+   the interchange. The real Python finding was elsewhere: deficiencies item 4.
+2. **gperftools Bazel packaging** — **RESOLVED (C++ phase, 2026-07)**: gperftools landed in BCR
+   (2.18.1) with upstream Bazel support exposing `//:cpu_profiler` and `//:tcmalloc`; both build
+   under the hermetic LLVM toolchain. Two probe findings shaped the capture path: (a) the
+   `CPUPROFILE` env activation resolves its output path twice and pid-suffixes the real file, so
+   benches use explicit `ProfilerStart/Stop` in a shared `prof_main.cpp` driven by `CPUPROF_OUT`;
+   (b) both profilers emit gperftools' legacy format with raw addresses — the runner symbolizes
+   it via google/pprof (a go.mod `tool`, like pprofutils) with `PPROF_TOOLS` pointed at the
+   toolchain's own `llvm-symbolizer`, keeping the pipeline hermetic.
+
+   **FOLLOW-UP — report (a) upstream to gperftools**: the pid-suffixing looks like a bug, not a
+   design choice. `GetUniquePathFromEnv` (src/base/sysinfo.cc) sets `CPUPROFILE_USE_PID=1` in its
+   own environment so that *forked children* uniquify their profile names — but profiler.cc
+   resolves the path through it twice in the same process (once in `CpuProfilerSwitch`, once in
+   the `CpuProfiler` constructor), and the second call sees the flag it just set for children:
+   the real profile lands at `$CPUPROFILE_<pid>` while an empty file is created at `$CPUPROFILE`.
+   Reproduced with gperftools 2.18.1, single-process binary, no fork. Check the upstream issue
+   tracker for an existing report before filing; our explicit-API capture path is unaffected
+   either way.
 3. **`valgrind massif`** (C/C++ heap-over-time) is a non-flamegraph outlier — **deferred**;
    gperftools heap flamegraph (allocation sites) likely suffices for v1.
-4. **JMH under Bazel** — JMH needs annotation-processor codegen and there is no maintained rules
-   set (`buchgr/rules_jmh` is stale). Path forward for the implementing agent: add
-   `org.openjdk.jmh:jmh-core` + `jmh-generator-annprocess` to `maven.install`, wire the processor
-   as a `java_plugin` on the bench `java_library`, and run via a thin `java_binary` around
-   `org.openjdk.jmh.Main` — replicate the ~30-line pattern in-repo rather than depend on the stale
-   rules.
+4. **JMH under Bazel** — **RESOLVED (Java phase, 2026-07)**: even simpler than planned — a
+   single `java_binary` with `plugins = ["//tools/profile:jmh_annprocess"]` (a `java_plugin`
+   on `jmh-generator-annprocess`) and `main_class = "org.openjdk.jmh.Main"` compiles the
+   generated harness and the `META-INF/BenchmarkList` resource into the deploy jar; no
+   intermediate `java_library`, no rules set. CPU capture via JMH's built-in `-prof jfr`
+   (per-benchmark recordings); memory via a `jdk.jfr.Recording` API shim
+   (`mem/ProfDump.java`) recording weighted `jdk.ObjectAllocationSample` events, stopped
+   before dumping so the dump's own allocations stay out of the profile.
 5. **Rust bin-crates + build scripts through crate_universe** — three assumptions to prove with
    one small trial (natural home: the Go pilot, which needs inferno anyway):
    inferno's binaries (`inferno-flamegraph`, `inferno-collapse-perf`, `inferno-collapse-dtrace`)
@@ -210,6 +229,87 @@ state it so consumers never quote timings from a profiled run.
    `gen_binaries` annotations and a proven `bazel run`; and `tikv-jemalloc-sys` builds jemalloc
    via its build script (autotools) — verify it builds in the sandbox. If flamelens won't build,
    it degrades to a documented host-installed tool; the other two have no fallback and must work.
+
+## Profiling-stack deficiencies & upstream follow-ups
+
+Started as a Rust/Go deep review after the C++ `CPUPROFILE` find (open item 2), extended with
+the Java/Python phase probes: every place the shipped implementations work around upstream
+deficiencies, with upstream status.
+
+**FOLLOW-UPS (actionable):**
+
+1. **pprofutils `folded` uses `sample.Value[0]` with no selector — Go/C++ memory renders are
+   mislabeled today.** Heap profiles differ per language: Rust emits a single `inuse_space/bytes`
+   (label "bytes" correct); Go emits `[alloc_objects, alloc_space, inuse_objects, inuse_space]`
+   so folded counts **alloc_objects**; C++ (pprof-converted tcmalloc dump) emits
+   `[objects/count, space/bytes]` so folded counts **objects** (verified: retained_growth's
+   top.txt says 65537 = 64Ki chunks + 1 vector buffer, not 67108864 bytes). Both render under
+   `countname="bytes"`. Upstream request already open: **felixge/pprofutils#15** ("folded: add
+   support for specifying sample index"; their #14 is likely the same root) — a small Go PR
+   candidate. Once it lands, the runner selects the index per profile and labels honestly.
+   Coupled fix: switching Go to `inuse_space` requires the Go shim to lower
+   `runtime.MemProfileRate` — the default 512 KiB sampling hides string_churn's ~128 KB live
+   string, the same trap Rust solved with `lg_prof_sample:15`.
+2. **jemalloc_pprof leaves its own profiling machinery in stack tails**
+   (`…;_rjem_je_prof_tctx_create;_rjem_je_prof_backtrace;prof_backtrace_impl` — verified still
+   present in 0.9). Worked around by `_trim_jemalloc_frames` in `tools/profile/src/profiling/spine.py`.
+   No upstream issue exists — report to polarsignals/rust-jemalloc-pprof (strip machinery frames
+   from `dump_pprof`, or document them).
+3. **jfrconv (`tools.profiler:jfr-converter` 4.0) `--cpu` silently emits nothing for JDK-JFR
+   recordings** (Java phase probe, 2026-07-13). Root cause, from the 4.0 converter source:
+   `JfrConverter.getThreadStates(cpu=true)` admits only samples whose thread state is
+   `STATE_DEFAULT` — the state async-profiler's *own* engine writes. JDK Flight Recorder
+   `jdk.ExecutionSample` events carry real states (`STATE_RUNNABLE`), so a JDK recording
+   converts to zero stacks; the 3.0 converter had no such filter and converted the same file
+   fine. Still present on master (which only adds a separate `--cpuTime` mode); no upstream
+   issue found — report to async-profiler/async-profiler (suggested fix: treat
+   `STATE_RUNNABLE` as cpu-eligible, or fall back when the recording has no async-profiler
+   events). **Our resolution: stay on 4.0 and pass `--state runnable` instead of `--cpu`** —
+   verified sample-for-sample equivalent to 3.0's output, and 4.0 additionally normalizes the
+   JIT-tier frame suffixes (`_[i]`/`_[j]`) that 3.0 splits aggregation on. `--alloc --total`
+   is unaffected.
+4. **pytest-benchmark blanks `sys` profile hooks around every timed section and crashes
+   restoring pyinstrument's** (Python phase probe, 2026-07-13). `PauseInstrumentation` in
+   `pytest_benchmark/fixture.py` wraps calibration, warmup, and the measurement rounds,
+   calling `sys.setprofile(None)` on entry — so a hook-based sampler like pyinstrument is
+   *structurally blind* to the benchmark loops. Worse, its `__exit__` restores via
+   `sys.setprofile(sys.getprofile())`, which raises `TypeError` for pyinstrument: C-level
+   profilers (set via `PyEval_SetProfile`) surface a non-callable state object from
+   `getprofile()` that the public `setprofile()` rejects — the restore both errors the test
+   and kills the profiler. Two upstream reports for pytest-benchmark: the crash (any C-level
+   profiler active during a bench run breaks the session) and, softer, an option to skip the
+   pausing. **Our resolution: in profile mode (CPUPROF_OUT set) the bench conftest
+   monkeypatches `PauseInstrumentation` to a no-op** — profiled runs are never measurement
+   runs, so sampling the real loops with distorted timings is exactly the trade we want;
+   measure mode leaves pytest-benchmark untouched.
+
+**Known upstream — track, don't file:**
+
+- **pprof-rs pins criterion `^0.5`** while criterion is at 0.8.2 — the Cargo.toml
+  "keep majors in sync" comment is load-bearing, and a Renovate criterion-major bump would break
+  resolution. Upstream: tikv/pprof-rs#284 (criterion 0.8) open, with older #269/#271 (0.6) —
+  nudge or review there.
+- **jemalloc_pprof macOS unsupported** — upstream #36 (compounded by jemalloc's autotools build
+  failing under the hermetic macOS toolchain); `mem_*` stays Linux-gated, the dtrace phase
+  remains the designed macOS story.
+- **jemalloc_pprof `PROF_CTL` is an async (tokio) mutex** — upstream #30; the one-shot shim
+  calls `.blocking_lock()` and pulls tokio into every mem workload binary. Cosmetic dep bloat.
+- **purego < 0.10.1 ICEs the Go 1.26 compiler** — pinned past it (rust-pilot doc); it arrived
+  via pprofutils → dd-trace-go. A folded converter dragging the DataDog tracing tree into go.mod
+  is itself a wart; no upstream issue about slimming it.
+
+**Accommodations by design (documented so nobody "simplifies" them away):**
+
+- criterion activates profilers only under `--profile-time` — the runner always passes it; slow
+  benches carry `sample_size(10)` to fit criterion's measurement window.
+- pprof-rs's default unwinder wants frame pointers — the `.bazelrc`
+  `-Cforce-frame-pointers=yes,-Cdebuginfo=2` line exists for it (pprof-rs DWARF support is weak:
+  their #152 "Make DWARF great again"); exactly parallel to the C++
+  `-g -fno-omit-frame-pointer` line.
+- Go's `runtime.GC()` before the heap dump is canonical live-set practice; Go CPU capture
+  (`-test.cpuprofile`) needed no workaround at all — the cleanest of the three.
+- CPU-side folded counts are correct everywhere (CPU profiles lead with `samples/count`,
+  matching `countname="samples"`) — the sample-index issue is memory-only.
 
 ## Phasing
 
@@ -220,9 +320,12 @@ Prove **one language end-to-end first** — bench → capture → folded → inf
    flamegraph. Validates the spine, the pprof2folded converter, the runner UX, and the
    crate_universe binaries trial (open item 5).
 2. Add the **`perf` sampler path** to the same runner.
-3. Replicate: **Rust** (pprof-rs → pprof → shared converter; heap via `jemalloc_pprof`) → **C++**
-   (resolve the gperftools packaging probe) → **Python** (folded adapters, open item 1) →
-   **Java** (JMH wiring, open item 4; `jfr-converter` from Maven Central).
+3. Replicate: **Rust** (pprof-rs → pprof → shared converter; heap via `jemalloc_pprof`) ✓ →
+   **C++** (gperftools packaging probe resolved — see open item 2) ✓ → **Python** (folded
+   adapters — shipped as the bench conftest and memray shim; see deficiencies item 4 for the
+   pytest-benchmark interplay) ✓ → **Java** (JMH via a `java_plugin` annotation processor on
+   plain `java_binary` targets — no rules needed; jfrconv from Maven Central, deficiencies
+   item 3) ✓. **All five languages replicated 2026-07-13.**
 
 Bench and memory-workload targets will live on the `_lib` modules (they hold the real logic worth
 profiling). Runner UX TBD, e.g. `bazel run //tools/profile -- <target> --cpu|--mem

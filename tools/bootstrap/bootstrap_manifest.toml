@@ -209,6 +209,9 @@ rust = [
     "tools/profile/gazelle/generate_test.go",
 ]
 go = ["tools/profile/gazelle/go.go"]
+cpp = ["tools/profile/gazelle/cpp.go"]
+python = ["tools/profile/gazelle/python.go"]
+java = ["tools/profile/gazelle/java.go"]
 
 # ---------------------------------------------------------------------------
 # Language-specific files in shared directories

@@ -13,6 +13,22 @@
 #
 bazel_dep(name = "googletest", version = "1.17.0.bcr.2")
 
+# --- BEGIN feature:profiling ---
+#
+# BCR page: https://registry.bazel.build/modules/google_benchmark
+# google/benchmark homepage: https://github.com/google/benchmark
+# Documentation: https://github.com/google/benchmark/blob/main/docs/user_guide.md
+#
+bazel_dep(name = "google_benchmark", version = "1.9.5")
+
+#
+# BCR page: https://registry.bazel.build/modules/gperftools
+# gperftools homepage: https://github.com/gperftools/gperftools
+# Documentation: https://gperftools.github.io/gperftools/
+#
+bazel_dep(name = "gperftools", version = "2.18.1")
+# --- END feature:profiling ---
+
 # --- BEGIN user-managed ---
 # Your C++ bazel_dep(...) / single_version_override(...) entries.
 # Preserved across re-bootstrap.

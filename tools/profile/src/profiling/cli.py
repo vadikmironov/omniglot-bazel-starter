@@ -18,7 +18,12 @@ def main(argv: list[str] | None = None) -> None:
     args = parser.parse_args(argv)
 
     workspace = _resolve_workspace()
-    out_root = args.out or workspace / "profile-out"
+    # Anchor a relative --out to the workspace: the runner and the bench
+    # processes run with different working directories.
+    out_root = workspace / args.out if args.out else workspace / "profile-out"
+
+    if args.all and args.measure:
+        parser.error("--measure runs one target at a time; it cannot be combined with --all")
 
     try:
         if args.list:

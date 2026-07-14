@@ -20,13 +20,14 @@ require (
 	github.com/bazel-contrib/bazel-gazelle/v2 v2.0.0-2 // indirect
 	github.com/bazelbuild/buildtools v0.0.0-20250930140053-2eb4fccefb52 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
+	github.com/chzyer/readline v1.5.1 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/felixge/httpsnoop v1.0.3 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
-	github.com/google/pprof v0.0.0-20240320155624-b11c3daa6f07 // indirect
 	github.com/google/uuid v1.3.1 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
+	github.com/ianlancetaylor/demangle v0.0.0-20250417193237-f615e6bd150b // indirect
 	github.com/julienschmidt/httprouter v1.3.0 // indirect
 	github.com/outcaste-io/ristretto v0.2.3 // indirect
 	github.com/peterbourgon/ff/v3 v3.1.0 // indirect
@@ -61,6 +62,9 @@ require (
 	github.com/ebitengine/purego v0.10.1 // indirect
 	github.com/felixge/pprofutils/v2 v2.0.4 // indirect
 	// --- END feature:profiling ---
+	// --- BEGIN feature:profiling lang:cpp ---
+	github.com/google/pprof v0.0.0-20260709232956-b9395ee17fa0
+	// --- END feature:profiling lang:cpp ---
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
@@ -69,3 +73,11 @@ require (
 tool github.com/felixge/pprofutils/v2/cmd/pprofutils
 
 // --- END feature:profiling ---
+
+// --- BEGIN feature:profiling lang:cpp ---
+// Converts + symbolizes gperftools' legacy profile format against the bench
+// binary's ELF symtab; the C++ capture path can't emit symbolized protos
+// in-process the way Go/Rust do.
+tool github.com/google/pprof
+
+// --- END feature:profiling lang:cpp ---
