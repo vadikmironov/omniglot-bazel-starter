@@ -231,14 +231,14 @@ maven.install(
     artifacts = [
         # --- BEGIN exclude ---
         # aspect_rules_lint dependency (disabled — kept for documentation only)
-        "com.palantir.javaformat:palantir-java-format:2.94.0",
+        "com.palantir.javaformat:palantir-java-format:2.96.0",
         # --- END exclude ---
         # --- BEGIN feature:lint ---
         # PMD and SpotBugs back the Java lint_test aspects (see tools/lint/BUILD).
         "net.sourceforge.pmd:pmd-core:7.26.0",
         "net.sourceforge.pmd:pmd-java:7.26.0",
         "net.sourceforge.pmd:pmd-cli:7.26.0",
-        "com.github.spotbugs:spotbugs:4.10.2",
+        "com.github.spotbugs:spotbugs:4.10.3",
         # --- END feature:lint ---
 
         # log4j — a general logging dependency (exposed via log4j_build_deps in
@@ -250,12 +250,12 @@ maven.install(
         "org.apache.logging.log4j:log4j-slf4j2-impl:2.26.1",
 
         # JUnit 5
-        "org.junit.platform:junit-platform-console:6.1.1",
-        "org.junit.platform:junit-platform-launcher:6.1.1",
-        "org.junit.platform:junit-platform-reporting:6.1.1",
-        "org.junit.jupiter:junit-jupiter-api:6.1.1",
-        "org.junit.jupiter:junit-jupiter-params:6.1.1",
-        "org.junit.jupiter:junit-jupiter-engine:6.1.1",
+        "org.junit.platform:junit-platform-console:6.1.2",
+        "org.junit.platform:junit-platform-launcher:6.1.2",
+        "org.junit.platform:junit-platform-reporting:6.1.2",
+        "org.junit.jupiter:junit-jupiter-api:6.1.2",
+        "org.junit.jupiter:junit-jupiter-params:6.1.2",
+        "org.junit.jupiter:junit-jupiter-engine:6.1.2",
 
         # --- BEGIN feature:profiling ---
         # JMH bench framework (the annotation processor generates the harness)
