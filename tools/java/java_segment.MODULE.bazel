@@ -238,7 +238,7 @@ maven.install(
         "net.sourceforge.pmd:pmd-core:7.26.0",
         "net.sourceforge.pmd:pmd-java:7.26.0",
         "net.sourceforge.pmd:pmd-cli:7.26.0",
-        "com.github.spotbugs:spotbugs:4.10.2",
+        "com.github.spotbugs:spotbugs:4.10.3",
         # --- END feature:lint ---
 
         # log4j — a general logging dependency (exposed via log4j_build_deps in
