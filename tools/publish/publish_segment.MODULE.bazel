@@ -22,7 +22,7 @@ bazel_dep(name = "rules_pkg", version = "1.2.0")
 # Please find documentation here:
 # https://github.com/bazel-contrib/tar.bzl/releases
 #
-bazel_dep(name = "tar.bzl", version = "0.10.5")
+bazel_dep(name = "tar.bzl", version = "0.10.7")
 
 #
 # rules_oci block
