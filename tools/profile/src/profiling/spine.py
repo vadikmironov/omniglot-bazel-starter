@@ -21,6 +21,14 @@ class Tools:
     inferno: Path
     collapse_perf: Path
     flamelens: Path | None
+    # C++ capture only (None unless the cpp language is scaffolded): pprof
+    # symbolizes gperftools' legacy profile format against the bench binary,
+    # with llvm_tools_dir supplying a hermetic llvm-symbolizer.
+    pprof: Path | None
+    llvm_tools_dir: Path | None
+    # Java capture only (None unless the java language is scaffolded):
+    # async-profiler's converter renders JFR recordings as collapsed stacks.
+    jfrconv: Path | None
 
 
 class ProfileError(Exception):
@@ -50,13 +58,54 @@ def resolve_tools() -> Tools:
     flamelens = rlocation("PROFILE_FLAMELENS")
     if flamelens is None and (host := shutil.which("flamelens")):
         flamelens = Path(host)
-    return Tools(pprofutils=pprofutils, inferno=inferno, collapse_perf=collapse_perf, flamelens=flamelens)
+    pprof = rlocation("PROFILE_PPROF")
+    symbolizer = rlocation("PROFILE_LLVM_SYMBOLIZER")
+    jfrconv = rlocation("PROFILE_JFRCONV")
+    return Tools(
+        pprofutils=pprofutils,
+        inferno=inferno,
+        collapse_perf=collapse_perf,
+        flamelens=flamelens,
+        pprof=pprof,
+        llvm_tools_dir=symbolizer.parent if symbolizer is not None else None,
+        jfrconv=jfrconv,
+    )
 
 
 def pprof_to_folded(tools: Tools, pb: Path, folded: Path, *, trim_jemalloc: bool = False) -> None:
     _run([str(tools.pprofutils), "folded", str(pb), str(folded)])
     if trim_jemalloc:
-        folded.write_text(_trim_jemalloc_frames(folded.read_text()))
+        folded.write_text(_trim_jemalloc_frames(folded.read_text(encoding="utf-8")), encoding="utf-8")
+
+
+def gperftools_to_pb(tools: Tools, binary: Path, raw: Path, pb: Path) -> None:
+    """Symbolize gperftools' legacy profile format against the binary's ELF
+    symbols (via the hermetic llvm-symbolizer) and convert it to pprof."""
+    if tools.pprof is None or tools.llvm_tools_dir is None:
+        raise ProfileError(
+            "pprof or llvm-symbolizer missing from runfiles; C++ capture needs the cpp language scaffolded"
+        )
+    env = {**os.environ, "PPROF_TOOLS": str(tools.llvm_tools_dir)}
+    _run(
+        [str(tools.pprof), "-proto", "-output", str(pb), str(binary), str(raw)],
+        env=env,
+    )
+
+
+def jfr_to_folded(tools: Tools, jfr: Path, folded: Path, *, mode: str) -> None:
+    """JFR recording -> collapsed stacks via async-profiler's converter.
+
+    mode "cpu" selects execution samples by runnable thread state — the
+    converter's own --cpu flag matches only the STATE_DEFAULT samples its
+    engine writes, never JDK Flight Recorder's. mode "alloc" selects
+    allocation samples weighted by size (bytes).
+    """
+    if tools.jfrconv is None:
+        raise ProfileError("jfrconv missing from runfiles; Java capture needs the java language scaffolded")
+    flags = ["--state", "runnable"] if mode == "cpu" else ["--alloc", "--total"]
+    _run([str(tools.jfrconv), *flags, "-o", "collapsed", str(jfr), str(folded)])
+    if not folded.is_file():
+        raise ProfileError(f"jfrconv produced no output for {jfr}")
 
 
 def perf_to_folded(tools: Tools, perf_data: Path, folded: Path) -> None:
@@ -101,7 +150,7 @@ def top_n(folded: Path, n: int = 10) -> str:
     self_weight: dict[str, int] = {}
     cumulative: dict[str, int] = {}
     total = 0
-    for line in folded.read_text().splitlines():
+    for line in folded.read_text(encoding="utf-8").splitlines():
         stack, _, count_str = line.rpartition(" ")
         if not stack or not count_str.isdigit():
             continue
@@ -145,7 +194,7 @@ def _trim_jemalloc_frames(text: str) -> str:
     return "".join(f"{stack} {count}\n" for stack, count in merged.items())
 
 
-def _run(cmd: list[str], stdout: BinaryIO | None = None) -> None:
-    result = subprocess.run(cmd, check=False, stdout=stdout)
+def _run(cmd: list[str], stdout: BinaryIO | None = None, env: dict[str, str] | None = None) -> None:
+    result = subprocess.run(cmd, check=False, stdout=stdout, env=env)
     if result.returncode != 0:
         raise ProfileError(f"{Path(cmd[0]).name} failed with exit code {result.returncode}")

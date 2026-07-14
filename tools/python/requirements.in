@@ -17,6 +17,16 @@ ty
 # git pre-commit hooks framework
 pre-commit
 
+# --- BEGIN feature:profiling ---
+# CPU bench framework driven by bazel run //tools/profile
+pytest
+pytest-benchmark
+# in-process CPU sampler; the bench conftest renders its session as folded stacks
+pyinstrument
+# heap capture for the one-shot memory workloads (Linux/macOS only)
+memray
+# --- END feature:profiling ---
+
 # --- BEGIN user-managed ---
 # Your project's pip dependencies. Preserved across re-bootstrap.
 # --- END user-managed ---

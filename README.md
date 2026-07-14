@@ -263,26 +263,26 @@ bazel run //tools/coverage:report
 
 ### Profiling
 
-CPU and memory profiling driven by tagged benchmark targets, rendered to flamegraphs by a fully hermetic toolchain (in-process capture → pprof → folded stacks → inferno SVG — no system tools needed). The contract is language-independent: targets tagged `profiling-cpu` are framework benches, targets tagged `profiling-mem` are one-shot memory workload binaries, and the runner drives either. Example workloads live in `modules/rust_workloads` and `modules/go_workloads`:
+CPU and memory profiling driven by tagged benchmark targets, rendered to flamegraphs by a fully hermetic toolchain (in-process capture → pprof → folded stacks → inferno SVG — no system tools needed). The contract is language-independent: targets tagged `profiling-cpu` are framework benches, targets tagged `profiling-mem` are one-shot memory workload binaries, and the runner drives either. Example workloads live in `modules/{rust,go,cpp,python,java}_workloads`:
 
 ```bash
 # List profilable targets (tags: profiling-cpu / profiling-mem)
 bazel run //tools/profile -- --list
 
 # Profile a CPU bench: SVG flamegraph + top-N table per bench function
-bazel run //tools/profile -- //modules/{rust|go}_workloads:bench_matmul
+bazel run //tools/profile -- //modules/{rust|go|cpp|python|java}_workloads:bench_matmul
 
 # Profile a one-shot memory workload (heap profile at dump time)
-bazel run //tools/profile -- //modules/{rust|go}_workloads:mem_retained_growth
+bazel run //tools/profile -- //modules/{rust|go|cpp|python|java}_workloads:mem_retained_growth
 
 # Real benchmark timings — no profiler attached
-bazel run //tools/profile -- //modules/{rust|go}_workloads:bench_matmul --measure
+bazel run //tools/profile -- //modules/{rust|go|cpp|python|java}_workloads:bench_matmul --measure
 
 # Browse the captured stacks in the terminal (flamelens TUI)
-bazel run //tools/profile -- //modules/{rust|go}_workloads:bench_matmul --view
+bazel run //tools/profile -- //modules/{rust|go|cpp|python|java}_workloads:bench_matmul --view
 
 # Sample with the host system profiler instead (non-hermetic; Linux perf)
-bazel run //tools/profile -- //modules/{rust|go}_workloads:bench_matmul --sampler=perf
+bazel run //tools/profile -- //modules/{rust|go|cpp|python|java}_workloads:bench_matmul --sampler=perf
 ```
 
 Artifacts land in `profile-out/<package>/<target>/{cpu|mem}/` as self-contained `.svg` flamegraphs (click-to-zoom, Ctrl-F search — open in any browser), `.folded` stacks, and `top.txt` summaries. `--all` profiles every discovered target; `--size N` rescales a workload (exported as `WORKLOAD_N`); `--profile-seconds S` adjusts capture length.
@@ -295,6 +295,9 @@ Capture is per-language; everything downstream (folded stacks, rendering, the ru
 |---|---|---|
 | Rust | criterion + pprof-rs (`PProfProfiler(Output::Protobuf)`) | `tikv-jemallocator` global allocator + `jemalloc_pprof` dump to `$MEMPROF_OUT` (shim: `modules/rust_workloads/mem/prof_dump.rs`). Linux-only (`jemalloc_pprof` upstream limit) — targets carry `target_compatible_with` and skip elsewhere. Heap profiles record *live* allocations (32 KiB sampling by default, `MALLOC_CONF` overrides), and the allocator story they tell — fragmentation especially — is jemalloc's, not glibc malloc's. |
 | Go | `testing.B` benches in `benches/bench_*_test.go` (stdlib capture via `-test.cpuprofile`) | `runtime/pprof` heap profile dumped to `$MEMPROF_OUT` after `runtime.GC()` (shim: `modules/go_workloads/mem/prof_dump.go`). Cross-platform; records the GC-managed live heap by sampled allocation site. |
+| C++ | [google/benchmark](https://github.com/google/benchmark) benches + the [gperftools](https://github.com/gperftools/gperftools) CPU profiler, wrapped in `ProfilerStart`/`ProfilerStop` by a shared entrypoint (`benches/prof_main.cpp`, output to `$CPUPROF_OUT`) | gperftools `tcmalloc` heap profiler dumped under a `$MEMPROF_OUT` prefix (shim: `modules/cpp_workloads/mem/prof_dump.cpp`); tracks every live allocation from `HeapProfilerStart` on, so the binary links tcmalloc as its allocator. Both captures write gperftools' legacy profile format — the runner symbolizes it against the bench binary with the hermetic pprof + the toolchain's own `llvm-symbolizer`, then rejoins the shared pipeline. |
+| Python | [pytest-benchmark](https://pytest-benchmark.readthedocs.io/) benches sampled by [pyinstrument](https://pyinstrument.readthedocs.io/): a shared `benches/conftest.py` runs the session under the sampler and renders its frame tree as folded stacks to `$CPUPROF_OUT` directly (no pprof hop). In profile mode the shim also un-pauses pytest-benchmark's instrumentation blanking — it blanks `sys` profile hooks around every timed section, so an unpatched run would sample everything *except* the benchmarks. | [memray](https://bloomberg.github.io/memray/) tracker via `mem/prof_dump.py`: allocations still live when tracking stops are written as folded stacks (honest bytes) to `$MEMPROF_OUT`. Linux/macOS only (memray upstream). |
+| Java | [JMH](https://github.com/openjdk/jmh) benches (annotation processor wired as a `java_plugin`; sources `benches/Bench*.java` map to `bench_*` targets) recorded per-bench by `-prof jfr`; the runner converts recordings with the hermetic [jfrconv](https://github.com/async-profiler/async-profiler) — passing `--state runnable`, since its `--cpu` flag only matches async-profiler's own recordings, not JDK-JFR ones. | JFR weighted allocation samples (`jdk.ObjectAllocationSample`) via `mem/ProfDump.java`, dumped to `$MEMPROF_OUT` and rendered by jfrconv `--alloc --total` (bytes). Note the semantics: allocation *rate* attributed by site, not a live-heap snapshot — JFR has no live-heap stack profile. |
 
 - **Profile runs are not measurement runs.** Quote timings only from `--measure` runs; profiling distorts them.
 - **`--sampler=perf` uses the host `perf`** (not Bazel-provided): install your distribution's linux-tools package and ensure `kernel.perf_event_paranoid` ≤ 2. Unlike in-process capture it sees kernel/syscall frames, and `perf stat`/hardware counters explain what flamegraphs can't (e.g. the matmul loop-order gap is `LLC-load-misses`, the pointer-chase gap is stalled cycles). One recording covers the whole bench binary and renders as `<target>-perf.svg` next to the per-function in-process SVGs. On WSL2, sampling works via software clock but hardware PMU counters are typically unavailable.

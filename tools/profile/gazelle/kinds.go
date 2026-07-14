@@ -22,6 +22,19 @@ const (
 	kindGoBinary = "go_binary"
 	kindGoTest   = "go_test"
 	// --- END lang:go ---
+	// --- BEGIN lang:cpp ---
+	loadCcDefs   = "@rules_cc//cc:defs.bzl"
+	kindCcBinary = "cc_binary"
+	// --- END lang:cpp ---
+	// --- BEGIN lang:python ---
+	loadPyDefs   = "@rules_python//python:defs.bzl"
+	kindPyBinary = "py_binary"
+	kindPyTest   = "py_test"
+	// --- END lang:python ---
+	// --- BEGIN lang:java ---
+	loadJavaDefs   = "@rules_java//java:defs.bzl"
+	kindJavaBinary = "java_binary"
+	// --- END lang:java ---
 )
 
 // profilingKinds declares the attributes gazelle may merge on generated
@@ -59,6 +72,51 @@ var profilingKinds = map[string]rule.KindInfo{
 		},
 	},
 	// --- END lang:go ---
+	// --- BEGIN lang:cpp ---
+	kindCcBinary: {
+		NonEmptyAttrs: map[string]bool{"srcs": true},
+		MergeableAttrs: map[string]bool{
+			"srcs": true,
+			"deps": true,
+			"tags": true,
+		},
+	},
+	// --- END lang:cpp ---
+	// --- BEGIN lang:python ---
+	kindPyTest: {
+		NonEmptyAttrs: map[string]bool{"srcs": true},
+		MergeableAttrs: map[string]bool{
+			"srcs": true,
+			"deps": true,
+			"tags": true,
+			"args": true,
+			"main": true,
+			"size": true,
+		},
+	},
+	kindPyBinary: {
+		NonEmptyAttrs: map[string]bool{"srcs": true},
+		MergeableAttrs: map[string]bool{
+			"srcs":    true,
+			"deps":    true,
+			"tags":    true,
+			"main":    true,
+			"imports": true,
+		},
+	},
+	// --- END lang:python ---
+	// --- BEGIN lang:java ---
+	kindJavaBinary: {
+		NonEmptyAttrs: map[string]bool{"srcs": true},
+		MergeableAttrs: map[string]bool{
+			"srcs":       true,
+			"deps":       true,
+			"tags":       true,
+			"main_class": true,
+			"plugins":    true,
+		},
+	},
+	// --- END lang:java ---
 }
 
 var profilingLoads = []rule.LoadInfo{
@@ -77,4 +135,25 @@ var profilingLoads = []rule.LoadInfo{
 		},
 	},
 	// --- END lang:go ---
+	// --- BEGIN lang:cpp ---
+	{
+		Name:    loadCcDefs,
+		Symbols: []string{kindCcBinary},
+	},
+	// --- END lang:cpp ---
+	// --- BEGIN lang:python ---
+	{
+		Name: loadPyDefs,
+		Symbols: []string{
+			kindPyBinary,
+			kindPyTest,
+		},
+	},
+	// --- END lang:python ---
+	// --- BEGIN lang:java ---
+	{
+		Name:    loadJavaDefs,
+		Symbols: []string{kindJavaBinary},
+	},
+	// --- END lang:java ---
 }

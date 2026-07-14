@@ -196,6 +196,15 @@ Capture is per-language; the rendering spine and the runner are shared:
 # --- BEGIN feature:profiling lang:go ---
 | Go | `testing.B` benches in `benches/bench_*_test.go` (stdlib capture via `-test.cpuprofile`) | `runtime/pprof` heap profile dumped to `$MEMPROF_OUT` after `runtime.GC()`, via a `mem/prof_dump.go` shim; cross-platform |
 # --- END feature:profiling lang:go ---
+# --- BEGIN feature:profiling lang:cpp ---
+| C++ | google/benchmark + gperftools `cpu_profiler`, wrapped in ProfilerStart/Stop by a `benches/prof_main.cpp` entrypoint (`$CPUPROF_OUT`) | gperftools `tcmalloc` heap profiler dumped under a `$MEMPROF_OUT` prefix, via a `mem/prof_dump.cpp` shim; the runner symbolizes the legacy-format dumps with the hermetic pprof + llvm-symbolizer |
+# --- END feature:profiling lang:cpp ---
+# --- BEGIN feature:profiling lang:python ---
+| Python | pytest-benchmark benches run under pyinstrument by a `benches/conftest.py` shim that writes folded stacks to `$CPUPROF_OUT` (profile mode un-pauses pytest-benchmark's instrumentation blanking; timings there are not quotable) | memray tracker via a `mem/prof_dump.py` shim; live-at-exit allocations written as folded stacks (bytes) to `$MEMPROF_OUT` |
+# --- END feature:profiling lang:python ---
+# --- BEGIN feature:profiling lang:java ---
+| Java | JMH benches (`benches/Bench*.java`, annotation-processed) recorded by `-prof jfr`; the runner converts per-bench recordings via the hermetic jfrconv (`--state runnable` — its `--cpu` only matches async-profiler's own recordings) | JFR allocation samples via a `mem/ProfDump.java` shim dumped to `$MEMPROF_OUT`; jfrconv `--alloc --total` renders bytes. Allocation-rate semantics, not live heap |
+# --- END feature:profiling lang:java ---
 # --- BEGIN feature:profiling ---
 
 Never quote timings from profile runs — use `--measure`; profiling distorts

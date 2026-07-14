@@ -15,6 +15,11 @@ MEM = "mem"
 _TAGS = {CPU: "profiling-cpu", MEM: "profiling-mem"}
 
 
+class SamplerUnsupportedError(ProfileError):
+    """A bench flavor with no system-sampler support: batch runs skip the
+    target with a note, a single-target run reports it as an error."""
+
+
 def list_targets(*, scope: str, cwd: Path, mode: str | None) -> None:
     for m in [CPU, MEM] if mode is None else [mode]:
         labels = _discover(_TAGS[m], scope, cwd)
@@ -36,10 +41,13 @@ def run_all(
     sampler: str | None = None,
 ) -> None:
     failures = []
+    skipped = []
     ran = 0
+    if sampler is not None and mode == MEM:
+        raise ProfileError("--sampler applies to CPU benches only; memory capture is in-process")
     modes = [CPU, MEM] if mode is None else [mode]
     if sampler is not None:
-        modes = [CPU] if CPU in modes else []
+        modes = [CPU]
     for m in modes:
         for label in _discover(_TAGS[m], scope, cwd):
             ran += 1
@@ -54,9 +62,14 @@ def run_all(
                     profile_seconds=profile_seconds,
                     sampler=sampler,
                 )
+            except SamplerUnsupportedError as err:
+                ran -= 1
+                skipped.append((label, str(err)))
             except ProfileError as err:
                 failures.append((label, str(err)))
     print(f"\nprofiled {ran - len(failures)}/{ran} targets")
+    for label, reason in skipped:
+        print(f"  SKIPPED {label}: {reason}")
     if failures:
         for label, err in failures:
             print(f"  FAILED {label}: {err}")
@@ -90,7 +103,12 @@ def run_one(
         raise ProfileError("--sampler applies to CPU benches only; memory capture is in-process")
 
     outdir = _outdir(out_root, label, actual)
-    outdir.mkdir(parents=True, exist_ok=True)
+    # Fresh directory per run: several capture paths collect their inputs
+    # by glob, so leftovers from renamed benches or a previously failed
+    # run would be re-rendered as current data.
+    if outdir.exists():
+        shutil.rmtree(outdir)
+    outdir.mkdir(parents=True)
     tools = spine.resolve_tools()
     if actual == CPU and sampler is not None:
         _run_cpu_profile_perf(label, outdir, cwd, tools, size, profile_seconds)
@@ -172,6 +190,21 @@ def _run_cpu_profile(
         _run_cpu_profile_gotest(label, outdir, cwd, tools, size, profile_seconds)
         return
     # --- END lang:go ---
+    # --- BEGIN lang:cpp ---
+    if flavor == "google_benchmark":
+        _run_cpu_profile_google_benchmark(label, outdir, cwd, tools, size, profile_seconds)
+        return
+    # --- END lang:cpp ---
+    # --- BEGIN lang:python ---
+    if flavor == "pytest_benchmark":
+        _run_cpu_profile_pytest_benchmark(label, outdir, cwd, tools, size, profile_seconds)
+        return
+    # --- END lang:python ---
+    # --- BEGIN lang:java ---
+    if flavor == "jmh":
+        _run_cpu_profile_jmh(label, outdir, cwd, tools, size, profile_seconds)
+        return
+    # --- END lang:java ---
     raise _unsupported_flavor(flavor)
 
 
@@ -242,6 +275,123 @@ def _render_go_profile(label: str, pb: Path, outdir: Path, tools: spine.Tools) -
 # --- END lang:go ---
 
 
+# --- BEGIN lang:cpp ---
+def _run_cpu_profile_google_benchmark(
+    label: str,
+    outdir: Path,
+    cwd: Path,
+    tools: spine.Tools,
+    size: int | None,
+    profile_seconds: int,
+) -> None:
+    raw = outdir / "profile.raw"
+    env = _env(size, CPUPROF_OUT=str(raw))
+    _bazel_run(label, ["--", *_google_benchmark_args(profile_seconds)], cwd, env, config="profile")
+    _render_gperftools_cpu(label, raw, outdir, cwd, tools)
+
+
+def _google_benchmark_args(profile_seconds: int | None) -> list[str]:
+    if profile_seconds is None:
+        return []
+    return [f"--benchmark_min_time={profile_seconds}s"]
+
+
+def _render_gperftools_cpu(label: str, raw: Path, outdir: Path, cwd: Path, tools: spine.Tools) -> None:
+    if not raw.is_file():
+        raise ProfileError(f"{label} did not write a CPU profile to {raw}")
+    pb = outdir / "profile.pb"
+    spine.gperftools_to_pb(tools, _built_binary(label, cwd), raw, pb)
+    raw.unlink()
+    name = _target_name(label)
+    folded = outdir / f"{name}.folded"
+    svg = outdir / f"{name}.svg"
+    spine.pprof_to_folded(tools, pb, folded)
+    spine.folded_to_svg(tools, folded, svg, title=f"{label} (CPU)", countname="samples")
+    _report(folded, svg, outdir / f"{name}.top.txt")
+
+
+# --- END lang:cpp ---
+
+
+# --- BEGIN lang:python ---
+def _run_cpu_profile_pytest_benchmark(
+    label: str,
+    outdir: Path,
+    cwd: Path,
+    tools: spine.Tools,
+    size: int | None,
+    profile_seconds: int,
+) -> None:
+    name = _target_name(label)
+    folded = outdir / f"{name}.folded"
+    env = _env(size, CPUPROF_OUT=str(folded))
+    _bazel_run(label, ["--", *_pytest_benchmark_args(profile_seconds)], cwd, env, config="profile")
+    if not folded.is_file():
+        raise ProfileError(f"{label} did not write folded stacks to {folded}")
+    svg = outdir / f"{name}.svg"
+    spine.folded_to_svg(tools, folded, svg, title=f"{label} (CPU)", countname="us")
+    _report(folded, svg, outdir / f"{name}.top.txt")
+
+
+def _pytest_benchmark_args(profile_seconds: int | None) -> list[str]:
+    # --benchmark-enable overrides the target's default --benchmark-disable
+    # (its bazel-test smoke mode); max-time stretches the measurement loops
+    # the in-process sampler observes.
+    args = ["--benchmark-enable"]
+    if profile_seconds is not None:
+        args.append(f"--benchmark-max-time={profile_seconds}")
+    return args
+
+
+# --- END lang:python ---
+
+
+# --- BEGIN lang:java ---
+def _run_cpu_profile_jmh(
+    label: str,
+    outdir: Path,
+    cwd: Path,
+    tools: spine.Tools,
+    size: int | None,
+    profile_seconds: int,
+) -> None:
+    jfr_dir = outdir / "jfr"
+    jfr_dir.mkdir(parents=True, exist_ok=True)
+    _bazel_run(label, ["--", *_jmh_args(jfr_dir, profile_seconds)], cwd, _env(size), config="profile")
+    recordings = sorted(jfr_dir.glob("*/profile.jfr"))
+    if not recordings:
+        raise ProfileError(f"{label} produced no JFR recordings under {jfr_dir}")
+    for jfr in recordings:
+        # jfr/<package>.<Class>.<bench>-<Mode>/profile.jfr
+        parts = jfr.parent.name.split(".")
+        bench_id = ".".join(parts[-2:]).rpartition("-")[0] or jfr.parent.name
+        folded = outdir / f"{bench_id}.folded"
+        svg = outdir / f"{bench_id}.svg"
+        spine.jfr_to_folded(tools, jfr, folded, mode="cpu")
+        spine.folded_to_svg(tools, folded, svg, title=f"{label} {bench_id} (CPU)", countname="samples")
+        _report(folded, svg, outdir / f"{bench_id}.top.txt")
+    shutil.rmtree(jfr_dir)
+
+
+def _jmh_args(jfr_dir: Path, profile_seconds: int | None) -> list[str]:
+    # One fork, one warmup, one long measurement iteration recorded by
+    # JMH's JFR profiler (per-benchmark recordings under jfr_dir).
+    seconds = 5 if profile_seconds is None else profile_seconds
+    return [
+        *("-f", "1", "-wi", "1", "-w", "1s", "-i", "1", "-r", f"{seconds}s"),
+        *("-prof", f"jfr:dir={jfr_dir}"),
+    ]
+
+
+def _jmh_measure_args() -> list[str]:
+    # A trimmed but honest dev-loop protocol (~8s per bench function);
+    # publication-grade numbers want JMH's full defaults (multiple forks).
+    return ["-f", "1", "-wi", "3", "-w", "1s", "-i", "5", "-r", "1s"]
+
+
+# --- END lang:java ---
+
+
 def _run_cpu_profile_perf(
     label: str,
     outdir: Path,
@@ -274,6 +424,27 @@ def _run_cpu_profile_perf(
         _render_go_profile(label, pb, outdir, tools)
         return
     # --- END lang:go ---
+    # --- BEGIN lang:cpp ---
+    if flavor == "google_benchmark":
+        raw = outdir / "profile.raw"
+        env = _env(size, CPUPROF_OUT=str(raw))
+        _perf_record_and_render(label, _google_benchmark_args(profile_seconds), env, outdir, cwd, tools)
+        _render_gperftools_cpu(label, raw, outdir, cwd, tools)
+        return
+    # --- END lang:cpp ---
+    # --- BEGIN lang:python ---
+    if flavor == "pytest_benchmark":
+        raise SamplerUnsupportedError(
+            "--sampler=perf is not supported for Python benches: perf sees interpreter frames, not Python functions"
+        )
+    # --- END lang:python ---
+    # --- BEGIN lang:java ---
+    if flavor == "jmh":
+        raise SamplerUnsupportedError(
+            "--sampler=perf is not supported for JMH benches: "
+            "JIT frames need a perf map agent; use the in-process JFR capture"
+        )
+    # --- END lang:java ---
     raise _unsupported_flavor(flavor)
 
 
@@ -364,14 +535,63 @@ def _run_mem_profile(
     size: int | None,
 ) -> None:
     pb = outdir / "profile.pb"
+    # --- BEGIN lang:cpp ---
+    if _rule_kind(label, cwd) == "cc_binary":
+        # tcmalloc dumps gperftools' legacy format under a MEMPROF_OUT
+        # prefix; symbolize + convert the last (live-heap) dump to pprof.
+        prefix = outdir / "heap"
+        env = _env(size, MEMPROF_OUT=str(prefix))
+        _bazel_run(label, [], cwd, env, config="profile")
+        dumps = sorted(outdir.glob("heap.*.heap"))
+        if not dumps:
+            raise ProfileError(f"{label} did not write heap dumps to {prefix}.*.heap")
+        spine.gperftools_to_pb(tools, _built_binary(label, cwd), dumps[-1], pb)
+        for dump in dumps:
+            dump.unlink()
+        _render_mem_profile(label, pb, outdir, tools)
+        return
+    # --- END lang:cpp ---
+    # --- BEGIN lang:java ---
+    if _rule_kind(label, cwd) == "java_binary":
+        # The shim dumps a JFR recording of weighted allocation samples;
+        # jfrconv renders it as collapsed stacks (bytes).
+        jfr = outdir / "recording.jfr"
+        env = _env(size, MEMPROF_OUT=str(jfr))
+        _bazel_run(label, [], cwd, env, config="profile")
+        if not jfr.is_file():
+            raise ProfileError(f"{label} did not write a JFR recording to {jfr}")
+        folded = outdir / "profile.folded"
+        spine.jfr_to_folded(tools, jfr, folded, mode="alloc")
+        jfr.unlink()
+        _render_mem_folded(label, folded, outdir, tools)
+        return
+    # --- END lang:java ---
+    # --- BEGIN lang:python ---
+    if _rule_kind(label, cwd) == "py_binary":
+        # The memray shim writes folded stacks (bytes) directly.
+        folded = outdir / "profile.folded"
+        env = _env(size, MEMPROF_OUT=str(folded))
+        _bazel_run(label, [], cwd, env, config="profile")
+        if not folded.is_file():
+            raise ProfileError(f"{label} did not write folded stacks to {folded}")
+        _render_mem_folded(label, folded, outdir, tools)
+        return
+    # --- END lang:python ---
     env = _env(size, MEMPROF_OUT=str(pb))
     _bazel_run(label, [], cwd, env, config="profile")
-
     if not pb.is_file():
         raise ProfileError(f"{label} did not write a heap profile to {pb}")
+    _render_mem_profile(label, pb, outdir, tools)
+
+
+def _render_mem_profile(label: str, pb: Path, outdir: Path, tools: spine.Tools) -> None:
     folded = outdir / "profile.folded"
-    svg = outdir / "flame.svg"
     spine.pprof_to_folded(tools, pb, folded, trim_jemalloc=True)
+    _render_mem_folded(label, folded, outdir, tools)
+
+
+def _render_mem_folded(label: str, folded: Path, outdir: Path, tools: spine.Tools) -> None:
+    svg = outdir / "flame.svg"
     spine.folded_to_svg(tools, folded, svg, title=f"{label} (heap)", countname="bytes")
     _report(folded, svg, outdir / "top.txt")
 
@@ -387,6 +607,18 @@ def _run_measure(label: str, cwd: Path, size: int | None) -> None:
     if flavor == "gotest":
         args = _gotest_args(None, None)
     # --- END lang:go ---
+    # --- BEGIN lang:cpp ---
+    if flavor == "google_benchmark":
+        args = _google_benchmark_args(None)
+    # --- END lang:cpp ---
+    # --- BEGIN lang:python ---
+    if flavor == "pytest_benchmark":
+        args = _pytest_benchmark_args(None)
+    # --- END lang:python ---
+    # --- BEGIN lang:java ---
+    if flavor == "jmh":
+        args = _jmh_measure_args()
+    # --- END lang:java ---
     if args is None:
         raise _unsupported_flavor(flavor)
     _bazel_run(label, ["--", *args], cwd, _env(size), config=None)
@@ -395,7 +627,7 @@ def _run_measure(label: str, cwd: Path, size: int | None) -> None:
 
 def _report(folded: Path, svg: Path, top_path: Path) -> None:
     top = spine.top_n(folded)
-    top_path.write_text(top)
+    top_path.write_text(top, encoding="utf-8")
     print(f"\n{svg}")
     print(top, end="")
 

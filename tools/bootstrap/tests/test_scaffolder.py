@@ -518,6 +518,12 @@ class TestScaffolder(unittest.TestCase):
         self.assertTrue((target / "tools" / "profile" / "BUILD").exists())
         self.assertTrue((target / "tools" / "profile" / "src" / "profiling" / "cli.py").exists())
         self.assertTrue((target / "tools" / "profile" / "gazelle" / "rust.go").exists())
+        # python is in the base selection, so its generator ships too.
+        self.assertTrue((target / "tools" / "profile" / "gazelle" / "python.go").exists())
+        # cpp/java are not selected: their generators must be pruned from
+        # the tools/profile directory copy, not shipped raw with markers.
+        self.assertFalse((target / "tools" / "profile" / "gazelle" / "cpp.go").exists())
+        self.assertFalse((target / "tools" / "profile" / "gazelle" / "java.go").exists())
         self.assertIn("profile_gen", (target / "BUILD").read_text())
         self.assertIn("build:profile", (target / ".bazelrc").read_text())
         self.assertIn("inferno", (target / "tools" / "rust" / "Cargo.toml").read_text())
@@ -529,6 +535,34 @@ class TestScaffolder(unittest.TestCase):
         )
         self.assertIn("/profile-out/", (target / ".gitignore").read_text())
         self.assertIn("## Profiling", (target / "README.md").read_text())
+        self._assert_no_markers(target)
+
+    def test_profiling_feature_with_cpp(self) -> None:
+        """Profiling + cpp: the C++ capture wiring ships marker-filtered."""
+        target = self._scaffold({"rust", "go", "python", "cpp"}, features={"profiling"})
+        self.assertTrue((target / "tools" / "profile" / "gazelle" / "cpp.go").exists())
+        self.assertIn("google_benchmark", (target / ".bazelrc").read_text())
+        self.assertIn("gperftools", (target / "tools" / "cpp" / "cpp_3rd_party_dependencies.MODULE.bazel").read_text())
+        self.assertIn("tool github.com/google/pprof", (target / "go.mod").read_text())
+        self.assertIn(
+            "com_github_google_pprof",
+            (target / "tools" / "go" / "go_segment.MODULE.bazel").read_text(),
+        )
+        engine = (target / "tools" / "profile" / "src" / "profiling" / "engine.py").read_text()
+        self.assertIn("google_benchmark", engine)
+        self.assertIn("PROFILE_PPROF", (target / "tools" / "profile" / "BUILD").read_text())
+        self._assert_no_markers(target)
+
+    def test_profiling_feature_with_java(self) -> None:
+        """Profiling + java: the Java capture wiring ships marker-filtered."""
+        target = self._scaffold({"rust", "go", "python", "java"}, features={"profiling"})
+        self.assertTrue((target / "tools" / "profile" / "gazelle" / "java.go").exists())
+        self.assertIn("jmh", (target / "tools" / "java" / "java_segment.MODULE.bazel").read_text())
+        profile_build = (target / "tools" / "profile" / "BUILD").read_text()
+        self.assertIn("jfrconv", profile_build)
+        self.assertIn("jmh_annprocess", profile_build)
+        engine = (target / "tools" / "profile" / "src" / "profiling" / "engine.py").read_text()
+        self.assertIn("_jmh_args", engine)
         self._assert_no_markers(target)
 
     def test_profiling_feature_off(self) -> None:

@@ -24,6 +24,11 @@ unfixable = ["B"]
 # S607 (partial executable path): bazel is the only external binary; it must be on PATH.
 "tools/profile/src/profiling/*.py" = ["S603", "S607"]
 # --- END feature:lint feature:profiling ---
+# --- BEGIN exclude ---
+# S311 (non-cryptographic PRNG): the example workloads are deterministic,
+# seeded benchmark kernels — that is the point, not a security hole.
+"modules/python_workloads/**/*.py" = ["S311"]
+# --- END exclude ---
 
 # --- BEGIN user-managed ---
 # Project-specific ruff entries (continues the per-file-ignores table above;

@@ -17,6 +17,7 @@ from pathlib import Path
 from bootstrap.manifest import (
     BootstrapManifest,
     ResolvedFiles,
+    all_composite_files,
     effective_excluded_files,
     write_bootstrap_marker,
 )
@@ -74,7 +75,10 @@ def scaffold_repo(
     # excludes (e.g. tools/cpp/toolchains/ when custom_toolchains is off) are
     # folded in here so a gated subdirectory is pruned from its language
     # tool-directory copytree.
-    composite_abs = {source_root / f for f in resolved.composite}
+    # All composite files, not just the resolved ones: an unselected
+    # language's composite file (e.g. a per-language workload generator)
+    # must be pruned from its tool-directory copy, not shipped raw.
+    composite_abs = {source_root / f for f in all_composite_files(manifest)}
     excluded_abs = {source_root / f for f in effective_excluded_files(manifest, selected_features)}
     skip_abs = composite_abs | excluded_abs
 

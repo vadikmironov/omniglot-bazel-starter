@@ -123,6 +123,24 @@ def effective_excluded_files(
     return excluded
 
 
+def all_composite_files(manifest: BootstrapManifest) -> set[str]:
+    """Return every file named in any composite list, selected or not.
+
+    These files carry section markers, so a language tool-directory copy
+    must never ship them raw: a selected one is written marker-filtered by
+    the composite pass, an unselected one (e.g. a per-language generator
+    whose language is off) must not land in the scaffold at all.
+    """
+    files: set[str] = set(manifest.composite_files)
+    for group in manifest.composite_language_files.values():
+        files.update(group)
+    for feat in manifest.features.values():
+        files.update(feat.composite_files)
+        for group in feat.composite_language_files.values():
+            files.update(group)
+    return files
+
+
 def effective_languages(
     manifest: BootstrapManifest,
     selected_languages: set[str],

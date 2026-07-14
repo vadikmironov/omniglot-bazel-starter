@@ -12,9 +12,18 @@ go_library(
         "generate.go",
         "kinds.go",
         "lang.go",
+        # --- BEGIN lang:cpp ---
+        "cpp.go",
+        # --- END lang:cpp ---
         # --- BEGIN lang:go ---
         "go.go",
         # --- END lang:go ---
+        # --- BEGIN lang:java ---
+        "java.go",
+        # --- END lang:java ---
+        # --- BEGIN lang:python ---
+        "python.go",
+        # --- END lang:python ---
         # --- BEGIN lang:rust ---
         "rust.go",
         # --- END lang:rust ---

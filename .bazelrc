@@ -295,6 +295,21 @@ build:profile --compilation_mode=opt
 build:profile --@rules_rust//rust/settings:extra_rustc_flags=-Cdebuginfo=2,-Cforce-frame-pointers=yes
 # --- END feature:profiling lang:rust ---
 
+# --- BEGIN feature:profiling lang:cpp ---
+# google_benchmark's mutex wrappers trip clang's -Wthread-safety analysis
+# (enabled by the toolchain's defaults) and the repo-wide -Werror turns
+# that into a build failure; scope the suppression to that repo only.
+# Plain `build`, not `build:profile` — the benches compile in ordinary
+# `bazel build //...` too. GCC caveat: it ignores this unknown -Wno-*
+# flag until google_benchmark emits some other warning, at which point
+# -Werror also escalates "unrecognized command-line option" — if a
+# gcc_hermetic build of google_benchmark ever starts failing, look here.
+build --per_file_copt=external/google_benchmark.*@-Wno-thread-safety-analysis
+# Debug info for inline-frame symbolization and frame pointers for reliable
+# in-process stack capture (the C++ counterpart of the rust settings above).
+build:profile --copt=-g --copt=-fno-omit-frame-pointer
+# --- END feature:profiling lang:cpp ---
+
 # --- BEGIN lang:core ---
 ##
 ## Project-wide overrides (committed)
