@@ -92,7 +92,7 @@ java_plugin(
 # shared rendering spine.
 java_binary(
     name = "jfrconv",
-    main_class = "Main",
+    main_class = "one.convert.Main",
     visibility = ["//visibility:public"],
     runtime_deps = wrap_build_deps(["tools.profiler:jfr-converter"]),
 )
