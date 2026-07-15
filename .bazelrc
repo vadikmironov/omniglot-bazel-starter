@@ -72,6 +72,11 @@ common --credential_helper=%workspace%/tools/publish/credential-helper
 # Platform-specific C++ compiler flags
 build:linux --cxxopt=-std=c++23 --cxxopt=-Werror
 build:macos --cxxopt=-std=c++23 --cxxopt=-Werror
+# Include external-repo headers with -isystem so diagnostics in vendored
+# headers (e.g. googletest's char8_t conversions) don't fail our first-party
+# -Werror builds. Applied to both the target and exec configurations.
+build --features=external_include_paths
+build --host_features=external_include_paths
 # Windows configuration: Uses auto-configured MSVC toolchain from Visual Studio Build Tools
 # Disable default_cpp_std feature to avoid D9025 warning about conflicting /std flags
 build:windows --features=-default_cpp_std --cxxopt=/std:c++23 --cxxopt=/WX
