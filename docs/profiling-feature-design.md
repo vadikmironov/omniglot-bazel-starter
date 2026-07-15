@@ -275,7 +275,9 @@ deficiencies, with upstream status.
    events). **Our resolution: stay on 4.0 and pass `--state runnable` instead of `--cpu`** —
    verified sample-for-sample equivalent to 3.0's output, and 4.0 additionally normalizes the
    JIT-tier frame suffixes (`_[i]`/`_[j]`) that 3.0 splits aggregation on. `--alloc --total`
-   is unaffected.
+   is unaffected. Re-checked on the 4.4 bump (2026-07-15): `--cpu` still yields zero stacks
+   from a JDK-JFR recording, so `--state runnable` stays. 4.4 also renamed the jar entrypoint
+   `Main` -> `one.convert.Main` (the `jfrconv` `main_class` in `tools/profile/BUILD`).
 4. **pytest-benchmark blanks `sys` profile hooks around every timed section and crashes
    restoring pyinstrument's** (Python phase probe, 2026-07-13). `PauseInstrumentation` in
    `pytest_benchmark/fixture.py` wraps calibration, warmup, and the measurement rounds,

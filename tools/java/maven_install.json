@@ -20,7 +20,7 @@
     "org.openjdk.jmh:jmh-core": 983716932,
     "org.openjdk.jmh:jmh-generator-annprocess": -1162360421,
     "repositories": -1949687017,
-    "tools.profiler:jfr-converter": 1348051199
+    "tools.profiler:jfr-converter": -1586799357
   },
   "__RESOLVED_ARTIFACTS_HASH": {
     "com.fasterxml.jackson.core:jackson-annotations": 1145483352,
@@ -91,7 +91,7 @@
     "org.slf4j:slf4j-simple": 897425033,
     "org.xmlresolver:xmlresolver": -2072175398,
     "org.xmlresolver:xmlresolver:jar:data": 792867476,
-    "tools.profiler:jfr-converter": 51068289
+    "tools.profiler:jfr-converter": -287824603
   },
   "artifacts": {
     "com.fasterxml.jackson.core:jackson-annotations": {
@@ -499,9 +499,9 @@
     },
     "tools.profiler:jfr-converter": {
       "shasums": {
-        "jar": "61e5cf8f2b2ec34278fd2ec81b51b499dc50c2738aa0c8d261f71aa07b87d473"
+        "jar": "e8da0076f4b31224678e5a15201784aa219b5e1f2ed211fcdfb88f4df4d9ffbc"
       },
-      "version": "4.0"
+      "version": "4.4"
     }
   },
   "dependencies": {
@@ -1608,7 +1608,6 @@
       "org.xmlresolver.utils"
     ],
     "tools.profiler:jfr-converter": [
-      "",
       "one.convert",
       "one.heatmap",
       "one.jfr",
