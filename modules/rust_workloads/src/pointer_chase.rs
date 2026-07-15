@@ -2,7 +2,7 @@
 //! the same buffer: dependent random loads against streaming loads.
 
 use rand::rngs::StdRng;
-use rand::{Rng, SeedableRng};
+use rand::{RngExt, SeedableRng};
 
 /// Single-cycle permutation of 0..n (Sattolo's algorithm): following
 /// `i = perm[i]` from any start visits every slot exactly once.

@@ -3,7 +3,7 @@
 //! memory stays high.
 
 use rand::rngs::StdRng;
-use rand::{Rng, SeedableRng};
+use rand::{RngExt, SeedableRng};
 
 pub struct FragStats {
     pub survivors: usize,

@@ -2,7 +2,7 @@
 //! through `b` (cache-hostile), `ikj` streams both operands row-major.
 
 use rand::rngs::StdRng;
-use rand::{Rng, SeedableRng};
+use rand::{RngExt, SeedableRng};
 
 /// Row-major n×n matrix filled from a seeded PRNG.
 pub fn random_matrix(n: usize, seed: u64) -> Vec<f64> {
