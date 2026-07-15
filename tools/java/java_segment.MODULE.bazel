@@ -6,7 +6,7 @@
 # Please find documentation here:
 # https://github.com/bazelbuild/rules_java/releases
 #
-bazel_dep(name = "rules_java", version = "9.6.1")
+bazel_dep(name = "rules_java", version = "9.7.0")
 
 # --- BEGIN feature:custom_toolchains ---
 #
