@@ -6,6 +6,7 @@ for a local host compiler. Please see README.md for more information.
 load("@bazel_tools//tools/build_defs/cc:action_names.bzl", "ACTION_NAMES")
 load("@bazel_tools//tools/cpp:cc_toolchain_config_lib.bzl", "feature", "flag_group", "flag_set", "tool_path")  # buildifier: disable=deprecated-function
 load("@rules_cc//cc/common:cc_common.bzl", "cc_common")
+load("@rules_cc//cc/toolchains:cc_toolchain_config_info.bzl", "CcToolchainConfigInfo")
 
 GCC_HOST_LOCAL = "gcc_host_local"
 CLANG_HOST_LOCAL = "clang_host_local"
@@ -59,6 +60,10 @@ def _impl(ctx):
             "/usr/local/include",
             "/usr/include/x86_64-linux-gnu",
             "/usr/include",
+            # linux-libc-dev keeps the arch UAPI headers here and symlinks
+            # /usr/include/x86_64-linux-gnu/asm to them; gcc records the resolved
+            # target in its depfile, so the directory must be declared builtin.
+            "/usr/lib/linux/uapi/x86",
         ]
 
         link_libs = ["-lstdc++", "-lm"]
