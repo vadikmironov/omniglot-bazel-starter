@@ -50,7 +50,7 @@ def _make_config(
 
 def _init_repo(path: Path) -> None:
     """Initialise a git repo with one commit."""
-    subprocess.run(["git", "init"], cwd=path, capture_output=True, check=True)
+    subprocess.run(["git", "init", "-b", "main"], cwd=path, capture_output=True, check=True)
     subprocess.run(
         ["git", "config", "user.email", "test@test.com"],
         cwd=path,

@@ -22,7 +22,7 @@ from mint.git import (
 
 def _init_repo(path: Path) -> None:
     """Initialise a git repo with one commit."""
-    subprocess.run(["git", "init"], cwd=path, capture_output=True, check=True)
+    subprocess.run(["git", "init", "-b", "main"], cwd=path, capture_output=True, check=True)
     subprocess.run(
         ["git", "config", "user.email", "test@test.com"],
         cwd=path,
@@ -178,7 +178,7 @@ class TestValidateBranchExists(unittest.TestCase):
         self.clone = Path(self.tmpdir) / "clone"
 
         subprocess.run(
-            ["git", "init", "--bare", str(self.bare)],
+            ["git", "init", "--bare", "-b", "main", str(self.bare)],
             capture_output=True,
             check=True,
         )
@@ -209,7 +209,7 @@ class TestValidateBranchExists(unittest.TestCase):
             check=True,
         )
         subprocess.run(
-            ["git", "push", "-u", "origin", "master"],
+            ["git", "push", "-u", "origin", "main"],
             cwd=self.clone,
             capture_output=True,
             check=True,
@@ -217,7 +217,7 @@ class TestValidateBranchExists(unittest.TestCase):
 
     def test_existing_branch(self):
         # Should not raise
-        validate_branch_exists("master", cwd=self.clone)
+        validate_branch_exists("main", cwd=self.clone)
 
     def test_missing_branch(self):
         with self.assertRaises(ValueError, msg="not found"):
