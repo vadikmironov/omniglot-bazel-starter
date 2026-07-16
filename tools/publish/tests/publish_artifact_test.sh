@@ -327,8 +327,11 @@ CODES_FILE="${RETRY_CODES}"
 count=$(cat "${COUNTER_FILE}" 2>/dev/null || echo "0")
 count=$((count + 1))
 echo "${count}" > "${COUNTER_FILE}"
-# Read all codes into array
-mapfile -t codes < "${CODES_FILE}"
+# Read all codes into array (portable — macOS /bin/bash 3.2 has no mapfile)
+codes=()
+while IFS= read -r line; do
+    codes+=("${line}")
+done < "${CODES_FILE}"
 idx=$((count - 1))
 if [ "${idx}" -ge "${#codes[@]}" ]; then
     idx=$(( ${#codes[@]} - 1 ))
