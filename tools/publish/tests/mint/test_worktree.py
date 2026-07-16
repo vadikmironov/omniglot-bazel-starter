@@ -21,7 +21,7 @@ def _setup_repo_with_remote() -> tuple[Path, Path]:
     clone = tmpdir / "clone"
 
     subprocess.run(
-        ["git", "init", "--bare", str(bare)],
+        ["git", "init", "--bare", "-b", "main", str(bare)],
         capture_output=True,
         check=True,
     )
@@ -51,7 +51,7 @@ def _setup_repo_with_remote() -> tuple[Path, Path]:
         check=True,
     )
     subprocess.run(
-        ["git", "push", "-u", "origin", "master"],
+        ["git", "push", "-u", "origin", "main"],
         cwd=clone,
         capture_output=True,
         check=True,
@@ -64,7 +64,7 @@ class TestCreateWorktree(unittest.TestCase):
         self.clone, self.bare = _setup_repo_with_remote()
 
     def test_creates_directory(self):
-        wt = create_worktree("master", cwd=self.clone)
+        wt = create_worktree("main", cwd=self.clone)
         try:
             self.assertTrue(wt.exists())
             self.assertTrue(wt.is_dir())
@@ -74,7 +74,7 @@ class TestCreateWorktree(unittest.TestCase):
             remove_worktree(wt, cwd=self.clone)
 
     def test_restrictive_permissions(self):
-        wt = create_worktree("master", cwd=self.clone)
+        wt = create_worktree("main", cwd=self.clone)
         try:
             mode = oct(wt.stat().st_mode & 0o777)
             self.assertEqual(mode, oct(0o700))
@@ -86,7 +86,7 @@ class TestCreateWorktree(unittest.TestCase):
             create_worktree("nonexistent-branch-xyz", cwd=self.clone)
 
     def test_detached_head(self):
-        wt = create_worktree("master", cwd=self.clone)
+        wt = create_worktree("main", cwd=self.clone)
         try:
             result = subprocess.run(
                 ["git", "symbolic-ref", "HEAD"],
@@ -106,7 +106,7 @@ class TestRemoveWorktree(unittest.TestCase):
         self.clone, self.bare = _setup_repo_with_remote()
 
     def test_removes_directory(self):
-        wt = create_worktree("master", cwd=self.clone)
+        wt = create_worktree("main", cwd=self.clone)
         self.assertTrue(wt.exists())
         remove_worktree(wt, cwd=self.clone)
         self.assertFalse(wt.exists())
@@ -121,19 +121,19 @@ class TestSecureWorktree(unittest.TestCase):
         self.clone, self.bare = _setup_repo_with_remote()
 
     def test_yields_valid_path(self):
-        with secure_worktree("master", cwd=self.clone) as wt:
+        with secure_worktree("main", cwd=self.clone) as wt:
             self.assertTrue(wt.exists())
             self.assertTrue((wt / "README").exists())
 
     def test_cleanup_on_success(self):
-        with secure_worktree("master", cwd=self.clone) as wt:
+        with secure_worktree("main", cwd=self.clone) as wt:
             wt_path = wt
         self.assertFalse(wt_path.exists())
 
     def test_cleanup_on_exception(self):
         wt_path = None
         try:
-            with secure_worktree("master", cwd=self.clone) as wt:
+            with secure_worktree("main", cwd=self.clone) as wt:
                 wt_path = wt
                 raise RuntimeError("simulated failure")
         except RuntimeError:
@@ -143,7 +143,7 @@ class TestSecureWorktree(unittest.TestCase):
 
     def test_worktree_is_independent(self):
         """Changes in worktree don't affect the main repo."""
-        with secure_worktree("master", cwd=self.clone) as wt:
+        with secure_worktree("main", cwd=self.clone) as wt:
             (wt / "new_file").write_text("test")
             subprocess.run(["git", "add", "."], cwd=wt, capture_output=True, check=True)
             subprocess.run(

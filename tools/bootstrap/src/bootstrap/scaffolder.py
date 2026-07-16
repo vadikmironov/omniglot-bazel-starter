@@ -157,7 +157,7 @@ def scaffold_repo(
 
     # 8. Git init
     print("  Initializing git repository...")
-    subprocess.run(["git", "init"], cwd=target_path, check=True, capture_output=True)  # noqa: S607
+    subprocess.run(["git", "init", "-b", "main"], cwd=target_path, check=True, capture_output=True)  # noqa: S607
 
 
 def prune_paths(target_path: Path, rel_paths: Iterable[str]) -> list[str]:

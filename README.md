@@ -212,6 +212,17 @@ bazel test --config=remote-cache //modules/...
 
 The `user.bazelrc` file is gitignored. See `user.bazelrc.template` for details.
 
+### Local Disk Cache
+
+For faster local builds that also carry across all your Bazel projects, add a shared on-disk action cache to your **user-global `~/.bazelrc`** (not this repo — it applies to every workspace you build):
+
+```bash
+build --disk_cache=~/.cache/bazel-disk
+build --experimental_disk_cache_gc_max_size=15G   # bounded; auto-GC'd when idle (Bazel 7.4+)
+```
+
+Same action-cache (AC/CAS) mechanism as the BuildBuddy remote cache, kept on local disk: identical actions — e.g. compiling a shared dependency like protobuf — run once and are restored across every project, and a `bazel clean` becomes cheap to recover from (mostly cache hits, not a full rebuild). It trades disk for speed, so tune the size to taste. Unlike the remote-cache config above, it lives in `~/.bazelrc` rather than the per-repo `user.bazelrc`, so one setting covers all your repos.
+
 ### Pre-commit Hooks
 
 Fast local formatting and linting checks (< 2s, no Bazel startup):
