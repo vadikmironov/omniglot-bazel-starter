@@ -125,6 +125,20 @@ bazel build --config=remote-cache //...
 `user.bazelrc` is gitignored. See `user.bazelrc.template` for the full list of
 flags it documents.
 # --- END feature:remote_cache ---
+## Local Disk Cache
+
+Faster local builds, shared across every Bazel project you build. Add to your
+**user-global `~/.bazelrc`** (not this repo — it applies to all your workspaces):
+
+```bash
+build --disk_cache=~/.cache/bazel-disk
+build --experimental_disk_cache_gc_max_size=15G   # bounded; auto-GC'd when idle (Bazel 7.4+)
+```
+
+The same action-cache (AC/CAS) mechanism as the remote cache, on local disk:
+identical actions (e.g. a shared protobuf compile) run once and are reused
+everywhere, and `bazel clean` becomes cheap to recover from. Trades disk for
+speed — tune the size to taste.
 # --- BEGIN feature:coverage ---
 
 ## Code Coverage
