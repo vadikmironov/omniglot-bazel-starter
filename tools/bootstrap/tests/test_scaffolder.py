@@ -738,7 +738,17 @@ class TestScaffolder(unittest.TestCase):
         # .bazelrc: custom configs gated; hermetic default JDK stays either way.
         rc_on = (on / ".bazelrc").read_text()
         rc_off = (off / ".bazelrc").read_text()
-        for cfg in ("gcc_host", "clang_host", "gcc_remote", "clang_remote", "python_host", "java_host", "go_host", "local_corretto", "remote_corretto"):
+        for cfg in (
+            "gcc_host",
+            "clang_host",
+            "gcc_remote",
+            "clang_remote",
+            "python_host",
+            "java_host",
+            "go_host",
+            "local_corretto",
+            "remote_corretto",
+        ):
             self.assertIn(cfg, rc_on, f"{cfg} missing with custom_toolchains")
             self.assertNotIn(cfg, rc_off, f"{cfg} present without custom_toolchains")
         self.assertIn("remotejdk_17", rc_on)
