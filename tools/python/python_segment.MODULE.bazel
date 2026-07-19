@@ -49,36 +49,17 @@ use_repo(pip, "omniglot-bazel-starter_pip_dependencies")
 
 # --- BEGIN feature:custom_toolchains ---
 #
-# Local python runtime toolchain definition
+# Local python runtime toolchain (auto-discovered)
 #
-# It is based on the rules_python documentation here: https://rules-python.readthedocs.io/en/latest/toolchains.html#local-toolchain
-# The call to register_toolchain is omitted as local toolchain would be registered ahead of
-# hermetic rules_python toolchains. This would prevent the use of standard build toolchain selection
-# via build configs defined in .bazelrc.
+# The host_python_discovery extension probes PATH for the newest python3.X
+# interpreter (falling back to plain python3) and wires it through
+# rules_python's local_runtime_repo / local_runtime_toolchains_repo, so no
+# interpreter version or path is pinned here. Select with
+# --config=python_host (registered on demand via --extra_toolchains there;
+# registering it globally would outrank the hermetic toolchain above).
 #
-local_runtime_repo = use_repo_rule(
-    "@rules_python//python/local_toolchains:repos.bzl",
-    "local_runtime_repo",
-)
-
-local_runtime_toolchains_repo = use_repo_rule(
-    "@rules_python//python/local_toolchains:repos.bzl",
-    "local_runtime_toolchains_repo",
-)
-
-local_runtime_repo(
-    name = "host_python3_13_repo",
-    interpreter_path = "/usr/bin/python3.13",
-    on_failure = "fail",
-)
-
-local_runtime_toolchains_repo(
-    name = "host_python3_13_toolchain",
-    runtimes = ["host_python3_13_repo"],
-)
-# Note that register_toolchains will insert the local toolchain earlier in the toolchain ordering,
-# so it will take precedence over other registered toolchains.
-#register_toolchains("@local_toolchains//:all", dev_dependency = True)
+host_python = use_extension("//tools/python/toolchains:host_python_discovery.bzl", "host_python_discovery")
+use_repo(host_python, "host_python_repo", "host_python_toolchain")
 # --- END feature:custom_toolchains ---
 
 #

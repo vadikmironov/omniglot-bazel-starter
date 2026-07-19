@@ -59,17 +59,28 @@ bazel build --config=gcc_hermetic //modules/cpp_app
 # C++ hermetic GCC toolchain resolution debugging
 bazel build --config=gcc_hermetic_debug //modules/cpp_app
 
-# C++ with GCC host compiler (non-hermetic, system gcc)
-bazel build --config=gcc_host //modules/cpp_app:main
+# C++ with GCC host compiler (non-hermetic, system gcc, auto-discovered)
+bazel build --config=gcc_host //modules/cpp_app
 
-# C++ with Clang host compiler (non-hermetic, system clang)
-bazel build --config=clang_host //modules/cpp_app:main
+# C++ with Clang host compiler (non-hermetic, system clang, auto-discovered)
+bazel build --config=clang_host //modules/cpp_app
 
-# Python with local host interpreter (3.13)
-bazel build --config=python3_13_host //modules/python_app:main
+# C++ with remote pinned compilers (downloaded on first use, link against host
+# glibc): xPack GCC 15.2.0 / hermetic-llvm minimal clang 22.1.8 (~41 MB)
+bazel build --config=gcc_remote //modules/cpp_app
+bazel build --config=clang_remote //modules/cpp_app
+
+# Python with local host interpreter (newest python3.X on PATH)
+bazel build --config=python_host //modules/python_app
+
+# Java with local host JDK (newest installed JDK)
+bazel build --config=java_host //modules/java_app
+
+# Go with local host SDK (newest discovered SDK)
+bazel build --config=go_host //modules/go_app
 
 # Python toolchain debugging
-bazel build --config=python_toolchain_debug //modules/python_app:main
+bazel build --config=python_host_debug //modules/python_app
 ```
 
 ## Linting and Formatting
@@ -232,10 +243,10 @@ bazel run @omniglot-bazel-starter_maven_dependencies//:pin
 Use debug configurations to troubleshoot toolchain resolution:
 ```bash
 # C++ toolchain debugging
-bazel build --config=gcc_host_debug //modules/cpp_app:main
+bazel build --config=gcc_host_debug //modules/cpp_app
 
-# Python toolchain debugging (local 3.13)
-bazel build --config=python3_13_host_debug //modules/python_app:main
+# Python toolchain debugging (local host interpreter)
+bazel build --config=python_host_debug //modules/python_app
 ```
 
 ### Post Development Checks

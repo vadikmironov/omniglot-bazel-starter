@@ -345,7 +345,7 @@ Contributions and feedback are welcome! Feel free to open a pull request for any
 
 - Rust ⇄ C/C++ interop example with working BUILD targets
 - Python extension module written in Rust (PyO3)
-- Possible additions: `rules_kotlin`, `rules_csharp`
+- Possible additions: `rules_kotlin`, `rules_dotnet`
 
 ## License
 

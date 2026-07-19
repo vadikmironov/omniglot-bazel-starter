@@ -588,12 +588,12 @@ class TestRealSnippets(unittest.TestCase):
             # --- END lang:cpp ---
 
             # --- BEGIN lang:python ---
-            common:python3_13_host --@rules_python//python/config_settings:python_version=3.13
+            common:python_host --@rules_python//python/config_settings:python_version=3.14
             # --- END lang:python ---
         """)
         result = filter_sections(content, {"python"})
         self.assertIn("enable_platform_specific_config", result)
-        self.assertIn("python3_13_host", result)
+        self.assertIn("python_host", result)
         self.assertNotIn("gcc_host", result)
 
     def test_real_format_build_snippet(self) -> None:

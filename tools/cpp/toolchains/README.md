@@ -25,7 +25,37 @@ bazel build --config=gcc_host_debug //modules/cpp_app
 --config=gcc_host        # Use system GCC (non-hermetic)
 --config=clang_host      # Use system Clang (non-hermetic)
 --config=gcc_host_debug  # GCC with toolchain resolution debugging
+--config=gcc_remote      # Downloaded pinned xPack GCC (non-hermetic linking)
+--config=clang_remote    # Downloaded pinned hermetic-llvm minimal Clang (non-hermetic linking)
 ```
+
+## Remote pinned compilers
+
+`remote_cc_toolchains.bzl` adds a corretto-style middle tier between the host configs and
+the hermetic defaults: a pinned vendor archive — [xPack GCC](https://github.com/xpack-dev-tools/gcc-xpack)
+or the [hermetic-llvm](https://github.com/hermeticbuild/hermetic-llvm) "minimal" Clang
+(~41 MB, also ships clang-tidy/clang-format/llvm-cov) — is downloaded with SHA256
+verification on first use of its `--config` and wired through the same
+`toolchain_config.bzl` as the host compilers. Neither archive carries a libc/sysroot, so
+both compile and link against the host glibc: pinned compiler, host runtime. Use them when
+the distro compiler is too old, or behind an artifact proxy where vendor downloads must be
+mirrorable URLs.
+
+Both vendors have fully hermetic upgrades worth adopting later: the
+[`llvm` BCR module](https://registry.bazel.build/modules/llvm) (hermetic-llvm's zero-sysroot
+cc_toolchain, ~50x smaller than the toolchains_llvm distribution) is a viable replacement for
+toolchains_llvm once upstream `bazel coverage` support lands
+([#675](https://github.com/hermeticbuild/hermetic-llvm/issues/675)), and xPack GCC could be
+hardened the same way by pairing it with a minimal downloaded sysroot.
+
+## Auto-discovery
+
+No compiler version or include path is pinned here: `host_cc_discovery.bzl` probes the
+installed `g++`/`clang++` at fetch time for their builtin include search directories and
+tool location (mirroring rules_cc's `unix_cc_configure.bzl`), and `toolchain_config.bzl`
+consumes the probed values. After upgrading a host compiler, refresh with
+`bazel fetch --configure --force`. The same convention backs the host Python and Java toolchains
+(`tools/python/toolchains/host_python_discovery.bzl`, `tools/java/toolchains/host_jdk_discovery.bzl`).
 
 ## Hermetic toolchains (the production defaults)
 

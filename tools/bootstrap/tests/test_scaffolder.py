@@ -720,23 +720,25 @@ class TestScaffolder(unittest.TestCase):
         self.assertIn("rules_cc", cpp_off)
         self.assertIn("host_gcc_cc_toolchain", cpp_on)
         self.assertNotIn("host_gcc_cc_toolchain", cpp_off)
+        self.assertIn("remote_cc_toolchain", cpp_on)
+        self.assertNotIn("remote_cc_toolchain", cpp_off)
 
         # java_segment: rules_jvm_external always; ALL Corretto (local + remote) gated.
         java_on = (on / "tools" / "java" / "java_segment.MODULE.bazel").read_text()
         java_off = (off / "tools" / "java" / "java_segment.MODULE.bazel").read_text()
         self.assertIn("rules_jvm_external", java_off)
-        for needle in ("local_corretto_toolchains", "remote_corretto_toolchains", "local_host_jdk_17_toolchain"):
+        for needle in ("local_corretto_toolchains", "remote_corretto_toolchains", "local_host_jdk_toolchain"):
             self.assertIn(needle, java_on)
             self.assertNotIn(needle, java_off)
 
         # go_segment: local SDK gated.
-        self.assertIn("go_local_sdk", (on / "tools" / "go" / "go_segment.MODULE.bazel").read_text())
-        self.assertNotIn("go_local_sdk", (off / "tools" / "go" / "go_segment.MODULE.bazel").read_text())
+        self.assertIn("host_go_sdk", (on / "tools" / "go" / "go_segment.MODULE.bazel").read_text())
+        self.assertNotIn("host_go_sdk", (off / "tools" / "go" / "go_segment.MODULE.bazel").read_text())
 
         # .bazelrc: custom configs gated; hermetic default JDK stays either way.
         rc_on = (on / ".bazelrc").read_text()
         rc_off = (off / ".bazelrc").read_text()
-        for cfg in ("gcc_host", "clang_host", "python3_13_host", "go_local_sdk", "local_corretto", "remote_corretto"):
+        for cfg in ("gcc_host", "clang_host", "gcc_remote", "clang_remote", "python_host", "java_host", "go_host", "local_corretto", "remote_corretto"):
             self.assertIn(cfg, rc_on, f"{cfg} missing with custom_toolchains")
             self.assertNotIn(cfg, rc_off, f"{cfg} present without custom_toolchains")
         self.assertIn("remotejdk_17", rc_on)

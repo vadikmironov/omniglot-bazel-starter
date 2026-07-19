@@ -93,16 +93,19 @@ Besides the hermetic defaults, optional host/local toolchains are selectable via
 # --- BEGIN feature:custom_toolchains lang:cpp ---
 bazel build --config=gcc_host //...                      # C++ via host GCC
 bazel build --config=clang_host //...                    # C++ via host Clang
+bazel build --config=gcc_remote //...                    # C++ via downloaded pinned xPack GCC
+bazel build --config=clang_remote //...                  # C++ via downloaded pinned Clang (hermetic-llvm minimal)
 # --- END feature:custom_toolchains lang:cpp ---
 # --- BEGIN feature:custom_toolchains lang:python ---
-bazel build --config=python3_13_host //...               # Python via host interpreter
+bazel build --config=python_host //...                   # Python via host interpreter (auto-discovered)
 # --- END feature:custom_toolchains lang:python ---
 # --- BEGIN feature:custom_toolchains lang:java ---
+bazel build --config=java_host //...                     # Java via newest host JDK (auto-discovered)
 bazel build --config=java_17_local_corretto_jdk //...    # Java via local Corretto JDK 17
 bazel build --config=java_17_remote_corretto_jdk //...   # Java via downloaded Corretto JDK 17
 # --- END feature:custom_toolchains lang:java ---
 # --- BEGIN feature:custom_toolchains lang:go ---
-bazel build --config=go_local_sdk //...                  # Go via local SDK (USE_LOCAL_GO_SDK=1)
+bazel build --config=go_host //...                       # Go via newest host SDK (auto-discovered)
 # --- END feature:custom_toolchains lang:go ---
 # --- BEGIN feature:custom_toolchains lang:cpp,python,java,go ---
 ```

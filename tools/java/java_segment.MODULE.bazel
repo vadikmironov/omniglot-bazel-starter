@@ -10,40 +10,22 @@ bazel_dep(name = "rules_java", version = "9.7.0")
 
 # --- BEGIN feature:custom_toolchains ---
 #
-# System-installed JDK configuration (alternative example)
+# System-installed JDK configuration (auto-discovered)
 #
-# This demonstrates how to configure a JDK that's already installed on the system
-# (e.g., via apt, brew, or manual installation) using use_repo_rule to directly
-# call the local_java_repository rule from rules_java.
+# The host_jdk_discovery extension (//tools/java/toolchains:host_jdk_discovery.bzl)
+# enumerates installed JDKs (JAVA_HOME + conventional distro directories) and
+# wires the newest one via rules_java's local_java_repository under the stable
+# repo name local_host_jdk_toolchain, so the .bazelrc java_host config never
+# needs updating with the installed JDK. The language level stays whatever the
+# build requests (a newer runtime handles older language levels).
 #
-# How it works:
-# - use_repo_rule exposes the repository rule for direct use in MODULE.bazel
-# - local_java_repository creates java_runtime and toolchain targets pointing
-#   to the specified java_home path
-# - Toolchain is registered on-demand via --extra_toolchains in .bazelrc
+# The toolchain is registered on-demand via --extra_toolchains in .bazelrc:
+#   build:java_host --java_runtime_version=local_host_jdk_toolchain
+#   build:java_host --tool_java_runtime_version=local_host_jdk_toolchain
+#   build:java_host --extra_toolchains=@local_host_jdk_toolchain//:all
 #
-# Note: When using use_repo_rule to call the rule directly (instead of the macro),
-# the runtime_name attribute must be set explicitly (typically same as name).
-#
-# Usage in .bazelrc:
-#   build:java_default_17_host --java_runtime_version=local_host_jdk_17_toolchain
-#   build:java_default_17_host --tool_java_runtime_version=local_host_jdk_17_toolchain
-#   build:java_default_17_host --extra_toolchains=@local_host_jdk_17_toolchain//:all
-#
-# Reference documentation:
-# https://github.com/bazelbuild/rules_java/blob/master/toolchains/local_java_repository.bzl
-#
-local_java_repository = use_repo_rule(
-    "@rules_java//toolchains:local_java_repository.bzl",
-    "_local_java_repository_rule",
-)
-
-local_java_repository(
-    name = "local_host_jdk_17_toolchain",
-    java_home = "/usr/lib/jvm/java-17-openjdk-amd64",
-    runtime_name = "local_host_jdk_17_toolchain",
-    version = "17",
-)
+host_jdk_discovery = use_extension("//tools/java/toolchains:host_jdk_discovery.bzl", "host_jdk_discovery")
+use_repo(host_jdk_discovery, "local_host_jdk_toolchain")
 
 #
 # Local Corretto JDK configuration
