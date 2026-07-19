@@ -24,7 +24,15 @@ _END_MARKER = "End of search list."
 # Shared with remote_cc_toolchains.bzl, which probes downloaded compilers the
 # same way.
 def probe_include_dirs(repository_ctx, cxx_bin):
-    """Returns the compiler's builtin C++ include dirs, or [] on failure."""
+    """Probes a C++ compiler driver for its builtin include search directories.
+
+    Args:
+      repository_ctx: the repository context used to execute the driver.
+      cxx_bin: path of the C++ driver (g++/clang++) to probe.
+
+    Returns:
+      The list of builtin include directories, or [] if the probe failed.
+    """
     result = repository_ctx.execute([str(cxx_bin), "-E", "-x", "c++", "/dev/null", "-v"])
     if result.return_code != 0:
         return []

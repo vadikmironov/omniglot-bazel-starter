@@ -65,7 +65,7 @@ register_toolchains(
     "//tools/cpp/toolchains:host_clang_cc_toolchain_for_linux_x86_64",
 )
 
-# Remote pinned compilers: downloaded on first use of their --config 
+# Remote pinned compilers: downloaded on first use of their --config
 # (gcc_remote / clang_remote), never register_toolchains()'d, so the
 # archives are only fetched when selected. See remote_cc_toolchains.bzl for
 # pins and the path to fully hermetic variants.
