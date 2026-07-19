@@ -132,6 +132,21 @@ build:gcc_host --cxxopt=-Wall
 build:clang_host --platforms=//tools/cpp/toolchains:x86_64_linux_platform
 build:clang_host --extra_toolchains=//tools/cpp/toolchains:host_clang_cc_toolchain_for_linux_x86_64
 build:clang_host --cxxopt=-Wall
+
+# Remote pinned compilers (downloaded on first use, link against the host glibc).
+# Pins and notes: tools/cpp/toolchains/remote_cc_toolchains.bzl
+
+# GCC (remote xPack GCC)
+
+build:gcc_remote --platforms=//tools/cpp/toolchains:x86_64_linux_platform
+build:gcc_remote --extra_toolchains=@remote_xpack_gcc//:all
+build:gcc_remote --cxxopt=-Wall
+
+# Clang (remote hermetic-llvm minimal)
+
+build:clang_remote --platforms=//tools/cpp/toolchains:x86_64_linux_platform
+build:clang_remote --extra_toolchains=@remote_llvm_clang//:all
+build:clang_remote --cxxopt=-Wall
 # --- END feature:custom_toolchains lang:cpp ---
 
 # --- BEGIN lang:python ---
@@ -145,13 +160,14 @@ build --incompatible_default_to_explicit_init_py
 # --- END lang:python ---
 
 # --- BEGIN feature:custom_toolchains lang:python ---
-# Host Python toolchain
+# Host Python toolchain (auto-discovered: newest python3.X on PATH; see
+# tools/python/toolchains/host_python_discovery.bzl)
 
-build:python3_13_host --extra_toolchains=@host_python3_13_toolchain//:all
+build:python_host --extra_toolchains=@host_python_toolchain//:all
 
-build:python3_13_host_debug --subcommands # https://bazel.build/docs/user-manual#subcommands
-build:python3_13_host_debug --toolchain_resolution_debug='@bazel_tools//tools/python:toolchain_type'
-build:python3_13_host_debug --extra_toolchains=@host_python3_13_toolchain//:all
+build:python_host_debug --subcommands # https://bazel.build/docs/user-manual#subcommands
+build:python_host_debug --toolchain_resolution_debug='@bazel_tools//tools/python:toolchain_type'
+build:python_host_debug --extra_toolchains=@host_python_toolchain//:all
 # --- END feature:custom_toolchains lang:python ---
 
 # --- BEGIN feature:lint ---
@@ -195,13 +211,13 @@ build --tool_java_runtime_version=remotejdk_17
 # --- END lang:java ---
 
 # --- BEGIN feature:custom_toolchains lang:java ---
-# Host Java toolchain
+# Host Java toolchain (auto-discovered: newest installed JDK; see
+# tools/java/toolchains/host_jdk_discovery.bzl). The language level stays the
+# build default (17) — a newer runtime handles older language levels.
 
-build:java_17_default_host --java_language_version=17
-build:java_17_default_host --tool_java_language_version=17
-build:java_17_default_host --java_runtime_version=local_host_jdk_17_toolchain
-build:java_17_default_host --tool_java_runtime_version=local_host_jdk_17_toolchain
-build:java_17_default_host --extra_toolchains=@local_host_jdk_17_toolchain//:all
+build:java_host --java_runtime_version=local_host_jdk_toolchain
+build:java_host --tool_java_runtime_version=local_host_jdk_toolchain
+build:java_host --extra_toolchains=@local_host_jdk_toolchain//:all
 
 # Local custom Java toolchain
 
@@ -245,7 +261,9 @@ build:java_17_remote_corretto_jdk --extra_toolchains=@remote_corretto_jdk17_wind
 ## Go specific flags
 ##
 
-build:go_local_sdk --repo_env=USE_LOCAL_GO_SDK=1
+# Host Go toolchain (auto-discovered: newest SDK from GOROOT, PATH, or the
+# conventional install roots; see tools/go/toolchains/host_go_discovery.bzl)
+build:go_host --repo_env=USE_HOST_GO_SDK=1
 # --- END feature:custom_toolchains lang:go ---
 
 # --- BEGIN feature:remote_cache ---

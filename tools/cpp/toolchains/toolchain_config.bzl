@@ -11,10 +11,16 @@ load("@rules_cc//cc/toolchains:cc_toolchain_config_info.bzl", "CcToolchainConfig
 GCC_HOST_LOCAL = "gcc_host_local"
 CLANG_HOST_LOCAL = "clang_host_local"
 
-COMPILER_PATH_PREFIX = {
-    GCC_HOST_LOCAL: "/usr/bin/",
-    CLANG_HOST_LOCAL: "/usr/bin/",
-}
+# Remote flavours: the same host-linked toolchains, but driven by a pinned
+# compiler downloaded by remote_cc_toolchains.bzl instead of whatever the
+# distro ships.
+GCC_REMOTE_XPACK = "gcc_remote_xpack"
+CLANG_REMOTE_LLVM = "clang_remote_llvm"
+
+_GCC_FLAVOURS = [GCC_HOST_LOCAL, GCC_REMOTE_XPACK]
+_CLANG_FLAVOURS = [CLANG_HOST_LOCAL, CLANG_REMOTE_LLVM]
+
+_KNOWN_FLAVOURS = _GCC_FLAVOURS + _CLANG_FLAVOURS
 
 all_link_actions = [
     ACTION_NAMES.cpp_link_executable,
@@ -22,23 +28,34 @@ all_link_actions = [
     ACTION_NAMES.cpp_link_nodeps_dynamic_library,
 ]
 
-def _impl(ctx):
-    if ctx.attr.compiler_flavour_name not in COMPILER_PATH_PREFIX:
-        fail("compiler_flavour_name must be set and registered in COMPILER_PATH_PREFIX dictionary.")
+all_compile_actions = [
+    ACTION_NAMES.preprocess_assemble,
+    ACTION_NAMES.linkstamp_compile,
+    ACTION_NAMES.c_compile,
+    ACTION_NAMES.cpp_compile,
+    ACTION_NAMES.cpp_header_parsing,
+    ACTION_NAMES.cpp_module_compile,
+    ACTION_NAMES.clif_match,
+]
 
-    tool_path_prefix = COMPILER_PATH_PREFIX[ctx.attr.compiler_flavour_name]
+def _impl(ctx):
+    if ctx.attr.compiler_flavour_name not in _KNOWN_FLAVOURS:
+        fail("compiler_flavour_name must be one of %s." % _KNOWN_FLAVOURS)
+
+    tool_path_prefix = ctx.attr.tool_bin_dir
 
     tool_paths = []
 
-    # for a proper way to calculate builtin_includes see here:
-    # https://github.com/bazelbuild/rules_cc/blob/main/cc/private/toolchain/unix_cc_configure.bzl:configure_unix_toolchain (_get_cxx_include_directories use)
-    # otherwise, you can do `gcc -print-prog-name=cc1` -v < /dev/null and `gcc -print-prog-name=cc1plus` -v < /dev/null to find out
-    # or clang -E -x c - -v < /dev/null and clang++ -E -x c++ - -v < /dev/null for Clang
-    builtin_include_directories = []
+    # The builtin include dirs are probed from the installed compiler at fetch
+    # time by //tools/cpp/toolchains:host_cc_discovery.bzl (mirroring rules_cc's
+    # unix_cc_configure.bzl) and passed in via builtin_include_directories, so
+    # the toolchain adapts to whatever gcc/clang version is on the host instead
+    # of hardcoding version-specific paths.
+    builtin_include_directories = ctx.attr.builtin_include_directories
 
     link_libs = []
 
-    if ctx.attr.compiler_flavour_name == GCC_HOST_LOCAL:
+    if ctx.attr.compiler_flavour_name in _GCC_FLAVOURS:
         tool_paths = [
             tool_path(name = "ar", path = tool_path_prefix + "ar"),
             tool_path(name = "compat-ld", path = tool_path_prefix + "ld"),
@@ -52,22 +69,15 @@ def _impl(ctx):
             tool_path(name = "objdump", path = tool_path_prefix + "objdump"),
             tool_path(name = "strip", path = tool_path_prefix + "strip"),
         ]
-        builtin_include_directories = [
-            "/usr/include/c++/14",
-            "/usr/include/x86_64-linux-gnu/c++/14",
-            "/usr/include/c++/14/backward",
-            "/usr/lib/gcc/x86_64-linux-gnu/14/include",
-            "/usr/local/include",
-            "/usr/include/x86_64-linux-gnu",
-            "/usr/include",
-            # linux-libc-dev keeps the arch UAPI headers here and symlinks
-            # /usr/include/x86_64-linux-gnu/asm to them; gcc records the resolved
-            # target in its depfile, so the directory must be declared builtin.
-            "/usr/lib/linux/uapi/x86",
-        ]
 
-        link_libs = ["-lstdc++", "-lm"]
-    elif ctx.attr.compiler_flavour_name == CLANG_HOST_LOCAL:
+        # xPack's libstdc++ headers are newer than the distro's runtime .so, so
+        # the remote flavour links its libstdc++ statically to avoid GLIBCXX
+        # version errors at runtime (same trick as gcc_hermetic in .bazelrc).
+        if ctx.attr.compiler_flavour_name == GCC_REMOTE_XPACK:
+            link_libs = ["-l:libstdc++.a", "-lm"]
+        else:
+            link_libs = ["-lstdc++", "-lm"]
+    elif ctx.attr.compiler_flavour_name in _CLANG_FLAVOURS:
         tool_paths = [
             tool_path(name = "ar", path = tool_path_prefix + "ar"),
             tool_path(name = "compat-ld", path = tool_path_prefix + "ld"),
@@ -80,15 +90,6 @@ def _impl(ctx):
             tool_path(name = "objcopy", path = tool_path_prefix + "objcopy"),
             tool_path(name = "objdump", path = tool_path_prefix + "objdump"),
             tool_path(name = "strip", path = tool_path_prefix + "strip"),
-        ]
-        builtin_include_directories = [
-            "/usr/bin/../lib/gcc/x86_64-linux-gnu/12/../../../../include/c++/12",
-            "/usr/bin/../lib/gcc/x86_64-linux-gnu/12/../../../../include/x86_64-linux-gnu/c++/12",
-            "/usr/bin/../lib/gcc/x86_64-linux-gnu/12/../../../../include/c++/12/backward",
-            "/usr/lib/llvm-19/lib/clang/19/include",
-            "/usr/local/include",
-            "/usr/include/x86_64-linux-gnu",
-            "/usr/include",
         ]
         link_libs = ["-lstdc++", "-lm"]
         #link_libs = ["-lc++", "-lm", ]
@@ -108,6 +109,26 @@ def _impl(ctx):
                             flags = link_libs,
                         ),
                     ]),
+                ),
+            ],
+        ),
+        # Opt-in support for --features=external_include_paths (set repo-wide in
+        # .bazelrc): include external-repo headers via -isystem so their
+        # diagnostics don't fail first-party -Werror builds. Hermetic toolchains
+        # define this themselves; without it here the flag is silently inert on
+        # these toolchains.
+        feature(
+            name = "external_include_paths",
+            flag_sets = [
+                flag_set(
+                    actions = all_compile_actions,
+                    flag_groups = [
+                        flag_group(
+                            flags = ["-isystem", "%{external_include_paths}"],
+                            iterate_over = "external_include_paths",
+                            expand_if_available = "external_include_paths",
+                        ),
+                    ],
                 ),
             ],
         ),
@@ -134,6 +155,15 @@ cc_toolchain_config = rule(
         "compiler_flavour_name": attr.string(
             mandatory = True,
             doc = "A flavour name for the compiler, e.g. 'gcc', 'clang'.",
+        ),
+        "tool_bin_dir": attr.string(
+            default = "/usr/bin/",
+            doc = "Directory (trailing slash) holding the compiler and binutils, " +
+                  "probed from the host by host_cc_discovery.",
+        ),
+        "builtin_include_directories": attr.string_list(
+            doc = "Compiler builtin include search dirs, probed from the host by " +
+                  "host_cc_discovery. Empty means the compiler was not found at fetch time.",
         ),
     },
     provides = [CcToolchainConfigInfo],

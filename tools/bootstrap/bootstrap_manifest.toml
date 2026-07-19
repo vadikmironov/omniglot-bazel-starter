@@ -329,6 +329,7 @@ custom_toolchains = [
     "tools/cpp/toolchains",
     "tools/go/toolchains",
     "tools/java/toolchains",
+    "tools/python/toolchains",
 ]
 
 # ---------------------------------------------------------------------------

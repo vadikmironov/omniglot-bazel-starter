@@ -49,6 +49,13 @@ gcc_toolchains.toolchain(
 use_repo(gcc_toolchains, "gcc_toolchain_x86_64")
 
 # --- BEGIN feature:custom_toolchains ---
+# Probe the host g++/clang++ at fetch time for their builtin include dirs and
+# tool bin dir, so the host toolchains below adapt to whatever compiler version
+# is installed. Refresh after a compiler upgrade with `bazel fetch --configure --force`.
+host_cc_discovery = use_repo_rule("//tools/cpp/toolchains:host_cc_discovery.bzl", "host_cc_discovery")
+
+host_cc_discovery(name = "host_cc_discovery")
+
 # Configure and register any custom toolchains - in our case gcc and clang host compilers.
 register_toolchains(
     "//tools/cpp/toolchains:host_gcc_cc_toolchain_for_linux_x86_64",
@@ -56,5 +63,21 @@ register_toolchains(
 
 register_toolchains(
     "//tools/cpp/toolchains:host_clang_cc_toolchain_for_linux_x86_64",
+)
+
+# Remote pinned compilers: downloaded on first use of their --config
+# (gcc_remote / clang_remote), never register_toolchains()'d, so the
+# archives are only fetched when selected. See remote_cc_toolchains.bzl for
+# pins and the path to fully hermetic variants.
+remote_cc_toolchain = use_repo_rule("//tools/cpp/toolchains:remote_cc_toolchains.bzl", "remote_cc_toolchain")
+
+remote_cc_toolchain(
+    name = "remote_xpack_gcc",
+    flavour = "gcc_remote_xpack",
+)
+
+remote_cc_toolchain(
+    name = "remote_llvm_clang",
+    flavour = "clang_remote_llvm",
 )
 # --- END feature:custom_toolchains ---

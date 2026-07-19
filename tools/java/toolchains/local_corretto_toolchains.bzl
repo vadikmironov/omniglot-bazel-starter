@@ -333,6 +333,11 @@ def _local_corretto_toolchains_impl(module_ctx):
             build_file = toolchain_build_file,
         )
 
+    # Machine-local discovery: keep the result out of MODULE.bazel.lock, so a
+    # JDK installed after the first build is picked up on re-evaluation instead
+    # of being shadowed by a locked placeholder.
+    return module_ctx.extension_metadata(reproducible = True)
+
 _config_tag = tag_class(
     attrs = {
         "unix_base_path": attr.string(

@@ -28,14 +28,14 @@ go_sdk.download(
     # https://github.com/bazel-contrib/rules_go/blob/master/go/private/sdk.bzl#L74
     #
     #sdks = {
-    #    "darwin_amd64": ("go1.26.4.darwin-amd64.tar.gz", "b69d51bce599e5381a94ce15263ae644ec84667a5ce23d58dc2e63e2c12a9f56"),
-    #    "darwin_arm64": ("go1.26.4.darwin-arm64.tar.gz", "bed8ebe824e3d3b27e8471d1307f803fc6ab8e1d0eb7a4ae196979bd9b801dd3"),
-    #    "linux_amd64": ("go1.26.4.linux-amd64.tar.gz", "9e9b755d63b36acf30c12a9a3fc379243714c1c6d3dd72861da637f336ebb35b"),
-    #    "linux_arm64": ("go1.26.4.linux-arm64.tar.gz", "b00b694903d126c588c378e72d3545549935d3982635ba3f7a964c9fa23fe3b9"),
-    #    "windows_amd64": ("go1.26.4.windows-amd64.zip", "ae756cce1cb80c819b4fe01b0353807178f532211b47f72d7fa77949de054ebb"),
+    #    "darwin_amd64": ("go1.26.5.darwin-amd64.tar.gz", "6231d8d3b8f5552ec6cbf6d685bdd5482e1e703214b120e89b3bf0d7bf1ef725"),
+    #    "darwin_arm64": ("go1.26.5.darwin-arm64.tar.gz", "efb87ff28af9a188d0536ef5d42e63dd52ba8263cd7344a993cc48dd11dedb6a"),
+    #    "linux_amd64": ("go1.26.5.linux-amd64.tar.gz", "5c2c3b16caefa1d968a94c1daca04a7ca301a496d9b086e17ad77bb81393f053"),
+    #    "linux_arm64": ("go1.26.5.linux-arm64.tar.gz", "fe4789e92b1f33358680864bbe8704289e7bb5fc207d80623c308935bd696d49"),
+    #    "windows_amd64": ("go1.26.5.windows-amd64.zip", "97e6b2a833b6d89f9ff17d25419ac0a7e3b482a044e9ab18cdef834bd834fd38"),
     #},
     #
-    version = "1.26.4",
+    version = "1.26.5",
 )
 
 # --- BEGIN feature:lint ---
@@ -51,34 +51,28 @@ go_sdk.nogo(
 
 # --- BEGIN feature:custom_toolchains ---
 #
-# Local Go SDK (for development or custom builds)
+# Host Go SDK (auto-discovered)
 #
-# Custom extension creates the @go_local_sdk repository from a local path with
-# complete toolchain definitions. When enabled and valid, toolchains have proper
-# platform constraints. When disabled or invalid, toolchains have incompatible
-# constraints, causing fallback to the remote SDK.
+# The host_go_discovery extension (//tools/go/toolchains:host_go_discovery.bzl)
+# enumerates candidate GOROOTs (GOROOT env, `go` on PATH, ~/.go_sdks/*,
+# /opt/go_sdk/*, /usr/local/go, /usr/lib/go) and wires the newest valid SDK
+# as the @host_go_sdk repository — no path or version is pinned here. Install
+# SDKs with //tools/go/toolchains:host_go_sdk_setup.sh (default root ~/.go_sdks).
 #
-# SDK selection via environment variable (remote SDK is default):
-#   USE_LOCAL_GO_SDK=0 (default) - use remote SDK (local SDK toolchain has incompatible constraints)
-#   USE_LOCAL_GO_SDK=1 - enable local SDK (local SDK toolchain has proper constraints)
+# SDK selection via environment variable (hermetic SDK is default):
+#   USE_HOST_GO_SDK=0 (default) - the @host_go_sdk toolchain has incompatible
+#     constraints and never matches, so the hermetic SDK is used
+#   USE_HOST_GO_SDK=1 - discovery runs and the toolchain gets proper constraints
 #
 # Usage in .bazelrc:
-#   build:go_local --repo_env=USE_LOCAL_GO_SDK=1
+#   build:go_host --repo_env=USE_HOST_GO_SDK=1
 #
-go_local_sdk_ext = use_extension("//tools/go/toolchains:local_go_sdk.bzl", "go_local_sdk_ext")
-go_local_sdk_ext.define_local_sdk(
-    name = "go_local_sdk",
-    path = "/opt/go_sdk/go1.24.11",
-    version = "1.24.11",
-    # Optional: enable Go experiments via GOEXPERIMENT environment variable.
-    # Available experiments: https://github.com/golang/go/blob/master/src/internal/goexperiment/flags.go
-    # experiments = ["arenas"],
-)
-use_repo(go_local_sdk_ext, "go_local_sdk")
+host_go_discovery = use_extension("//tools/go/toolchains:host_go_discovery.bzl", "host_go_discovery")
+use_repo(host_go_discovery, "host_go_sdk")
 
-# Register local SDK toolchain, when SDK is disabled/invalid, the toolchain has incompatible constraints
-# and won't match.
-register_toolchains("@go_local_sdk//:all")
+# Register the host SDK toolchain; when discovery is disabled or finds nothing,
+# the toolchain has incompatible constraints and won't match.
+register_toolchains("@host_go_sdk//:all")
 # --- END feature:custom_toolchains ---
 
 #
@@ -104,8 +98,8 @@ register_toolchains("@go_local_sdk//:all")
 # --- BEGIN feature:custom_toolchains ---
 #
 # By default, these commands use the remote SDK from rules_go. To use a custom
-# toolchain (e.g., local SDK), pass the corresponding --config flag from .bazelrc:
-#   bazel run --config=go_local_sdk @rules_go//go -- get github.com/some/pkg
+# toolchain (e.g., the discovered host SDK), pass the corresponding --config flag from .bazelrc:
+#   bazel run --config=go_host @rules_go//go -- get github.com/some/pkg
 # --- END feature:custom_toolchains ---
 #
 go_deps = use_extension("@gazelle//:extensions.bzl", "go_deps")
