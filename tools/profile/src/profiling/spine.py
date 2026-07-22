@@ -29,6 +29,10 @@ class Tools:
     # Java capture only (None unless the java language is scaffolded):
     # async-profiler's converter renders JFR recordings as collapsed stacks.
     jfrconv: Path | None
+    # Runfiles root for launching jfrconv: its java_binary bash launcher only
+    # consults $JAVA_RUNFILES for runfiles discovery, which manifest-mode
+    # runfiles leave unset (see jfr_to_folded). None outside a runfiles tree.
+    java_runfiles: Path | None
 
 
 class ProfileError(Exception):
@@ -61,6 +65,10 @@ def resolve_tools() -> Tools:
     pprof = rlocation("PROFILE_PPROF")
     symbolizer = rlocation("PROFILE_LLVM_SYMBOLIZER")
     jfrconv = rlocation("PROFILE_JFRCONV")
+    # Prefer JAVA_RUNFILES (directory-mode EnvVars sets it), else the runfiles
+    # root RUNFILES_DIR (manifest-mode EnvVars sets that but not JAVA_RUNFILES).
+    env_vars = r.EnvVars()
+    runfiles_root = env_vars.get("JAVA_RUNFILES") or env_vars.get("RUNFILES_DIR")
     return Tools(
         pprofutils=pprofutils,
         inferno=inferno,
@@ -69,6 +77,7 @@ def resolve_tools() -> Tools:
         pprof=pprof,
         llvm_tools_dir=symbolizer.parent if symbolizer is not None else None,
         jfrconv=jfrconv,
+        java_runfiles=Path(runfiles_root) if runfiles_root else None,
     )
 
 
@@ -102,8 +111,13 @@ def jfr_to_folded(tools: Tools, jfr: Path, folded: Path, *, mode: str) -> None:
     """
     if tools.jfrconv is None:
         raise ProfileError("jfrconv missing from runfiles; Java capture needs the java language scaffolded")
+    # jfrconv is a bazel java_binary; its bash launcher can't self-locate its
+    # runfiles when execed from our tree under manifest-mode runfiles (its $0 is
+    # the real bazel-out path, no .runfiles/ ancestor). It only honors
+    # $JAVA_RUNFILES, so hand it the runfiles root.
+    env = {**os.environ, "JAVA_RUNFILES": str(tools.java_runfiles)} if tools.java_runfiles else None
     flags = ["--state", "runnable"] if mode == "cpu" else ["--alloc", "--total"]
-    _run([str(tools.jfrconv), *flags, "-o", "collapsed", str(jfr), str(folded)])
+    _run([str(tools.jfrconv), *flags, "-o", "collapsed", str(jfr), str(folded)], env=env)
     if not folded.is_file():
         raise ProfileError(f"jfrconv produced no output for {jfr}")
 
