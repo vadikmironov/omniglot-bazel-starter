@@ -20,7 +20,7 @@
     "org.openjdk.jmh:jmh-core": 983716932,
     "org.openjdk.jmh:jmh-generator-annprocess": -1162360421,
     "repositories": -1949687017,
-    "tools.profiler:jfr-converter": -1586799357
+    "tools.profiler:jfr-converter": 900713476
   },
   "__RESOLVED_ARTIFACTS_HASH": {
     "com.fasterxml.jackson.core:jackson-annotations": 1145483352,
@@ -91,7 +91,7 @@
     "org.slf4j:slf4j-simple": 897425033,
     "org.xmlresolver:xmlresolver": -2072175398,
     "org.xmlresolver:xmlresolver:jar:data": 792867476,
-    "tools.profiler:jfr-converter": -287824603
+    "tools.profiler:jfr-converter": 1716872069
   },
   "artifacts": {
     "com.fasterxml.jackson.core:jackson-annotations": {
@@ -499,9 +499,9 @@
     },
     "tools.profiler:jfr-converter": {
       "shasums": {
-        "jar": "e8da0076f4b31224678e5a15201784aa219b5e1f2ed211fcdfb88f4df4d9ffbc"
+        "jar": "d8a5452b26adb11a2a0abf0c53799a6fd60dbccb0647efa5a734e3c46ced3df4"
       },
-      "version": "4.4"
+      "version": "4.5"
     }
   },
   "dependencies": {
