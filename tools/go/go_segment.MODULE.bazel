@@ -6,7 +6,7 @@
 # Please find documentation here:
 # https://github.com/bazel-contrib/rules_go/releases
 #
-bazel_dep(name = "rules_go", version = "0.61.1")
+bazel_dep(name = "rules_go", version = "0.62.0")
 
 # Gazelle is used to generate BUILD files and manage Go dependencies.
 # Documentation: https://github.com/bazel-contrib/bazel-gazelle
