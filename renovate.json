@@ -3,6 +3,9 @@
    "extends":[
       "config:recommended"
    ],
+   "labels":[
+      "dependencies"
+   ],
    "bazel-module":{
       "fileMatch":[
          ".*\\.MODULE\\.bazel$"
