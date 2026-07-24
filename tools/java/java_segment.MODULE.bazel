@@ -189,7 +189,7 @@ use_repo(
 #
 # Documentation: https://github.com/bazel-contrib/rules_jvm_external/releases
 #
-bazel_dep(name = "rules_jvm_external", version = "7.0")
+bazel_dep(name = "rules_jvm_external", version = "7.1")
 
 #
 # Project-specific Maven repository name. Using a unique name prevents conflicts
