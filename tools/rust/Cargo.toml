@@ -21,7 +21,7 @@ rand = { version = "0.10" }
 # CPU capture: criterion benches profiled in-process by pprof-rs
 # (pprof's `criterion` feature is built against criterion 0.5; keep majors in sync).
 # protobuf-codec is the pure-Rust codegen path — prost-codec needs a host protoc.
-criterion = { version = "0.5" }
+criterion = { version = "0.8" }
 pprof = { version = "0.15", features = ["criterion", "protobuf-codec"] }
 # Memory capture: jemalloc heap profiling dumped as pprof
 tikv-jemallocator = { version = "0.7", features = ["profiling", "unprefixed_malloc_on_supported_platforms"] }
