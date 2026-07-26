@@ -536,7 +536,9 @@ def _run_mem_profile(
 ) -> None:
     pb = outdir / "profile.pb"
     # --- BEGIN lang:cpp ---
-    if _rule_kind(label, cwd) == "cc_binary":
+    # Rust rides this path too: its shim links tcmalloc, which couples Rust
+    # memory capture to the C++ shard — hence the lang:cpp gate.
+    if _rule_kind(label, cwd) in ("cc_binary", "rust_binary"):
         # tcmalloc dumps gperftools' legacy format under a MEMPROF_OUT
         # prefix; symbolize + convert the last (live-heap) dump to pprof.
         prefix = outdir / "heap"
@@ -548,7 +550,7 @@ def _run_mem_profile(
         spine.gperftools_to_pb(tools, _built_binary(label, cwd), dumps[-1], pb)
         for dump in dumps:
             dump.unlink()
-        _render_mem_profile(label, pb, outdir, tools)
+        _render_mem_profile(label, pb, outdir, tools, meta=_take_meta(prefix))
         return
     # --- END lang:cpp ---
     # --- BEGIN lang:java ---
@@ -563,37 +565,113 @@ def _run_mem_profile(
         folded = outdir / "profile.folded"
         spine.jfr_to_folded(tools, jfr, folded, mode="alloc")
         jfr.unlink()
-        _render_mem_folded(label, folded, outdir, tools)
+        # JFR attributes allocated bytes and nothing else: its throttled samples
+        # carry no object count, and its live-object event carries no size (see
+        # modules/java_workloads/mem/README.md). So one bucket, and the ratios
+        # that need the others report as unavailable rather than guessing.
+        _render_mem_folded(
+            label,
+            folded,
+            outdir,
+            tools,
+            table=spine.folded_to_table({"alloc_space": folded}),
+            meta=_take_meta(jfr),
+            view="allocated",
+        )
         return
     # --- END lang:java ---
     # --- BEGIN lang:python ---
     if _rule_kind(label, cwd) == "py_binary":
-        # The memray shim writes folded stacks (bytes) directly.
+        # The memray shim writes folded stacks (bytes) directly, plus one file
+        # per bucket alongside them — memray is exact, so all four are real.
         folded = outdir / "profile.folded"
         env = _env(size, MEMPROF_OUT=str(folded))
         _bazel_run(label, [], cwd, env, config="profile")
         if not folded.is_file():
             raise ProfileError(f"{label} did not write folded stacks to {folded}")
-        _render_mem_folded(label, folded, outdir, tools)
+        _render_mem_folded(
+            label,
+            folded,
+            outdir,
+            tools,
+            table=_take_bucket_files(folded),
+            meta=_take_meta(folded),
+        )
         return
     # --- END lang:python ---
     env = _env(size, MEMPROF_OUT=str(pb))
     _bazel_run(label, [], cwd, env, config="profile")
     if not pb.is_file():
         raise ProfileError(f"{label} did not write a heap profile to {pb}")
-    _render_mem_profile(label, pb, outdir, tools)
+    _render_mem_profile(label, pb, outdir, tools, meta=_take_meta(pb))
 
 
-def _render_mem_profile(label: str, pb: Path, outdir: Path, tools: spine.Tools) -> None:
+def _take_meta(memprof_out: Path) -> spine.Meta | None:
+    """Read and remove the footprint sidecar a mem shim writes, if any."""
+    path = memprof_out.with_name(memprof_out.name + ".meta")
+    meta = spine.read_meta(path)
+    path.unlink(missing_ok=True)
+    return meta
+
+
+def _take_bucket_files(memprof_out: Path) -> spine.BucketTable | None:
+    """Join the per-bucket folded files a shim wrote beside its profile.
+
+    The route for languages whose capture never becomes pprof: they emit one
+    folded file per bucket they can measure, named `<profile>.<bucket>.folded`.
+    """
+    sources = {
+        bucket: path
+        for bucket in spine.BUCKETS
+        if (path := memprof_out.with_name(f"{memprof_out.name}.{bucket}.folded")).is_file()
+    }
+    if not sources:
+        return None
+    table = spine.folded_to_table(sources)
+    for path in sources.values():
+        path.unlink()
+    return table
+
+
+def _render_mem_profile(
+    label: str,
+    pb: Path,
+    outdir: Path,
+    tools: spine.Tools,
+    meta: spine.Meta | None = None,
+) -> None:
     folded = outdir / "profile.folded"
-    spine.pprof_to_folded(tools, pb, folded, trim_jemalloc=True)
-    _render_mem_folded(label, folded, outdir, tools)
+    # Heap profiles lead with an object count in both the Go 4-type and the
+    # gperftools 2-type shapes, so the bytes bucket has to be named.
+    spine.pprof_to_folded(
+        tools,
+        pb,
+        folded,
+        select="inuse_space,space",
+        unit="bytes",
+    )
+    table_path = outdir / "buckets.tsv"
+    spine.pprof_to_table(tools, pb, table_path)
+    table = spine.bucket_table(table_path)
+    _render_mem_folded(label, folded, outdir, tools, table=table, meta=meta)
+    table_path.unlink()
 
 
-def _render_mem_folded(label: str, folded: Path, outdir: Path, tools: spine.Tools) -> None:
+def _render_mem_folded(
+    label: str,
+    folded: Path,
+    outdir: Path,
+    tools: spine.Tools,
+    table: spine.BucketTable | None = None,
+    meta: spine.Meta | None = None,
+    view: str = "live",
+) -> None:
     svg = outdir / "flame.svg"
-    spine.folded_to_svg(tools, folded, svg, title=f"{label} (heap)", countname="bytes")
-    _report(folded, svg, outdir / "top.txt")
+    # Java's capture is allocation-weighted, everyone else's is retained heap;
+    # the title has to say which, or the two read as the same measurement.
+    spine.folded_to_svg(tools, folded, svg, title=f"{label} (heap, {view})", countname="bytes")
+    extra = spine.bucket_report(table, meta) if table is not None else ""
+    _report(folded, svg, outdir / "top.txt", extra=extra)
 
 
 def _run_measure(label: str, cwd: Path, size: int | None) -> None:
@@ -625,8 +703,10 @@ def _run_measure(label: str, cwd: Path, size: int | None) -> None:
     print("\nreminder: quote timings from --measure runs only; profile runs distort them")
 
 
-def _report(folded: Path, svg: Path, top_path: Path) -> None:
+def _report(folded: Path, svg: Path, top_path: Path, extra: str = "") -> None:
     top = spine.top_n(folded)
+    if extra:
+        top = f"{extra}\n{top}"
     top_path.write_text(top, encoding="utf-8")
     print(f"\n{svg}")
     print(top, end="")

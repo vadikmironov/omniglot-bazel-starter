@@ -4,4 +4,14 @@
     <Match>
         <Bug code="OS" />
     </Match>
+
+    <!-- The memory-profiling shim must force a collection before reading the
+         live heap, otherwise it measures uncollected garbage. SpotBugs' own
+         message allows for this ("extremely dubious except in benchmarking
+         code"), which is exactly what this is. -->
+    <Match>
+        <Class name="monorepo.workloads.ProfDump" />
+        <Method name="dump" />
+        <Bug pattern="DM_GC" />
+    </Match>
 </FindBugsFilter>

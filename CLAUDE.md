@@ -232,7 +232,18 @@ bazel run //tools/python:generate_requirements_lock.update
 
 # Run following command after any Java Maven dependency changes or Java version change
 bazel run @omniglot-bazel-starter_maven_dependencies//:pin
+
+# Run following command after any Rust crate changes in tools/rust/Cargo.toml
+# (note: `bazel sync` no longer exists — use fetch)
+CARGO_BAZEL_REPIN=1 bazel fetch @crates//...
+
+# Run following command after any Go dependency changes in go.mod
+bazel run @rules_go//go -- mod tidy
 ```
+
+These four are the same commands the bootstrap tool runs after scaffolding
+(`_LOCK_REFRESH_COMMANDS` in `tools/bootstrap/src/bootstrap/scaffolder.py`) and
+the ones listed in README.md — keep all three in step.
 
 ### Key Configuration Files
 - `.bazelrc`: Build configurations and toolchain settings

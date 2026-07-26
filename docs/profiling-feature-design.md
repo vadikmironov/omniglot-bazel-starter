@@ -33,9 +33,11 @@ gperftools / pprof-rs).
 
 **Interchange model — pprof protobuf is the inner lingua franca.** Every capture tool that can
 emit pprof does: Go CPU/heap, pprof-rs (Rust CPU), gperftools CPU/heap (C/C++), and Rust heap via
-`jemalloc_pprof`. One hermetic converter — `felixge/pprofutils` (`pprof2folded`, pure Go, builds
-with the existing rules_go toolchain) — turns all of them into folded stacks. Bespoke conversions
-remain for only two languages:
+`jemalloc_pprof`. One hermetic converter — `//tools/profile/pb2folded`, ~200 lines of first-party
+Go over `github.com/google/pprof/profile` — turns all of them into folded stacks, and additionally
+emits every sample type at once as TSV for the four-bucket memory report. (It replaced
+`felixge/pprofutils`, which folded a hardcoded sample index; see FOLLOW-UPS item 1.) Bespoke
+conversions remain for only two languages:
 
 - **Java:** JFR → collapsed via async-profiler's converter, a **pure-Java jar on Maven Central**
   (`tools.profiler:jfr-converter`, 4.x — the pre-4.0 name was `async-profiler-converter`). Slots
@@ -200,7 +202,7 @@ state it so consumers never quote timings from a profiled run.
    `CPUPROFILE` env activation resolves its output path twice and pid-suffixes the real file, so
    benches use explicit `ProfilerStart/Stop` in a shared `prof_main.cpp` driven by `CPUPROF_OUT`;
    (b) both profilers emit gperftools' legacy format with raw addresses — the runner symbolizes
-   it via google/pprof (a go.mod `tool`, like pprofutils) with `PPROF_TOOLS` pointed at the
+   it via google/pprof (a go.mod `tool` directive) with `PPROF_TOOLS` pointed at the
    toolchain's own `llvm-symbolizer`, keeping the pipeline hermetic.
 
    macOS-build addendum (2026-07-14, caught by CI on the PR): gperftools has platform-conditional
@@ -246,23 +248,50 @@ deficiencies, with upstream status.
 
 **FOLLOW-UPS (actionable):**
 
-1. **pprofutils `folded` uses `sample.Value[0]` with no selector — Go/C++ memory renders are
-   mislabeled today.** Heap profiles differ per language: Rust emits a single `inuse_space/bytes`
-   (label "bytes" correct); Go emits `[alloc_objects, alloc_space, inuse_objects, inuse_space]`
-   so folded counts **alloc_objects**; C++ (pprof-converted tcmalloc dump) emits
-   `[objects/count, space/bytes]` so folded counts **objects** (verified: retained_growth's
-   top.txt says 65537 = 64Ki chunks + 1 vector buffer, not 67108864 bytes). Both render under
-   `countname="bytes"`. Upstream request already open: **felixge/pprofutils#15** ("folded: add
-   support for specifying sample index"; their #14 is likely the same root) — a small Go PR
-   candidate. Once it lands, the runner selects the index per profile and labels honestly.
-   Coupled fix: switching Go to `inuse_space` requires the Go shim to lower
-   `runtime.MemProfileRate` — the default 512 KiB sampling hides string_churn's ~128 KB live
-   string, the same trap Rust solved with `lg_prof_sample:15`.
-2. **jemalloc_pprof leaves its own profiling machinery in stack tails**
-   (`…;_rjem_je_prof_tctx_create;_rjem_je_prof_backtrace;prof_backtrace_impl` — verified still
-   present in 0.9). Worked around by `_trim_jemalloc_frames` in `tools/profile/src/profiling/spine.py`.
-   No upstream issue exists — report to polarsignals/rust-jemalloc-pprof (strip machinery frames
-   from `dump_pprof`, or document them).
+1. **pprofutils `folded` used `sample.Value[0]` with no selector — Go/C++ memory renders were
+   mislabeled** — **RESOLVED (memory phase, 2026-07-26)**, not by upstream. The open request
+   (**felixge/pprofutils#15**, "folded: add support for specifying sample index"; #14 is likely the
+   same root) is still unmerged; we replaced the dependency instead with
+   `//tools/profile/pb2folded`, which selects a sample type by *name* — precedence: explicit
+   `-select` > `Profile.DefaultSampleType` > index 0. CPU callers pass `-select samples`; memory
+   callers pass `-select inuse_space,space -unit bytes`. Dropping pprofutils also shed the whole
+   `dd-trace-go` tree it dragged in (~30 indirect requires), and with it the purego pin that tree
+   required.
+
+   Four things the implementation turned up that the original analysis had wrong:
+   - **The C++ pb shape is data-dependent.** pprof's legacy parser emits the Go-shaped 4-type set
+     whenever the dump's alloc counters differ from in-use (`legacy_profile.go:496-510`), so only
+     `retained_growth` produces `[objects, space]`; `string_churn` and `fragmentation` produce
+     four. In the 2-type case `space` *is* the in-use pair, so `space ≡ inuse_space`.
+   - **`Compact()` does not merge folded-equivalent stacks** — sample keys include labels, and Go
+     tags every heap sample with its size class. Repeated stacks with distinct weights are correct
+     output; merging them would have been a silent behaviour change.
+   - **Non-positive samples must be dropped.** Selecting `inuse_space` leaves every freed site at
+     zero, which `top_n` counts (`"0".isdigit()`) and inferno renders as zero-width frames.
+   - **Unsymbolized locations need a placeholder.** Emitting no frame made a fully-unsymbolized
+     sample yield an empty stack, which `top_n` skips but inferno counts — so top.txt and the SVG
+     silently disagreed on totals. They now render `[unknown]`.
+
+   Coupled fix, also shipped: the Go shim lowers `runtime.MemProfileRate` to 32 KiB, matching
+   Rust's `lg_prof_sample:15`. That was necessary but *not sufficient* — `mem_string_churn` still
+   reported its accumulator as 0 live bytes because `main` used only `len(s)` after the dump, so
+   the compiler dropped the reference and the dump's own GC collected it. It now holds the value
+   across the dump with `runtime.KeepAlive`, mirroring `mem_retained_growth`.
+2. **Rust heap capture moved from jemalloc to tcmalloc** — **RESOLVED (memory phase, 2026-07-26)**,
+   which retired this entry rather than fixing it. jemalloc could only ever report live bytes:
+   `opt.prof_accum` was removed in **5.0.0** because cumulative counts oblige it to retain every
+   unique backtrace for the life of the process, so `alloc_*` was permanently unreachable. The
+   workloads now link `@gperftools//:tcmalloc` and drive `HeapProfilerStart/Dump/Stop` over FFI —
+   the same capture C++ uses, giving Rust all four buckets exactly. Linking is the whole
+   integration: tcmalloc interposes `malloc`/`free`, so no `#[global_allocator]` is needed, and
+   `mem_retained_growth` reports 68,681,728 bytes, byte-identical to C++.
+
+   Verified before committing: rules_rust links the cc_library (via `link_deps` — C++ libraries in
+   `deps` are deprecated); interposition captures Rust's allocations under Bazel's linking; and
+   llvm-symbolizer demangles Rust's v0 symbols. Three warts went with jemalloc — Linux-only
+   capture, the `_rjem_je_prof_backtrace` stack-tail trimming (`_trim_jemalloc_frames`, deleted),
+   and a tokio mutex pulled in for a one-shot dump. The cost: Rust memory capture now rides the
+   C++ shard, so it is gated on `lang:cpp`; Rust CPU profiling is unaffected.
 3. **jfrconv (`tools.profiler:jfr-converter` 4.0) `--cpu` silently emits nothing for JDK-JFR
    recordings** (Java phase probe, 2026-07-13). Root cause, from the 4.0 converter source:
    `JfrConverter.getThreadStates(cpu=true)` admits only samples whose thread state is
@@ -299,14 +328,17 @@ deficiencies, with upstream status.
   "keep majors in sync" comment is load-bearing, and a Renovate criterion-major bump would break
   resolution. Upstream: tikv/pprof-rs#284 (criterion 0.8) open, with older #269/#271 (0.6) —
   nudge or review there.
-- **jemalloc_pprof macOS unsupported** — upstream #36 (compounded by jemalloc's autotools build
-  failing under the hermetic macOS toolchain); `mem_*` stays Linux-gated, the dtrace phase
-  remains the designed macOS story.
-- **jemalloc_pprof `PROF_CTL` is an async (tokio) mutex** — upstream #30; the one-shot shim
-  calls `.blocking_lock()` and pulls tokio into every mem workload binary. Cosmetic dep bloat.
-- **purego < 0.10.1 ICEs the Go 1.26 compiler** — pinned past it (rust-pilot doc); it arrived
-  via pprofutils → dd-trace-go. A folded converter dragging the DataDog tracing tree into go.mod
-  is itself a wart; no upstream issue about slimming it.
+- **`go mod tidy` is broken repo-wide, and not by anything of ours.** From gazelle v0.52.0 the
+  `github.com/bazelbuild/bazel-gazelle` packages became shims re-exporting
+  `github.com/bazel-contrib/bazel-gazelle/v2/...`, but the published v2 module (v2.0.0-1,
+  v2.0.0-2) ships only `cmd, flag, internal, label, merger, pathtools, rule, testtools` — the
+  `config`, `resolve`, `language` and `repo` packages our gazelle extensions import do not exist
+  there. A `replace` cannot bridge it either: the bazel-contrib module is the same module
+  republished and its go.mod still declares the bazelbuild path. **Worked around** by holding
+  go.mod at `bazel-gazelle v0.51.3` (the last self-contained release) while MODULE.bazel keeps
+  0.52.2; Bazel is unaffected because `@gazelle//config` and friends declare the old importpath
+  and build from gazelle's own sources. Cost: `go_deps` prints a version-skew DEBUG when it
+  re-evaluates. Realign once upstream publishes a complete v2.
 
 **Accommodations by design (documented so nobody "simplifies" them away):**
 

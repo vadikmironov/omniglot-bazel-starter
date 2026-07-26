@@ -528,11 +528,14 @@ class TestScaffolder(unittest.TestCase):
         self.assertIn("build:profile", (target / ".bazelrc").read_text())
         self.assertIn("inferno", (target / "tools" / "rust" / "Cargo.toml").read_text())
         self.assertIn("gen_binaries", (target / "tools" / "rust" / "rust_segment.MODULE.bazel").read_text())
-        self.assertIn("pprofutils", (target / "go.mod").read_text())
+        # pb2folded links the pprof library, so a profiling scaffold needs the
+        # dep even without cpp (which additionally runs pprof's CLI as a tool).
+        self.assertIn("github.com/google/pprof", (target / "go.mod").read_text())
         self.assertIn(
-            "com_github_felixge_pprofutils_v2",
+            "com_github_google_pprof",
             (target / "tools" / "go" / "go_segment.MODULE.bazel").read_text(),
         )
+        self.assertNotIn("tool github.com/google/pprof", (target / "go.mod").read_text())
         self.assertIn("/profile-out/", (target / ".gitignore").read_text())
         self.assertIn("## Profiling", (target / "README.md").read_text())
         self._assert_no_markers(target)
@@ -572,8 +575,8 @@ class TestScaffolder(unittest.TestCase):
         self.assertNotIn("build:profile", (target / ".bazelrc").read_text())
         self.assertNotIn("inferno", (target / "tools" / "rust" / "Cargo.toml").read_text())
         self.assertNotIn("gen_binaries", (target / "tools" / "rust" / "rust_segment.MODULE.bazel").read_text())
-        self.assertNotIn("pprofutils", (target / "go.mod").read_text())
-        self.assertNotIn("pprofutils", (target / "tools" / "go" / "go_segment.MODULE.bazel").read_text())
+        self.assertNotIn("github.com/google/pprof", (target / "go.mod").read_text())
+        self.assertNotIn("com_github_google_pprof", (target / "tools" / "go" / "go_segment.MODULE.bazel").read_text())
         self.assertNotIn("/profile-out/", (target / ".gitignore").read_text())
         self.assertNotIn("## Profiling", (target / "README.md").read_text())
 

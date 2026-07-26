@@ -47,7 +47,7 @@ py_binary(
         "src/profiling/cli.py",
     ],
     data = [
-        "@com_github_felixge_pprofutils_v2//cmd/pprofutils",
+        "//tools/profile/pb2folded",
         "@crates//:flamelens__flamelens",
         "@crates//:inferno__inferno-collapse-perf",
         "@crates//:inferno__inferno-flamegraph",
@@ -63,7 +63,7 @@ py_binary(
         "PROFILE_COLLAPSE_PERF": "$(rlocationpath @crates//:inferno__inferno-collapse-perf)",
         "PROFILE_FLAMELENS": "$(rlocationpath @crates//:flamelens__flamelens)",
         "PROFILE_INFERNO": "$(rlocationpath @crates//:inferno__inferno-flamegraph)",
-        "PROFILE_PPROFUTILS": "$(rlocationpath @com_github_felixge_pprofutils_v2//cmd/pprofutils)",
+        "PROFILE_PB2FOLDED": "$(rlocationpath //tools/profile/pb2folded)",
         # --- BEGIN lang:cpp ---
         "PROFILE_LLVM_SYMBOLIZER": "$(rlocationpath @llvm_toolchain_llvm//:bin/llvm-symbolizer)",
         "PROFILE_PPROF": "$(rlocationpath @com_github_google_pprof//:pprof)",

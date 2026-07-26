@@ -208,7 +208,7 @@ Capture is per-language; the rendering spine and the runner are shared:
 |---|---|---|
 # --- END feature:profiling ---
 # --- BEGIN feature:profiling lang:rust ---
-| Rust | criterion + pprof-rs (`PProfProfiler(Output::Protobuf)`) | `tikv-jemallocator` (`profiling` feature) as global allocator + `jemalloc_pprof` dump to `$MEMPROF_OUT`, via a `mem/prof_dump.rs` shim; Linux-only (`jemalloc_pprof` upstream limit) — constrain with `target_compatible_with = ["@platforms//os:linux"]` |
+| Rust | criterion + pprof-rs (`PProfProfiler(Output::Protobuf)`) | gperftools `tcmalloc` heap profiler driven over FFI by a `mem/prof_dump.rs` shim, linked via `link_deps = ["@gperftools//:tcmalloc"]` (rules_rust deprecates C++ libraries in `deps`). No `#[global_allocator]` needed — tcmalloc interposes `malloc`/`free` — and every allocation is recorded, so all four buckets are exact. Requires the `cpp` language, since the conversion reuses gperftools and llvm-symbolizer. |
 # --- END feature:profiling lang:rust ---
 # --- BEGIN feature:profiling lang:go ---
 | Go | `testing.B` benches in `benches/bench_*_test.go` (stdlib capture via `-test.cpuprofile`) | `runtime/pprof` heap profile dumped to `$MEMPROF_OUT` after `runtime.GC()`, via a `mem/prof_dump.go` shim; cross-platform |
