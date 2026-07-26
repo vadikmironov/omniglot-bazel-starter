@@ -6,6 +6,13 @@ load("@rules_python//python:defs.bzl", "py_test")
 # =========================================================================
 
 py_test(
+    name = "test_engine",
+    size = "small",
+    srcs = ["test_engine.py"],
+    deps = ["//tools/profile:profiling_lib"],
+)
+
+py_test(
     name = "test_spine",
     size = "small",
     srcs = ["test_spine.py"],
