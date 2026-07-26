@@ -16,7 +16,7 @@ require (
 	// and friends, which declare the old importpath and build from gazelle's own
 	// sources with no module resolution. This pin only serves `go mod tidy`,
 	// gopls and `go build ./...`. Realign it once upstream publishes a complete v2.
-	github.com/bazelbuild/bazel-gazelle v0.51.3
+	github.com/bazelbuild/bazel-gazelle v0.52.2
 	github.com/stretchr/testify v1.11.1
 )
 
