@@ -124,8 +124,14 @@ func TestOptIn_GeneratesBenchAndMem(t *testing.T) {
 			if got := r.AttrStrings("srcs"); !reflect.DeepEqual(got, wantSrcs) {
 				t.Errorf("mem srcs = %v, want %v", got, wantSrcs)
 			}
-			if got := r.AttrStrings("target_compatible_with"); !reflect.DeepEqual(got, []string{"@platforms//os:linux"}) {
-				t.Errorf("mem target_compatible_with = %v", got)
+			// tcmalloc supplies the heap profiler, linked rather than imported —
+			// hence link_deps, and no platform gate (jemalloc_pprof's Linux-only
+			// limit is what used to force one).
+			if got := r.AttrStrings("link_deps"); !reflect.DeepEqual(got, []string{tcmallocDep}) {
+				t.Errorf("mem link_deps = %v, want %v", got, []string{tcmallocDep})
+			}
+			if got := r.AttrStrings("target_compatible_with"); len(got) != 0 {
+				t.Errorf("mem target_compatible_with = %v, want none", got)
 			}
 		}
 	}

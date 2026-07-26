@@ -10,15 +10,25 @@ import (
 )
 
 // memShim is the shared capture shim compiled into every memory
-// workload binary (global jemalloc allocator + pprof heap dump).
+// workload binary (tcmalloc heap profiler, driven over FFI).
 const memShim = "mem/prof_dump.rs"
+
+// tcmalloc supplies the heap profiler for Rust memory workloads, exactly as it
+// does for C++. Linking it is enough — it interposes malloc/free, so Rust's
+// allocations are captured without a #[global_allocator] — and it reports live
+// *and* cumulative bytes *and* object counts, which jemalloc cannot: jemalloc
+// removed opt.prof_accum in 5.0.0 because cumulative counts oblige it to retain
+// every unique backtrace for the life of the process.
+//
+// It goes in link_deps, not deps: rules_rust deprecates C++ libraries in deps
+// and directs manual FFI linkage here.
+const tcmallocDep = "@gperftools//:tcmalloc"
 
 // generateRustWorkloads maps the package's Rust workload sources to
 // runner-discoverable targets:
 //
 //	benches/bench_<x>.rs -> rust_binary(bench_<x>)  criterion + pprof, tagged profiling-cpu
-//	mem/mem_<x>.rs       -> rust_binary(mem_<x>)    jemalloc capture, tagged profiling-mem,
-//	                                                Linux-only (jemalloc_pprof upstream limit)
+//	mem/mem_<x>.rs       -> rust_binary(mem_<x>)    tcmalloc capture, tagged profiling-mem
 //
 // Each target depends on the package's canonical library (the rule
 // named after the package basename), which holds the workload logic;
@@ -50,8 +60,8 @@ func generateRustWorkloads(args language.GenerateArgs) []*rule.Rule {
 		r.SetAttr("srcs", srcs)
 		r.SetAttr("crate_root", src)
 		r.SetAttr("tags", []string{tagMem})
-		r.SetAttr("target_compatible_with", []string{"@platforms//os:linux"})
-		r.SetAttr("deps", []string{":" + lib, "@crates//:jemalloc_pprof", "@crates//:tikv-jemallocator"})
+		r.SetAttr("deps", []string{":" + lib})
+		r.SetAttr("link_deps", []string{tcmallocDep})
 		out = append(out, r)
 	}
 	return out

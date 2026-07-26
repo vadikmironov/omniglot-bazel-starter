@@ -10,6 +10,7 @@ const CHUNK_BYTES: usize = 1024;
 
 fn main() {
     let chunks = workload_n(DEFAULT_CHUNKS);
+    prof_dump::start();
     let retained = retained_growth::grow(chunks, CHUNK_BYTES);
     let out = prof_dump::dump();
     println!(

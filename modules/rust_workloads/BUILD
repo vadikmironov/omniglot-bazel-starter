@@ -116,13 +116,9 @@ rust_binary(
         "mem/prof_dump.rs",
     ],
     crate_root = "mem/mem_fragmentation.rs",
+    link_deps = ["@gperftools//:tcmalloc"],
     tags = ["profiling-mem"],
-    target_compatible_with = ["@platforms//os:linux"],
-    deps = [
-        ":rust_workloads",
-        "@crates//:jemalloc_pprof",
-        "@crates//:tikv-jemallocator",
-    ],
+    deps = [":rust_workloads"],
 )
 
 rust_binary(
@@ -132,13 +128,9 @@ rust_binary(
         "mem/prof_dump.rs",
     ],
     crate_root = "mem/mem_retained_growth.rs",
+    link_deps = ["@gperftools//:tcmalloc"],
     tags = ["profiling-mem"],
-    target_compatible_with = ["@platforms//os:linux"],
-    deps = [
-        ":rust_workloads",
-        "@crates//:jemalloc_pprof",
-        "@crates//:tikv-jemallocator",
-    ],
+    deps = [":rust_workloads"],
 )
 
 rust_binary(
@@ -148,11 +140,7 @@ rust_binary(
         "mem/prof_dump.rs",
     ],
     crate_root = "mem/mem_string_churn.rs",
+    link_deps = ["@gperftools//:tcmalloc"],
     tags = ["profiling-mem"],
-    target_compatible_with = ["@platforms//os:linux"],
-    deps = [
-        ":rust_workloads",
-        "@crates//:jemalloc_pprof",
-        "@crates//:tikv-jemallocator",
-    ],
+    deps = [":rust_workloads"],
 )

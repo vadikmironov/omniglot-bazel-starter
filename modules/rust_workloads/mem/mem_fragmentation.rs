@@ -1,4 +1,4 @@
-//! One-shot fragmentation workload: live bytes drop while jemalloc's mapped
+//! One-shot fragmentation workload: live bytes drop while tcmalloc's mapped
 //! memory stays high.
 
 mod prof_dump;
@@ -9,6 +9,7 @@ const DEFAULT_BLOCKS: usize = 50_000;
 
 fn main() {
     let blocks = workload_n(DEFAULT_BLOCKS);
+    prof_dump::start();
     let (survivors, stats) = fragmentation::fragment(blocks, 42);
     let out = prof_dump::dump();
     println!(

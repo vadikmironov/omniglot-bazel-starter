@@ -39,7 +39,7 @@ const (
 	// every generated workload rule in opted-in packages repo-wide. The
 	// bootstrap tool runs `bazel run //:profile_gen -- -profiling_remove`
 	// when the profiling feature is dropped on re-bootstrap, before the
-	// feature's crate deps (criterion, pprof, jemalloc) are pruned.
+	// feature's crate deps (criterion, pprof, inferno) are pruned.
 	flagRemove = "profiling_remove"
 )
 

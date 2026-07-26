@@ -23,9 +23,9 @@ rand = { version = "0.10" }
 # protobuf-codec is the pure-Rust codegen path — prost-codec needs a host protoc.
 criterion = { version = "0.5" }
 pprof = { version = "0.15", features = ["criterion", "protobuf-codec"] }
-# Memory capture: jemalloc heap profiling dumped as pprof
-tikv-jemallocator = { version = "0.7", features = ["profiling", "unprefixed_malloc_on_supported_platforms"] }
-jemalloc_pprof = { version = "0.9", features = ["symbolize"] }
+# Memory capture needs no crate: the workloads link gperftools' tcmalloc
+# (@gperftools//:tcmalloc) and drive its heap profiler over FFI, the same
+# mechanism C++ uses.
 # Renderer toolchain (bin crates; built via gen_binaries annotations in
 # rust_segment.MODULE.bazel): folded stacks -> SVG, and a terminal flamegraph
 # viewer.

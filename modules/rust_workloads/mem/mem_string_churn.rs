@@ -9,6 +9,7 @@ const DEFAULT_PIECES: usize = 8_000;
 
 fn main() {
     let pieces = workload_n(DEFAULT_PIECES);
+    prof_dump::start();
     let s = string_churn::concat(pieces, "0123456789abcdef");
     let out = prof_dump::dump();
     println!("built {} bytes; heap profile: {}", s.len(), out.display());
