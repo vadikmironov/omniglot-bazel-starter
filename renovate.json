@@ -3,12 +3,19 @@
    "extends":[
       "config:recommended"
    ],
+   "prHourlyLimit":0,
    "bazel-module":{
       "managerFilePatterns": [
          "/.*\\.MODULE\\.bazel$/"
       ]
    },
    "packageRules":[
+      {
+         "description":"Held at 0.51.3 in go.mod on purpose: from 0.52.0 the github.com/bazelbuild packages are shims re-exporting github.com/bazel-contrib/bazel-gazelle/v2, which does not yet publish config, resolve, language or repo, so `go mod tidy` cannot resolve them. Bazel builds //tools/*/gazelle against @gazelle sources and is unaffected. Re-enable once upstream publishes a complete v2.",
+         "matchManagers":["gomod"],
+         "matchPackageNames":["github.com/bazelbuild/bazel-gazelle"],
+         "enabled":false
+      },
       {
          "description":"Distroless images are digest pins on floating tags rebuilt continuously upstream — no versioned releases exist to render a changelog from. Link the source and say so in the PR body instead.",
          "matchPackageNames":["/^gcr_io_distroless_/"],
