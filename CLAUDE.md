@@ -2,52 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Architecture Overview
-
-This is a Bazel-based polyglot monorepo demonstrating multi-language development with Python, Rust, C++, and Java. The repository uses Bazel's module system (`MODULE.bazel`) and is organized into language-specific modules under the `modules/` directory.
-
-### Key Components
-
-- **Bazel Configuration**: Uses `MODULE.bazel` for dependency management with language-specific segments
-- **Toolchain Management**: Hermetic toolchains for all languages with configurable platform support
-- **Linting/Formatting**: Integrated via `aspect_rules_lint` with language-specific tools
-- **Module Structure**: Each language has example applications and libraries with external dependencies
-
 ## Build Commands
-
-### Basic Build and Test
-```bash
-# Build all targets
-bazel build //...
-
-# Test all targets
-bazel test //...
-
-# Build specific modules
-
-# Python applications
-bazel build //modules/python_app
-bazel build //modules/python_app_with_ext_dep
-
-# Rust applications
-bazel build //modules/rust_app
-bazel build //modules/rust_app_with_ext_dep
-bazel build //modules/rust_lib:rust_lib_test
-
-# C++ applications
-bazel build //modules/cpp_app
-bazel build //modules/cpp_app_with_ext_dep
-
-# Java applications
-bazel build //modules/java_app
-bazel build //modules/java_app_with_ext_dep
-
-# Libraries
-bazel build //modules/python_lib:python_lib
-bazel build //modules/rust_lib:rust_lib
-bazel build //modules/cpp_library:cpp_library
-bazel build //modules/java_lib:java_lib
-```
 
 ### Language-Specific Toolchain Selection
 ```bash
@@ -128,23 +83,6 @@ tools\buildifier.bat fix
 # Check Bazel/Starlark formatting (Windows)
 tools\buildifier.bat check
 ```
-
-## Testing
-
-### Running Tests
-```bash
-# All tests
-bazel test //modules/...
-
-# Language-specific tests
-bazel test //modules/python_lib/tests/...
-bazel test //modules/rust_lib:rust_lib_test
-bazel test //modules/cpp_library:cpp_library_test
-bazel test //modules/java_lib:java_lib_test
-```
-
-### Test Output
-Tests are configured to show errors only (`--test_output=errors` in .bazelrc).
 
 ## Code Coverage
 
@@ -244,11 +182,6 @@ bazel run @rules_go//go -- mod tidy
 These four are the same commands the bootstrap tool runs after scaffolding
 (`_LOCK_REFRESH_COMMANDS` in `tools/bootstrap/src/bootstrap/scaffolder.py`) and
 the ones listed in README.md — keep all three in step.
-
-### Key Configuration Files
-- `.bazelrc`: Build configurations and toolchain settings
-- `MODULE.bazel`: Main module definition with language-specific includes
-- `tools/`: Language-specific build definitions and toolchain configurations
 
 ### Debugging Toolchains
 Use debug configurations to troubleshoot toolchain resolution:
