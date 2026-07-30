@@ -5,8 +5,8 @@
    ],
    "prHourlyLimit":0,
    "bazel-module":{
-      "fileMatch":[
-         ".*\\.MODULE\\.bazel$"
+      "managerFilePatterns": [
+         "/.*\\.MODULE\\.bazel$/"
       ]
    },
    "packageRules":[
