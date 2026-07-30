@@ -10,7 +10,7 @@
     "org.apache.logging.log4j:log4j-core": 260343140,
     "org.apache.logging.log4j:log4j-slf4j-impl": 1608875535,
     "org.apache.logging.log4j:log4j-slf4j2-impl": -1564835513,
-    "org.jsoup:jsoup": 174385437,
+    "org.jsoup:jsoup": 184888541,
     "org.junit.jupiter:junit-jupiter-api": 389201227,
     "org.junit.jupiter:junit-jupiter-engine": -1937974425,
     "org.junit.jupiter:junit-jupiter-params": -1348746325,
@@ -66,7 +66,7 @@
     "org.dom4j:dom4j": -355280329,
     "org.functionaljava:functionaljava": 576697941,
     "org.jline:jline": -1888912200,
-    "org.jsoup:jsoup": -1617947731,
+    "org.jsoup:jsoup": 1453605484,
     "org.jspecify:jspecify": 117231129,
     "org.junit.jupiter:junit-jupiter-api": 676925586,
     "org.junit.jupiter:junit-jupiter-engine": -1414496726,
@@ -354,9 +354,9 @@
     },
     "org.jsoup:jsoup": {
       "shasums": {
-        "jar": "596785996d3c6df16f544c232d10a9a1d88783b2a4740cf5251cb616f2be704d"
+        "jar": "8b15e2b28eeb1e0a88a9b7dab4dc0c23524491c56959785dea22f7846897b668"
       },
-      "version": "1.22.2"
+      "version": "1.23.1"
     },
     "org.jspecify:jspecify": {
       "shasums": {
@@ -712,8 +712,6 @@
       "com.fasterxml.jackson.core.filter",
       "com.fasterxml.jackson.core.format",
       "com.fasterxml.jackson.core.internal.shaded.fdp.v2_21_4",
-      "com.fasterxml.jackson.core.internal.shaded.fdp.v2_21_4.bte",
-      "com.fasterxml.jackson.core.internal.shaded.fdp.v2_21_4.chr",
       "com.fasterxml.jackson.core.io",
       "com.fasterxml.jackson.core.io.schubfach",
       "com.fasterxml.jackson.core.json",
@@ -1002,7 +1000,6 @@
       "net.sourceforge.pmd",
       "net.sourceforge.pmd.annotation",
       "net.sourceforge.pmd.benchmark",
-      "net.sourceforge.pmd.cache",
       "net.sourceforge.pmd.cache.internal",
       "net.sourceforge.pmd.cpd",
       "net.sourceforge.pmd.cpd.impl",
@@ -1528,7 +1525,6 @@
       "org.junit.platform.launcher.tagexpression"
     ],
     "org.junit.platform:junit-platform-reporting": [
-      "org.junit.platform.reporting",
       "org.junit.platform.reporting.legacy",
       "org.junit.platform.reporting.legacy.xml",
       "org.junit.platform.reporting.open.xml",
