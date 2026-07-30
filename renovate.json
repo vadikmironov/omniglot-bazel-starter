@@ -4,8 +4,8 @@
       "config:recommended"
    ],
    "bazel-module":{
-      "fileMatch":[
-         ".*\\.MODULE\\.bazel$"
+      "managerFilePatterns": [
+         "/.*\\.MODULE\\.bazel$/"
       ]
    },
    "packageRules":[
