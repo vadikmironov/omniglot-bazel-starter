@@ -169,8 +169,9 @@ directories = ["tools/coverage"]
 [features.profiling]
 label = "Profiling (CPU + memory benches -> flamegraphs)"
 # rust: the inferno/flamelens renderer bin-crates (plus the capture crates);
-# go: the pprofutils pprof->folded converter; python: the //tools/profile
-# runner (rules_python ships only with lang:python).
+# go: the //tools/profile/pb2folded pprof->folded converter and the gazelle
+# workload generator; python: the //tools/profile runner (rules_python ships
+# only with lang:python).
 requires = ["rust", "go", "python"]
 directories = ["tools/profile"]
 # Section-filtered: tools/profile/BUILD's ruff/ty lint rules gate behind
