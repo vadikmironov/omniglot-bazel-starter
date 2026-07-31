@@ -7,6 +7,7 @@ They catch:
   - Composite files with unbalanced or orphaned markers
   - Marker tags that reference unknown languages
   - Key composite files missing expected language sections
+  - A shipped test outliving the sections of the module it exercises
 """
 
 import re
@@ -32,6 +33,16 @@ _END_RE = re.compile(r"^\s*#\s*---\s*END\s+((?:lang|feature):\S+|exclude)\s*---\
 # quoted filenames inside it — used to verify exported siblings are shipped.
 _EXPORTS_RE = re.compile(r"exports_files\(\s*\[([^\]]*)\]")
 _QUOTED_RE = re.compile(r"""["']([^"']+)["']""")
+
+# Private module-level names a filtered Python source still defines (`def _x`
+# or `_X = ...`), and the `engine._x` uses a filtered test makes of them.
+_DEFINED_RE = re.compile(r"^(?:def\s+)?(_\w+)", re.MULTILINE)
+_USED_RE = re.compile(r"\bengine\.(_\w+)")
+
+# `"kind": "flavor",` in the engine's bench-flavor map, and the `("kind",
+# "flavor")` rows the test pins it against.
+_FLAVOR_MAP_RE = re.compile(r'^\s*"(\w+)":\s*"(\w+)",\s*$', re.MULTILINE)
+_FLAVOR_ROW_RE = re.compile(r'\(\s*"(\w+)",\s*"(\w+)"\s*\)')
 
 
 def _exported_filenames(content: str) -> list[str]:
@@ -215,6 +226,57 @@ class TestMarkerIntegrity(unittest.TestCase):
                         known,
                         f"{f} has unknown tag '{lang}' in marker '{tag}'",
                     )
+
+
+class TestProfilingRunnerTestsFilterWithIt(unittest.TestCase):
+    """The runner's test must be filtered by the same sections as the runner.
+
+    ``engine.py`` gates its per-language bench helpers behind ``lang:`` markers,
+    so a fork without java has no ``_jmh_args``. Shipping the test that pins
+    those helpers unfiltered is a green source repo and a red derived one — the
+    bug this guards. Only cpp and java vary: the profiling feature requires
+    rust, go and python.
+    """
+
+    source_root: Path
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.source_root = _find_source_root()
+
+    ENGINE = "tools/profile/src/profiling/engine.py"
+    TEST = "tools/profile/tests/test_engine.py"
+    SELECTIONS = [{"rust", "go", "python"} | extra for extra in ({"cpp"}, {"java"}, set(), {"cpp", "java"})]
+
+    def _filtered(self, rel: str, languages: set[str]) -> str:
+        content = (self.source_root / rel).read_text()
+        return filter_sections(content, languages, {"profiling"}, filename=rel)
+
+    def test_the_test_uses_only_helpers_the_engine_keeps(self) -> None:
+        for languages in self.SELECTIONS:
+            engine = self._filtered(self.ENGINE, languages)
+            test = self._filtered(self.TEST, languages)
+            defined = set(_DEFINED_RE.findall(engine))
+            for used in sorted(set(_USED_RE.findall(test))):
+                self.assertIn(
+                    used,
+                    defined,
+                    f"test_engine.py calls engine.{used}, stripped from engine.py for {sorted(languages)}",
+                )
+
+    def test_the_flavor_table_pins_only_kinds_the_engine_maps(self) -> None:
+        """The flavor rows name rule kinds rather than symbols, so they survive
+        stripping silently — until the assertion runs and the kind is unknown."""
+        for languages in self.SELECTIONS:
+            flavors = dict(_FLAVOR_MAP_RE.findall(self._filtered(self.ENGINE, languages)))
+            rows = _FLAVOR_ROW_RE.findall(self._filtered(self.TEST, languages))
+            self.assertTrue(rows, "the flavor table should not filter away entirely")
+            for kind, flavor in rows:
+                self.assertEqual(
+                    flavors.get(kind),
+                    flavor,
+                    f"test_engine.py expects {kind} -> {flavor}, absent from _BENCH_FLAVORS for {sorted(languages)}",
+                )
 
 
 class TestManifestConsistency(unittest.TestCase):

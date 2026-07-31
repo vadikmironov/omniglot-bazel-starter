@@ -30,9 +30,12 @@ class BenchArgsTest(unittest.TestCase):
             [*base, "-test.benchtime=2s", f"-test.cpuprofile={pb}"],
         )
 
+    # --- BEGIN lang:cpp ---
     def test_google_benchmark_passes_min_time(self) -> None:
         self.assertEqual(engine._google_benchmark_args(None), [])
         self.assertEqual(engine._google_benchmark_args(4), ["--benchmark_min_time=4s"])
+
+    # --- END lang:cpp ---
 
     def test_pytest_benchmark_always_re_enables_benchmarks(self) -> None:
         """The targets default to --benchmark-disable for their bazel-test smoke
@@ -40,6 +43,7 @@ class BenchArgsTest(unittest.TestCase):
         self.assertEqual(engine._pytest_benchmark_args(None), ["--benchmark-enable"])
         self.assertIn("--benchmark-max-time=7", engine._pytest_benchmark_args(7))
 
+    # --- BEGIN lang:java ---
     def test_jmh_profile_run_uses_one_fork_and_one_iteration(self) -> None:
         args = engine._jmh_args(Path("/tmp/jfr"), None)
         self.assertEqual(args[args.index("-f") + 1], "1")
@@ -57,6 +61,8 @@ class BenchArgsTest(unittest.TestCase):
         self.assertEqual(args[args.index("-i") + 1], "5")
         self.assertNotIn("-prof", args)
 
+    # --- END lang:java ---
+
 
 class BenchFlavorTest(unittest.TestCase):
     """Which framework drives a bench target, keyed by its rule kind."""
@@ -73,9 +79,13 @@ class BenchFlavorTest(unittest.TestCase):
         for kind, expected in (
             ("rust_binary", "criterion"),
             ("go_test", "gotest"),
+            # --- BEGIN lang:cpp ---
             ("cc_binary", "google_benchmark"),
+            # --- END lang:cpp ---
             ("py_test", "pytest_benchmark"),
+            # --- BEGIN lang:java ---
             ("java_binary", "jmh"),
+            # --- END lang:java ---
         ):
             self.assertEqual(self.flavor(kind), expected, kind)
 
@@ -84,7 +94,8 @@ class BenchFlavorTest(unittest.TestCase):
             self.flavor("sh_binary")
         message = str(caught.exception)
         self.assertIn("sh_binary", message)
-        self.assertIn("cc_binary", message, "the error should name what *is* supported")
+        for kind in engine._BENCH_FLAVORS:
+            self.assertIn(kind, message, "the error should name what *is* supported")
 
 
 class ArtifactLayoutTest(unittest.TestCase):

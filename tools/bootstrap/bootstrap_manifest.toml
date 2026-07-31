@@ -184,6 +184,9 @@ composite_files = [
     "tools/profile/BUILD",
     # The runner's per-language bench-flavor branches carry lang: markers.
     "tools/profile/src/profiling/engine.py",
+    # ...and so must the test that pins them: a verbatim copy would reference
+    # helpers (_jmh_args, _google_benchmark_args) stripped from the engine.
+    "tools/profile/tests/test_engine.py",
     "tools/profile/gazelle/BUILD",
     "tools/profile/gazelle/lang.go",
     "tools/profile/gazelle/kinds.go",

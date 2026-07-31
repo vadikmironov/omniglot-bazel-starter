@@ -165,6 +165,11 @@ definitions stay template-managed.
   that need *both*, use a multi-condition tag (`feature:lint lang:python`). For whole,
   marker-less config files (`.nogo_config.json`, `.pmd.xml`,
   `.spotbugs-exclude.xml`) use `[exclude.when_feature_absent].lint`.
+- A **test ships like the code it pins**: if its subject gates helpers behind `lang:`
+  markers, the test needs the same markers and its own `composite_files` entry —
+  `tools/profile/tests/test_engine.py` mirrors `engine.py`'s per-language bench sections.
+  Shipped verbatim it leaves the source repo green and the fork red on a stripped symbol
+  (`engine._jmh_args`). `TestProfilingRunnerTestsFilterWithIt` guards the pair.
 - `.clang-tidy` / `.clippy.toml` / `ty.toml` are intentionally left ungated (their tools
   come from the toolchain / rules_lint — no dep to gate). `.ruff.toml` ships for the formatter; only
   its `[lint]` block is gated.
