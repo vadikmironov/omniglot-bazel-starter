@@ -524,6 +524,9 @@ class TestScaffolder(unittest.TestCase):
         # the tools/profile directory copy, not shipped raw with markers.
         self.assertFalse((target / "tools" / "profile" / "gazelle" / "cpp.go").exists())
         self.assertFalse((target / "tools" / "profile" / "gazelle" / "java.go").exists())
+        # The runner's test is filtered with the runner: it must not keep
+        # pinning helpers that engine.py no longer defines.
+        self.assertNotIn("_jmh_args", (target / "tools" / "profile" / "tests" / "test_engine.py").read_text())
         self.assertIn("profile_gen", (target / "BUILD").read_text())
         self.assertIn("build:profile", (target / ".bazelrc").read_text())
         self.assertIn("inferno", (target / "tools" / "rust" / "Cargo.toml").read_text())
@@ -566,6 +569,7 @@ class TestScaffolder(unittest.TestCase):
         self.assertIn("jmh_annprocess", profile_build)
         engine = (target / "tools" / "profile" / "src" / "profiling" / "engine.py").read_text()
         self.assertIn("_jmh_args", engine)
+        self.assertIn("_jmh_args", (target / "tools" / "profile" / "tests" / "test_engine.py").read_text())
         self._assert_no_markers(target)
 
     def test_profiling_feature_off(self) -> None:
