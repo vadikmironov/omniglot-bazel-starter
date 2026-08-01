@@ -114,6 +114,17 @@ Rules: sections must **not nest** — a multi-condition tag expresses what nesti
 otherwise would; the END marker must repeat the BEGIN tag; a stray/mismatched/unclosed
 marker raises `ValueError`.
 
+Stripping must leave the scaffold **formatter-clean**, since its CI runs
+`format.check` on day one. Rendering is blank-neutral (stripped material merges the
+blank runs around it into one, so surviving code keeps the spacing its formatter
+chose), but it cannot re-run a formatter — so authoring has to anticipate two Go
+shapes. A marker comment breaks a gofmt alignment group in *this* repo and not in a
+scaffold, so per-language entries in a `const`/`var` block get a blank line between
+them (`gazelle/kinds.go`); and a literal whose entries are all gated renders as an
+empty `x{\n}` nothing in the filter can settle. The bootstrap's closing
+`//tools/format:format` + `//:buildifier.fix` pass absorbs that residue — which is
+also why neither shape is worth guarding in the bootstrap's own tests.
+
 `# --- BEGIN/END user-managed ---` regions are *not* filtered — they survive into the
 output and their body is carried forward on re-bootstrap, so user edits persist. The
 marker also accepts `//` and a Markdown HTML-comment form

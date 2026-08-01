@@ -15,14 +15,14 @@ import questionary
 from bootstrap.detect import DetectedRepo, detect_repo
 from bootstrap.manifest import BootstrapManifest, compute_prune_set, load_manifest, resolve_files
 from bootstrap.scaffolder import (
-    buildifier_command,
     feature_finalizer_commands,
     feature_remover_commands,
+    formatter_commands,
     prune_paths,
     refresh_lock_files,
-    run_buildifier_fix,
     run_feature_finalizers,
     run_feature_removers,
+    run_formatters,
     scaffold_repo,
 )
 
@@ -248,10 +248,10 @@ def run(argv: list[str] | None = None) -> None:
             print()
             print(f"  Warning: feature finalizers failed for: {', '.join(feat_failed)}")
 
-    # ── Buildifier cleanup ────────────────────────────────────────────
+    # ── Formatting cleanup ────────────────────────────────────────────
     print()
-    print("  Formatting Bazel files...")
-    buildifier_ok = run_buildifier_fix(target_path=target_path)
+    print("  Formatting generated files...")
+    format_results = run_formatters(target_path=target_path)
 
     # ── Summary ───────────────────────────────────────────────────────
     print()
@@ -266,8 +266,8 @@ def run(argv: list[str] | None = None) -> None:
         # `bazel test //...` excludes lint by default, so show how to run lint tests.
         if feat == "lint":
             print("    bazel test --test_tag_filters=lint //...   # [lint] run the generated lint tests")
-    if not buildifier_ok:
-        print(f"    {buildifier_command()}   # one-time formatting cleanup")
+    for cmd_str in formatter_commands(label for label, ok in format_results.items() if not ok):
+        print(f"    {cmd_str}   # one-time formatting cleanup")
     print()
 
 

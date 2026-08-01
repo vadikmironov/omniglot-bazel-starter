@@ -271,17 +271,45 @@ class TestMarkerStripping(unittest.TestCase):
 
 
 class TestBlankLineCollapse(unittest.TestCase):
-    """Runs of 3+ consecutive blank lines are collapsed to 2."""
+    """Stripping is blank-neutral: surviving content keeps its own spacing, and
+    a removed section leaves behind one separator, not two."""
 
-    def test_three_blank_lines_collapsed(self) -> None:
-        content = "a\n\n\n\nb\n"
-        result = filter_sections(content, set())
-        self.assertEqual(result, "a\n\nb\n")
+    def test_untouched_runs_are_left_alone(self) -> None:
+        """No marker, no rewrite. A blanket collapse here is what shipped
+        engine.py with one blank line between top-level defs where its
+        formatter had put two, failing `format.check` in every scaffold."""
+        for content in ("a\n\nb\n", "a\n\n\nb\n", "a\n\n\n\nb\n"):
+            self.assertEqual(filter_sections(content, set()), content)
 
-    def test_two_blank_lines_preserved(self) -> None:
-        content = "a\n\nb\n"
-        result = filter_sections(content, set())
-        self.assertEqual(result, "a\n\nb\n")
+    def test_removed_section_leaves_one_separator(self) -> None:
+        """One blank on each side of the removed section is one blank total —
+        the method-in-a-class shape (test_engine.py's per-language cases)."""
+        content = textwrap.dedent("""\
+            kept
+
+            # --- BEGIN lang:java ---
+            java_stuff
+
+            # --- END lang:java ---
+
+            also_kept
+        """)
+        self.assertEqual(filter_sections(content, {"python"}), "kept\n\nalso_kept\n")
+
+    def test_the_wider_separator_wins(self) -> None:
+        """The blanks around a removed section merge to the longer run, so a
+        two-blank top-level separator is still two blanks afterwards."""
+        content = textwrap.dedent("""\
+            def kept(): ...
+
+
+            # --- BEGIN lang:java ---
+            def java_only(): ...
+            # --- END lang:java ---
+            def also_kept(): ...
+        """)
+        result = filter_sections(content, {"python"})
+        self.assertEqual(result, "def kept(): ...\n\n\ndef also_kept(): ...\n")
 
     def test_collapse_after_section_removal(self) -> None:
         """When an unselected section is removed, resulting blank runs collapse."""
