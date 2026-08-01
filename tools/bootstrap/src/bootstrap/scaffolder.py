@@ -629,31 +629,39 @@ def feature_remover_commands(removed_features: set[str]) -> list[tuple[str, str]
     ]
 
 
-# Run last so it cleans up any BUILD output that publish_gen / lint_gen
-# may have emitted, plus the cosmetic blank lines left behind by section-
-# marker stripping in MODULE.bazel / linters.bzl / etc.
-_BUILDIFIER_CMD: list[str] = ["bazel", "run", "//:buildifier.fix"]
+# Run last so they clean up any BUILD output that publish_gen / lint_gen may
+# have emitted, plus what section-marker stripping leaves behind. Rendering
+# keeps blank lines faithful (see processor.filter_sections), but it cannot
+# re-run a formatter: dropping a language merges gofmt alignment groups and can
+# empty a composite literal, and neither shape is visible in the source repo —
+# only in a scaffold. The repo's own formatters settle both.
+_FORMAT_CMDS: list[tuple[str, str, list[str]]] = [
+    ("buildifier", "Format Bazel files", ["bazel", "run", "//:buildifier.fix"]),
+    ("format", "Format source files", ["bazel", "run", "//tools/format:format"]),
+]
 
 
-def run_buildifier_fix(*, target_path: Path) -> bool:
-    """Run buildifier.fix on the scaffolded repo. Best-effort, non-fatal."""
-    cmd_str = _format_cmd(_BUILDIFIER_CMD, {})
-    try:
-        return _run_streaming_command(
-            label="buildifier",
-            description="Format Bazel files",
-            cmd=list(_BUILDIFIER_CMD),
-            env_extras={},
-            target_path=target_path,
-        )
-    except KeyboardInterrupt:
-        _exit_on_interrupt("buildifier", "buildifier", cmd_str, target_path)
-        return False  # unreachable
+def run_formatters(*, target_path: Path) -> dict[str, bool]:
+    """Run the scaffold's own formatters over it. Best-effort, non-fatal."""
+    results: dict[str, bool] = {}
+    for label, description, cmd in _FORMAT_CMDS:
+        try:
+            results[label] = _run_streaming_command(
+                label=label,
+                description=description,
+                cmd=list(cmd),
+                env_extras={},
+                target_path=target_path,
+            )
+        except KeyboardInterrupt:
+            _exit_on_interrupt("formatting", label, _format_cmd(cmd, {}), target_path)
+    return results
 
 
-def buildifier_command() -> str:
-    """Return the formatted buildifier command for the `Next steps` block."""
-    return _format_cmd(list(_BUILDIFIER_CMD), {})
+def formatter_commands(labels: Iterable[str]) -> list[str]:
+    """Return the formatted commands for *labels*, for the `Next steps` block."""
+    wanted = set(labels)
+    return [_format_cmd(list(cmd), {}) for label, _desc, cmd in _FORMAT_CMDS if label in wanted]
 
 
 def _apply_substitutions(target_path: Path, original_name: str, new_name: str) -> None:

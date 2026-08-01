@@ -12,13 +12,16 @@ const (
 	// --- BEGIN lang:cpp ---
 	kindClangTidyTest = "clang_tidy_test"
 	// --- END lang:cpp ---
+
 	// --- BEGIN lang:rust ---
 	kindClippyTest = "clippy_test"
 	// --- END lang:rust ---
+
 	// --- BEGIN lang:java ---
 	kindPmdTest      = "pmd_test"
 	kindSpotbugsTest = "spotbugs_test"
 	// --- END lang:java ---
+
 	// --- BEGIN lang:python ---
 	kindRuffTest = "ruff_test"
 	kindTyTest   = "ty_test"

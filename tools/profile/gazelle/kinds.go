@@ -17,20 +17,24 @@ const (
 	loadRustDefs   = "@rules_rust//rust:defs.bzl"
 	kindRustBinary = "rust_binary"
 	// --- END lang:rust ---
+
 	// --- BEGIN lang:go ---
 	loadGoDefs   = "@rules_go//go:def.bzl"
 	kindGoBinary = "go_binary"
 	kindGoTest   = "go_test"
 	// --- END lang:go ---
+
 	// --- BEGIN lang:cpp ---
 	loadCcDefs   = "@rules_cc//cc:defs.bzl"
 	kindCcBinary = "cc_binary"
 	// --- END lang:cpp ---
+
 	// --- BEGIN lang:python ---
 	loadPyDefs   = "@rules_python//python:defs.bzl"
 	kindPyBinary = "py_binary"
 	kindPyTest   = "py_test"
 	// --- END lang:python ---
+
 	// --- BEGIN lang:java ---
 	loadJavaDefs   = "@rules_java//java:defs.bzl"
 	kindJavaBinary = "java_binary"

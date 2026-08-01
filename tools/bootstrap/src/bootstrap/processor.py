@@ -70,7 +70,9 @@ def filter_sections(
     - Includes ``feature:<tags>`` sections when any tag matches *selected_features*.
     - Includes a multi-predicate tag only when every predicate matches (AND).
     - Strips all marker comment lines from the output.
-    - Collapses runs of 3+ consecutive blank lines down to 2.
+    - Leaves the blank-line structure of surviving content exactly as authored;
+      stripped material (a marker line or a removed section) merges the blank
+      runs on either side of it into a single run as long as the longer side.
     - Drops blank lines stranded immediately before a closing-bracket line
       (e.g. when a section ending a brace/paren group is removed) — the one
       gofmt-visible artifact stripping introduces. Separator blanks between
@@ -84,6 +86,21 @@ def filter_sections(
     result: list[str] = []
     current_tag: str | None = None  # normalized tag of the open section, else None
     include = True
+    # Blank-line bookkeeping. `pending` collects the blanks seen since the last
+    # kept content line; `held` remembers the longest run already cut off from
+    # it by stripped material. Emitting the longer of the two — rather than
+    # their sum, or a fixed cap — is what makes stripping blank-neutral: the
+    # separator a removed section carried survives at its authored size, and
+    # untouched regions keep exactly the spacing their formatter put there.
+    pending: list[str] = []
+    held: list[str] = []
+
+    def fold_gap() -> None:
+        """Absorb `pending` into `held`, keeping the longer of the two runs."""
+        nonlocal pending, held
+        if len(pending) > len(held):
+            held = pending
+        pending = []
 
     for line_num, line in enumerate(lines, start=1):
         begin_match = _BEGIN_RE.match(line)
@@ -98,6 +115,7 @@ def filter_sections(
                 )
             current_tag = tag
             include = _section_included(tag, selected_languages, selected_features)
+            fold_gap()
             continue  # strip the marker line
 
         end_match = _END_RE.match(line)
@@ -111,26 +129,30 @@ def filter_sections(
                 raise ValueError(f"Mismatched section markers{loc}: END {tag} at line {line_num} closes {current_tag}")
             current_tag = None
             include = True
+            fold_gap()
             continue  # strip the marker line
 
         # Lines outside any section (e.g. blank separators between sections)
         # are included by default. Inside a section, respect the inclusion decision.
-        if current_tag is None or include:
-            result.append(line)
+        if current_tag is not None and not include:
+            fold_gap()
+            continue
+        if not line.strip():
+            pending.append(line)
+            continue
+        fold_gap()
+        result.extend(held)
+        held = []
+        result.append(line)
 
     if current_tag is not None:
         loc = f" in {filename}" if filename else ""
         raise ValueError(f"Unclosed section {current_tag}{loc} at end of {filename or 'content'}")
 
-    text = _collapse_blank_lines("".join(result))
-    text = _drop_blanks_before_closers(text)
+    # Blanks trailing the last content line (`pending`/`held`) are dropped.
+    text = _drop_blanks_before_closers("".join(result))
     # Ensure exactly one trailing newline (no trailing blank lines)
     return text.rstrip("\n") + "\n" if text else text
-
-
-def _collapse_blank_lines(text: str) -> str:
-    """Collapse runs of 3+ consecutive blank lines down to 2."""
-    return re.sub(r"\n{3,}", "\n\n", text)
 
 
 def _is_closing_bracket_line(line: str) -> bool:

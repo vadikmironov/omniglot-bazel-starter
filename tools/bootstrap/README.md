@@ -37,7 +37,7 @@ After you confirm the review screen, it:
 2. Generates a starter `README.md` — initial Bazelisk install, common repo commands, and other useful information on developer's setup. Its intro is a user-managed region you can edit; a re-bootstrap refreshes the rest but keeps your intro.
 3. Rewrites the module name everywhere and `git init`s the result.
 4. Optionally refreshes dependency lock files for the selected languages (needs network + Bazel).
-5. Runs per-feature finalizers (`lint_gen`, `publish_gen`) and formats the generated Bazel files.
+5. Runs per-feature finalizers (`lint_gen`, `publish_gen`), then formats the generated repo with its own `//:buildifier.fix` and `//tools/format:format`.
 
 It finishes by printing your next steps (`cd …`, `bazel build //...`, `bazel test //...`).
 
