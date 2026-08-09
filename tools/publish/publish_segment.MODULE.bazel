@@ -9,15 +9,14 @@
 # Please find documentation here:
 # https://github.com/bazelbuild/rules_pkg/releases
 #
-bazel_dep(name = "rules_pkg", version = "1.2.0")
+bazel_dep(name = "rules_pkg", version = "1.3.0")
 
 #
 # tar.bzl block
 #
-# Hermetic, reproducible bsdtar-backed tar rule. Used by image_publish to
-# build OCI image layers. Recommended over pkg_tar by rules_oci itself — the
-# layer-hash-determinism guarantees matter for OCI registry layer cache
-# deduplication.
+# Hermetic bsdtar-backed tar rule. Used by image_publish to build OCI image
+# layers: it is what rules_oci's own docs use, and it avoids pkg_tar's Python
+# archive builder. See IMAGE_PUBLISH_SPEC.md for the full comparison.
 #
 # Please find documentation here:
 # https://github.com/bazel-contrib/tar.bzl/releases
