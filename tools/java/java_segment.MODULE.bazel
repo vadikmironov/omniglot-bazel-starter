@@ -213,7 +213,7 @@ maven.install(
     artifacts = [
         # --- BEGIN exclude ---
         # aspect_rules_lint dependency (disabled — kept for documentation only)
-        "com.palantir.javaformat:palantir-java-format:2.96.0",
+        "com.palantir.javaformat:palantir-java-format:2.97.0",
         # --- END exclude ---
         # --- BEGIN feature:lint ---
         # PMD and SpotBugs back the Java lint_test aspects (see tools/lint/BUILD).
