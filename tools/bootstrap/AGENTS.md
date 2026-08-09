@@ -35,12 +35,19 @@ subset of this repo into the target, rewrites the module name, `git init`s, and
 ## Re-bootstrap override (changing the selection)
 
 Every scaffold writes a `.omniglot_bootstrap.toml` marker (`[repo]` →
-`module_dir`, `languages`, `features`, `bootstrapped_at`) via
-`manifest.write_bootstrap_marker`, rewritten on each re-bootstrap.
+`module_dir`, `languages`, `features`, `bootstrapped_at`, `starter_revision`)
+via `manifest.write_bootstrap_marker`, rewritten on each re-bootstrap.
 `detect.detect_repo` reads it back exactly, so re-bootstrap never guesses the
-code dir or selection from the filesystem. `bootstrapped_at` is write-only —
-nothing reads it, and it exists so a generated file that predates a starter
-change can be dated without resorting to file mtimes.
+code dir or selection from the filesystem.
+
+The last two are **provenance, write-only** — nothing reads them, and they exist
+so a generated file that predates a starter change can be identified without
+resorting to file mtimes and `git log -S`. `starter_revision` is the source
+checkout's HEAD (suffixed `-dirty` when it had uncommitted changes), and is
+omitted entirely when the source is not a git checkout — scaffolding from an
+unpacked tarball is legitimate, so it records nothing rather than a guess.
+`git -C <starter> diff <starter_revision>..HEAD -- <path>` then answers "what
+changed in this file since that scaffold?" directly.
 
 On a detected repo, `_reuse_detected` reuses the detected languages/features by
 default, but offers to **change** them: it re-presents both checkboxes

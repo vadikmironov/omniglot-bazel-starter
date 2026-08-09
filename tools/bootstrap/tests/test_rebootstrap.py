@@ -6,6 +6,7 @@ verifies the edit survived while the starter baseline stayed intact.
 """
 
 import shutil
+import subprocess
 import tempfile
 import tomllib
 import unittest
@@ -20,6 +21,7 @@ from bootstrap.manifest import (
     load_manifest,
     read_bootstrap_marker,
     resolve_files,
+    starter_revision,
     write_bootstrap_marker,
 )
 from bootstrap.processor import has_user_region
@@ -394,6 +396,33 @@ class TestBootstrapMarker(_ScaffoldHarness):
         self._scaffold_into(target, {"python"})
         refreshed = tomllib.loads(marker.read_text())["repo"]["bootstrapped_at"]
         self.assertNotEqual(refreshed, "2000-01-01T00:00:00Z")
+
+    def test_marker_records_the_starter_revision(self) -> None:
+        # The source root is this repo, so the scaffold should be pinned to a
+        # real commit — that is what dates a generated file exactly.
+        target = self._fresh_target()
+        self._scaffold_into(target, {"python"})
+        repo = tomllib.loads((target / BOOTSTRAP_MARKER_FILE).read_text())["repo"]
+        revision = repo["starter_revision"]
+        sha = revision.removesuffix("-dirty")
+        self.assertRegex(sha, r"^[0-9a-f]{40}$")
+        head = subprocess.run(  # noqa: S603
+            ["git", "-C", str(self.source_root), "rev-parse", "HEAD"],  # noqa: S607
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+        self.assertEqual(sha, head)
+
+    def test_starter_revision_omitted_outside_a_git_checkout(self) -> None:
+        # Scaffolding from an unpacked tarball is legitimate; the field is
+        # dropped rather than recorded as a guess.
+        target = self._fresh_target()
+        self.assertIsNone(starter_revision(target))  # fresh temp dir, no git
+        write_bootstrap_marker(target, "modules", {"python"}, set(), source_root=target)
+        repo = tomllib.loads((target / BOOTSTRAP_MARKER_FILE).read_text())["repo"]
+        self.assertNotIn("starter_revision", repo)
+        self.assertIn("bootstrapped_at", repo)
 
     def test_read_marker_drops_unknown_keys(self) -> None:
         target = self._fresh_target()
