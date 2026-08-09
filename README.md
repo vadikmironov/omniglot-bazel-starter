@@ -173,6 +173,7 @@ bazel run //tools/python:generate_requirements_lock.update            # Python �
 REPIN=1 bazel run @omniglot-bazel-starter_maven_dependencies//:pin    # Java   — Maven artifacts
 CARGO_BAZEL_REPIN=1 bazel fetch @crates//...                          # Rust   — tools/rust/Cargo.toml
 bazel run @rules_go//go -- mod tidy                                   # Go     — go.mod / go.sum
+bazel mod tidy                                                        # Bazel  — use_repo() calls in the MODULE segments
 ```
 
 ### Dependency Updates
