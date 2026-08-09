@@ -77,7 +77,9 @@ oci_image(
 
 `tar.bzl` includes runfiles automatically when `srcs` is an executable target — no `include_runfiles` flag. Single app layer per call; users add more via `extra_layers`.
 
-**Why `tar.bzl` over `pkg_tar`:** rules_oci [PR #808](https://github.com/bazel-contrib/rules_oci/pull/808) ("chore(docs): stop recommending pkg_tar — It has a lot of problems and we can't fix them") deprecates `pkg_tar` for OCI use. The killer issue is layer-hash determinism: `pkg_tar`'s file ordering / mtime / uid-gid quirks produce different tar bytes on different builds, busting OCI registry layer-cache deduplication. `tar.bzl` ships its own `bsdtar` and is reproducible by design.
+**Why `tar.bzl` over `pkg_tar`:** rules_oci stopped showing `pkg_tar` in its docs ([PR #808](https://github.com/bazel-contrib/rules_oci/pull/808)), so `tar.bzl` is the path its examples and issue tracker assume. Beyond that, `pkg_tar` drives `build_tar.py` through a `py_binary`, while `tar.bzl` runs bsdtar/libarchive over an mtree manifest — cheaper on large layers, and without the Python toolchain constraining what the rule can do (rules_pkg documents `xz` as toolchain-dependent for this reason). `tar.bzl` also handles runfiles for executable `srcs` with no extra attribute, and ships fixes for OCI-shaped concerns at a faster cadence — symlink preservation, mtree attribute validation, ownership on synthesized parent directories.
+
+Not a reason, despite being widely repeated: layer-hash determinism. `pkg_tar` defaults to `portable_mtime = True`, `owner = "0.0"` and `mode = "0555"`, so mtime and ownership are pinned already; rules_pkg had to *add* `preserve_mtime` as an opt-in to get real mtimes back. Note that this is a close call — `rules_pkg` is a dependency regardless (`pkg_zip` builds the Maven artifacts), so dropping `tar.bzl` would remove a `bazel_dep` outright rather than trade one for another.
 
 ## Gazelle auto-emission
 
@@ -123,7 +125,7 @@ For each canonical binary rule (`cc_binary`, `go_binary`, `java_binary`, `py_bin
 
 ```python
 bazel_dep(name = "rules_oci", version = "2.3.0")
-bazel_dep(name = "tar.bzl",   version = "0.10.1")
+bazel_dep(name = "tar.bzl",   version = "0.10.7")
 
 oci = use_extension("@rules_oci//oci:extensions.bzl", "oci")
 
