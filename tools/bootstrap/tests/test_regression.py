@@ -190,13 +190,27 @@ class TestMarkerIntegrity(unittest.TestCase):
         cls.manifest = load_manifest(cls.source_root / "tools" / "bootstrap" / "bootstrap_manifest.toml")
 
     def test_composite_files_have_markers(self) -> None:
-        """Every composite file contains at least one BEGIN/END pair."""
+        """Every composite file earns the classification: it carries either
+        lang/feature/exclude sections to filter, or a user-managed region to
+        splice across re-bootstrap (or both). A file with neither belongs in
+        [core] or a language list as a plain copy.
+
+        Files with sections must have both a BEGIN and an END (balance of tags
+        is checked separately in test_markers_balanced). .bazelignore is the
+        section-free case: composite only for its user-managed region.
+        """
         for f in self.manifest.composite_files:
             content = (self.source_root / f).read_text()
             begins = _BEGIN_RE.findall(content)
             ends = _END_RE.findall(content)
-            self.assertTrue(len(begins) > 0, f"{f} has no BEGIN markers")
-            self.assertTrue(len(ends) > 0, f"{f} has no END markers")
+            if begins or ends:
+                self.assertTrue(len(begins) > 0, f"{f} has END but no BEGIN markers")
+                self.assertTrue(len(ends) > 0, f"{f} has BEGIN but no END markers")
+            else:
+                self.assertTrue(
+                    has_user_region(content),
+                    f"{f} is composite but has neither section markers nor a user-managed region",
+                )
 
     def test_markers_balanced(self) -> None:
         """Every BEGIN has a matching END with the same tag."""

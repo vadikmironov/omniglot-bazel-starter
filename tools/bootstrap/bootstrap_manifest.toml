@@ -10,6 +10,7 @@
 #   [features.*]      - Opt-in capabilities (own dirs / files / composite files)
 #   [language_files]  - Individual files in shared directories, keyed by language tag
 #   [composite]       - Files with section markers (# --- BEGIN/END lang:*|feature:* ---)
+#                       and/or a user-managed region preserved across re-bootstrap
 #   [exclude]         - Files to skip (overrides all other sections);
 #                       [exclude.when_feature_absent] drops files when a feature is off
 #   [substitutions]   - String replacements applied to all generated files
@@ -27,7 +28,6 @@ default_module_dir = "modules"
 files = [
     ".bazelversion",
     "WORKSPACE.bazel",
-    ".bazelignore",
     ".bazeliskrc",
     "bazel_downloader.cfg",
 ]
@@ -243,6 +243,11 @@ files = [
     ".bazelrc",
     "BUILD",
     ".gitignore",
+    # No lang/feature sections — listed as composite (not core) purely so its
+    # user-managed region is preserved across re-bootstrap via splicing, the
+    # same mechanism requirements.in / .gitignore use. A plain core copy would
+    # clobber a repo's project-specific ignore paths on every re-bootstrap.
+    ".bazelignore",
     "tools/format/BUILD",
     "user.bazelrc.template",
 ]

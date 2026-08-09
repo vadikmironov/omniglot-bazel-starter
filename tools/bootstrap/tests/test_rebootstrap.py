@@ -28,6 +28,7 @@ TEST_REPO_NAME = "rebootstrap_test"
 # Source-repo paths of the managed dependency files (relative to repo root).
 MANAGED_SOURCE_FILES = [
     ".gitignore",
+    ".bazelignore",
     "tools/python/requirements.in",
     "tools/rust/Cargo.toml",
     "tools/cpp/cpp_3rd_party_dependencies.MODULE.bazel",
@@ -156,6 +157,25 @@ class TestRebootstrap(_ScaffoldHarness):
         self.assertIn("secrets/", result, "user gitignore entry lost on re-bootstrap")
         # Bazel core ignores prove the baseline was refreshed alongside the user region.
         self.assertIn("/bazel-*", result, "starter baseline lost on re-bootstrap")
+
+    def test_bazelignore_user_edit_survives(self) -> None:
+        target = self._fresh_target()
+        self._scaffold_into(target, {"python"})
+        bi = target / ".bazelignore"
+
+        # User appends a project-specific ignore inside the user-managed region.
+        edited = bi.read_text().replace(
+            "# --- END user-managed ---",
+            "services/postgres/data\n# --- END user-managed ---",
+            1,
+        )
+        bi.write_text(edited)
+
+        self._scaffold_into(target, {"python"})  # re-bootstrap
+        result = bi.read_text()
+        self.assertIn("services/postgres/data", result, "user bazelignore entry lost on re-bootstrap")
+        # The bazel-* symlink ignores prove the baseline was refreshed alongside.
+        self.assertIn("bazel-out", result, "starter baseline lost on re-bootstrap")
 
     def test_gomod_is_not_managed(self) -> None:
         """go.mod carries no user-managed region — it is import-driven (tidy)."""
