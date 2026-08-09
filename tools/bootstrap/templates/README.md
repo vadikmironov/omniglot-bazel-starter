@@ -58,13 +58,16 @@ bazel test --test_tag_filters=lint //...
 ```
 # --- END feature:lint ---
 
-# --- BEGIN lang:python,java,rust,go ---
-### Regenerate dependency locks
+### Sync dependencies
 
-After editing a language's dependency manifest, refresh its lockfile:
+After adding or removing a module extension repo in a `*.MODULE.bazel` segment, sync
+the `use_repo()` calls.
+# --- BEGIN lang:python,java,rust,go ---
+After editing a language's dependency manifest, refresh its lockfile too.
+# --- END lang:python,java,rust,go ---
 
 ```bash
-# --- END lang:python,java,rust,go ---
+bazel mod tidy                                                        # Bazel  — use_repo() calls in the MODULE segments
 # --- BEGIN lang:python ---
 bazel run //tools/python:generate_requirements_lock.update            # Python — tools/python/requirements.in
 # --- END lang:python ---
@@ -77,9 +80,7 @@ CARGO_BAZEL_REPIN=1 bazel fetch @crates//...                          # Rust   �
 # --- BEGIN lang:go ---
 bazel run @rules_go//go -- mod tidy                                   # Go     — go.mod / go.sum
 # --- END lang:go ---
-# --- BEGIN lang:python,java,rust,go ---
 ```
-# --- END lang:python,java,rust,go ---
 
 # --- BEGIN feature:custom_toolchains lang:cpp,python,java,go ---
 ## Custom Toolchains

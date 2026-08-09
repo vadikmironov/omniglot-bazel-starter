@@ -177,11 +177,21 @@ CARGO_BAZEL_REPIN=1 bazel fetch @crates//...
 
 # Run following command after any Go dependency changes in go.mod
 bazel run @rules_go//go -- mod tidy
+
+# Run following command after adding or removing a module extension repo in any
+# *.MODULE.bazel segment — syncs the use_repo() calls
+bazel mod tidy
 ```
 
-These four are the same commands the bootstrap tool runs after scaffolding
-(`_LOCK_REFRESH_COMMANDS` in `tools/bootstrap/src/bootstrap/scaffolder.py`) and
-the ones listed in README.md — keep all three in step.
+The four language commands above are the same ones the bootstrap tool runs after
+scaffolding (`_LOCK_REFRESH_COMMANDS` in `tools/bootstrap/src/bootstrap/scaffolder.py`)
+and the ones listed in README.md — keep all three in step. `bazel mod tidy` is not
+part of that set.
+
+Check `bazel mod tidy`'s diff before committing: it appends new repos to the *last*
+`use_repo()` call for that extension, which here can land inside a `# --- BEGIN ... ---`
+scaffold region — anything left in an `exclude` or unselected `feature:` region is
+dropped from scaffolds. Move it out by hand.
 
 ### Debugging Toolchains
 Use debug configurations to troubleshoot toolchain resolution:
