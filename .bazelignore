@@ -2,3 +2,12 @@ bazel-bin
 bazel-omniglot-bazel-starter
 bazel-out
 bazel-testlogs
+
+# --- BEGIN user-managed ---
+# Project-specific paths Bazel must not descend into — preserved across
+# re-bootstrap. Unlike .gitignore, .bazelignore matches literal directory
+# paths (no globs), so list each one explicitly. Typical entries are runtime
+# data dirs a container creates with host-unreadable permissions, which would
+# otherwise fail package traversal with "Permission denied", e.g.:
+#   services/postgres/data
+# --- END user-managed ---

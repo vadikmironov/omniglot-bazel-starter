@@ -240,6 +240,7 @@ class TestLoadManifest(unittest.TestCase):
             ".bazelrc",
             "BUILD",
             ".gitignore",
+            ".bazelignore",
             "tools/format/BUILD",
             "user.bazelrc.template",
         }
