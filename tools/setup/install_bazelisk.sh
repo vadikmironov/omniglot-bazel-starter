@@ -18,6 +18,11 @@ die() {
   exit 1
 }
 
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# Downloads that survive a stalling proxy — see download_lib.sh.
+# shellcheck source=tools/setup/download_lib.sh
+source "${SCRIPT_DIR}/download_lib.sh"
+
 usage() {
   cat <<'EOF'
 install_bazelisk.sh — install the Bazelisk launcher.
@@ -106,14 +111,18 @@ fetch_and_verify() {
   local asset=$1
   local base="${RELEASES}/download/${VERSION}"
   log "Downloading ${asset}..."
-  curl -fsSL -o "${WORKDIR}/${asset}" "${base}/${asset}"
+  download_resumable "${base}/${asset}" "${WORKDIR}/${asset}" --silent ||
+    die "download failed: ${asset}"
   curl -fsSL -o "${WORKDIR}/${asset}.sha256" "${base}/${asset}.sha256"
 
   local expected actual
   expected=$(awk '{print $1}' "${WORKDIR}/${asset}.sha256")
   actual=$(sha256sum "${WORKDIR}/${asset}" | awk '{print $1}')
-  [[ "$expected" == "$actual" ]] ||
+  # Drop the file on mismatch so a resumed-onto bad partial cannot persist.
+  [[ "$expected" == "$actual" ]] || {
+    rm -f "${WORKDIR}/${asset}"
     die "SHA256 mismatch for ${asset} (expected ${expected}, got ${actual})"
+  }
   log "✓ SHA256 verified for ${asset}"
 
   printf '%s\n' "${WORKDIR}/${asset}"

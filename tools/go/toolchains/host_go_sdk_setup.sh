@@ -33,6 +33,11 @@ error() {
     exit 1
 }
 
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# Downloads that survive a stalling proxy — see download_lib.sh.
+# shellcheck source=tools/setup/download_lib.sh
+source "${SCRIPT_DIR}/../../setup/download_lib.sh"
+
 TOOLCHAIN_ROOT_PATH=""
 GO_VERSION=""
 
@@ -118,11 +123,13 @@ TMP_DIR=$(mktemp -d)
 trap 'rm -rf "$TMP_DIR"' EXIT
 
 log "Downloading $BASE_URL/$ARCHIVE"
-curl -fSL -o "$TMP_DIR/$ARCHIVE" "$BASE_URL/$ARCHIVE" || error "Download failed: $ARCHIVE"
+download_resumable "$BASE_URL/$ARCHIVE" "$TMP_DIR/$ARCHIVE" --progress-bar || error "Download failed: $ARCHIVE"
 
 log "Verifying SHA256 checksum"
 EXPECTED_SHA=$(curl -fsSL "$BASE_URL/$ARCHIVE.sha256") || error "Failed to fetch checksum for $ARCHIVE"
-echo "$EXPECTED_SHA  $TMP_DIR/$ARCHIVE" | sha256sum -c - >/dev/null || error "Checksum mismatch for $ARCHIVE"
+# Drop the file on mismatch so a resumed-onto bad partial cannot persist.
+echo "$EXPECTED_SHA  $TMP_DIR/$ARCHIVE" | sha256sum -c - >/dev/null ||
+    { rm -f "$TMP_DIR/$ARCHIVE"; error "Checksum mismatch for $ARCHIVE"; }
 
 log "Extracting to $DEST"
 tar -xzf "$TMP_DIR/$ARCHIVE" -C "$TMP_DIR" || error "Extraction failed"

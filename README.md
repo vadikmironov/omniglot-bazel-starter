@@ -139,6 +139,17 @@ tools/setup/install_bazelisk.sh --system
 
 The installer script is Linux-only; on macOS use `brew install bazelisk`, on Windows `choco install bazelisk` (or `npm install -g @bazel/bazelisk` on any platform). Run `bazel version` to verify (restart your shell first if the installer added `~/.local/bin` to your PATH). Pin a specific launcher version with `BAZELISK_VERSION=v1.25.0`.
 
+#### Downloads behind a stalling proxy
+
+This installer and the two toolchain installers (`tools/go/toolchains/host_go_sdk_setup.sh`, `tools/java/toolchains/local_corretto_toolchains_setup.sh`) fetch through [tools/setup/download_lib.sh](tools/setup/download_lib.sh), which resumes from the bytes already on disk instead of restarting when a transfer stops making progress. Tune it with:
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `DOWNLOAD_MIN_SPEED` | `1024` | Bytes/sec below which a transfer counts as stalled |
+| `DOWNLOAD_STALL_SECONDS` | `30` | Seconds under that floor before the attempt is abandoned |
+| `DOWNLOAD_MAX_STALLED_RETRIES` | `5` | Consecutive attempts fetching nothing new before giving up |
+| `DOWNLOAD_RETRY_DELAY` | `2` | Seconds between attempts |
+
 ### Common Commands
 
 ```bash

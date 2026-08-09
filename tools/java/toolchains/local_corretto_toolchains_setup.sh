@@ -29,6 +29,11 @@ error() {
     exit 1
 }
 
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# Downloads that survive a stalling proxy — see download_lib.sh.
+# shellcheck source=tools/setup/download_lib.sh
+source "${SCRIPT_DIR}/../../setup/download_lib.sh"
+
 TOOLCHAIN_ROOT_PATH=""
 
 while [[ $# -gt 0 ]]; do
@@ -191,7 +196,7 @@ download_jdk() {
     local checksum_file="${filename}.md5"
 
     log "Downloading $filename from $archive_url"
-    if ! curl -L -f --progress-bar -o "$filename" "$archive_url"; then
+    if ! download_resumable "$archive_url" "$filename" --progress-bar; then
         error "Failed to download $filename"
     fi
 
@@ -205,15 +210,19 @@ validate_checksum() {
     local filename="$1"
     local checksum_file="$2"
 
+    # This directory persists between runs, so a failed checksum has to take the
+    # file with it — otherwise the next run resumes onto the bad bytes forever.
     log "Validating checksum for $filename"
     if command -v md5sum >/dev/null 2>&1; then
         if ! echo "$(cat "$checksum_file") $filename" | md5sum -c -; then
+            rm -f "$filename"
             error "Checksum validation failed for $filename"
         fi
     elif command -v md5 >/dev/null 2>&1; then
         local expected_checksum=$(cat "$checksum_file")
         local actual_checksum=$(md5 -q "$filename")
         if [ "$expected_checksum" != "$actual_checksum" ]; then
+            rm -f "$filename"
             error "Checksum validation failed for $filename (expected: $expected_checksum, got: $actual_checksum)"
         fi
         log "Checksum validation passed for $filename"
