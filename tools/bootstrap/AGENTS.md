@@ -125,6 +125,12 @@ empty `x{\n}` nothing in the filter can settle. The bootstrap's closing
 `//tools/format:format` + `//:buildifier.fix` pass absorbs that residue — which is
 also why neither shape is worth guarding in the bootstrap's own tests.
 
+Markers live in files that other tools rewrite, and those tools do not know about them.
+`bazel mod tidy` appends new repos to the *last* `use_repo()` call for an extension, and
+`go mod tidy` sorts require blocks with each line's comments attached — so a new entry can
+land inside a region and vanish from scaffolds, and deleting the line an END marker is
+attached to takes the marker with it. Read the diff after either command.
+
 `# --- BEGIN/END user-managed ---` regions are *not* filtered — they survive into the
 output and their body is carried forward on re-bootstrap, so user edits persist. The
 marker also accepts `//` and a Markdown HTML-comment form
