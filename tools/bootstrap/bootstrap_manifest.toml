@@ -182,6 +182,9 @@ directories = ["tools/profile"]
 # under all three (de-duped by resolve_files).
 composite_files = [
     "tools/profile/BUILD",
+    # The criterion Profiler every Rust bench depends on; its BUILD gates the
+    # generated clippy test behind feature:lint, like tools/profile/BUILD.
+    "tools/profile/criterion_pprof/BUILD",
     # The runner's per-language bench-flavor branches carry lang: markers.
     "tools/profile/src/profiling/engine.py",
     # ...and so must the test that pins them: a verbatim copy would reference

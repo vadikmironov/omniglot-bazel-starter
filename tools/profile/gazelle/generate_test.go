@@ -112,7 +112,9 @@ func TestOptIn_GeneratesBenchAndMem(t *testing.T) {
 			if got := r.AttrStrings("tags"); !reflect.DeepEqual(got, []string{tagCPU}) {
 				t.Errorf("bench tags = %v", got)
 			}
-			want := []string{":foo", "@crates//:criterion", "@crates//:pprof"}
+			// CPU capture arrives as a dep, not a per-package shim: the
+			// criterion Profiler lives in //tools/profile/criterion_pprof.
+			want := []string{":foo", "@crates//:criterion", criterionPprofDep}
 			if got := r.AttrStrings("deps"); !reflect.DeepEqual(got, want) {
 				t.Errorf("bench deps = %v, want %v", got, want)
 			}

@@ -5,7 +5,7 @@
 use std::hint::black_box;
 
 use criterion::{Criterion, criterion_group, criterion_main};
-use pprof::criterion::{Output, PProfProfiler};
+use criterion_pprof::PProfProfiler;
 use rust_workloads::{matmul, workload_n};
 
 const DEFAULT_N: usize = 256;
@@ -26,7 +26,7 @@ fn bench_matmul(c: &mut Criterion) {
 
 criterion_group! {
     name = benches;
-    config = Criterion::default().with_profiler(PProfProfiler::new(100, Output::Protobuf));
+    config = Criterion::default().with_profiler(PProfProfiler::new(100));
     targets = bench_matmul
 }
 criterion_main!(benches);

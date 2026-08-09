@@ -82,8 +82,8 @@ rust_binary(
     tags = ["profiling-cpu"],
     deps = [
         ":rust_workloads",
+        "//tools/profile/criterion_pprof",
         "@crates//:criterion",
-        "@crates//:pprof",
     ],
 )
 
@@ -93,8 +93,8 @@ rust_binary(
     tags = ["profiling-cpu"],
     deps = [
         ":rust_workloads",
+        "//tools/profile/criterion_pprof",
         "@crates//:criterion",
-        "@crates//:pprof",
     ],
 )
 
@@ -104,8 +104,8 @@ rust_binary(
     tags = ["profiling-cpu"],
     deps = [
         ":rust_workloads",
+        "//tools/profile/criterion_pprof",
         "@crates//:criterion",
-        "@crates//:pprof",
     ],
 )
 

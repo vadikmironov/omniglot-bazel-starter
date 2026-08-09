@@ -4,7 +4,7 @@
 use std::hint::black_box;
 
 use criterion::{BatchSize, Criterion, criterion_group, criterion_main};
-use pprof::criterion::{Output, PProfProfiler};
+use criterion_pprof::PProfProfiler;
 use rust_workloads::{quicksort, workload_n};
 
 const DEFAULT_N: usize = 1_000_000;
@@ -27,7 +27,7 @@ criterion_group! {
     // cannot fit criterion's 5s measurement window.
     config = Criterion::default()
         .sample_size(10)
-        .with_profiler(PProfProfiler::new(100, Output::Protobuf));
+        .with_profiler(PProfProfiler::new(100));
     targets = bench_quicksort
 }
 criterion_main!(benches);

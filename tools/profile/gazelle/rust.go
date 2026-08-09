@@ -9,6 +9,13 @@ import (
 	"github.com/bazelbuild/bazel-gazelle/rule"
 )
 
+// criterionPprofDep supplies CPU capture to every criterion bench: a criterion
+// Profiler backed by pprof-rs, which a bench installs with
+// `Criterion::default().with_profiler(PProfProfiler::new(100))`. pprof-rs ships
+// an equivalent behind its own `criterion` feature, but that feature depends on
+// criterion 0.5 and would pin every bench to it.
+const criterionPprofDep = "//tools/profile/criterion_pprof"
+
 // memShim is the shared capture shim compiled into every memory
 // workload binary (tcmalloc heap profiler, driven over FFI).
 const memShim = "mem/prof_dump.rs"
@@ -27,7 +34,8 @@ const tcmallocDep = "@gperftools//:tcmalloc"
 // generateRustWorkloads maps the package's Rust workload sources to
 // runner-discoverable targets:
 //
-//	benches/bench_<x>.rs -> rust_binary(bench_<x>)  criterion + pprof, tagged profiling-cpu
+//	benches/bench_<x>.rs -> rust_binary(bench_<x>)  criterion + the shared
+//	                                                pprof profiler, tagged profiling-cpu
 //	mem/mem_<x>.rs       -> rust_binary(mem_<x>)    tcmalloc capture, tagged profiling-mem
 //
 // Each target depends on the package's canonical library (the rule
@@ -45,7 +53,7 @@ func generateRustWorkloads(args language.GenerateArgs) []*rule.Rule {
 		r := rule.NewRule(kindRustBinary, name)
 		r.SetAttr("srcs", []string{src})
 		r.SetAttr("tags", []string{tagCPU})
-		r.SetAttr("deps", []string{":" + lib, "@crates//:criterion", "@crates//:pprof"})
+		r.SetAttr("deps", []string{":" + lib, "@crates//:criterion", criterionPprofDep})
 		out = append(out, r)
 	}
 

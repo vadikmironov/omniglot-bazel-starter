@@ -518,6 +518,12 @@ class TestScaffolder(unittest.TestCase):
         self.assertTrue((target / "tools" / "profile" / "BUILD").exists())
         self.assertTrue((target / "tools" / "profile" / "src" / "profiling" / "cli.py").exists())
         self.assertTrue((target / "tools" / "profile" / "gazelle" / "rust.go").exists())
+        # Generated bench targets depend on the criterion Profiler, so it has to
+        # ship with the feature — the workloads it is exercised by do not.
+        criterion_pprof = target / "tools" / "profile" / "criterion_pprof"
+        self.assertTrue((criterion_pprof / "BUILD").exists())
+        self.assertTrue((criterion_pprof / "criterion_pprof.rs").exists())
+        self.assertTrue((criterion_pprof / "criterion_pprof_test.rs").exists())
         # python is in the base selection, so its generator ships too.
         self.assertTrue((target / "tools" / "profile" / "gazelle" / "python.go").exists())
         # cpp/java are not selected: their generators must be pruned from
@@ -666,6 +672,14 @@ class TestScaffolder(unittest.TestCase):
         target = self._scaffold({"go"}, features={"publish"})
         build = (target / "tools" / "publish" / "BUILD").read_text()
         self.assertNotIn("ruff_test", build)
+        self.assertNotIn("linters.bzl", build)
+
+    def test_profiling_without_lint_gates_clippy_test(self) -> None:
+        """profiling on / lint off: criterion_pprof ships but its clippy_test is gated."""
+        target = self._scaffold({"rust", "go", "python"}, features={"profiling"})
+        build = (target / "tools" / "profile" / "criterion_pprof" / "BUILD").read_text()
+        self.assertIn("rust_library", build)
+        self.assertNotIn("clippy_test", build)
         self.assertNotIn("linters.bzl", build)
 
     def test_readme_sections_gated_by_features(self) -> None:
