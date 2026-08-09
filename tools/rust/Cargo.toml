@@ -18,11 +18,13 @@ path = "fake.rs"
 # --- BEGIN feature:profiling ---
 # Workload inputs (seeded, deterministic)
 rand = { version = "0.10" }
-# CPU capture: criterion benches profiled in-process by pprof-rs
-# (pprof's `criterion` feature is built against criterion 0.5; keep majors in sync).
+# CPU capture: criterion benches profiled in-process by pprof-rs. pprof's own
+# `criterion` feature is deliberately not enabled — it depends on criterion 0.5
+# and would hold the benches there; benches/prof_criterion.rs implements the
+# criterion Profiler over pprof's core API instead.
 # protobuf-codec is the pure-Rust codegen path — prost-codec needs a host protoc.
-criterion = { version = "0.5" }
-pprof = { version = "0.15", features = ["criterion", "protobuf-codec"] }
+criterion = { version = "0.8" }
+pprof = { version = "0.15", features = ["protobuf-codec"] }
 # Memory capture needs no crate: the workloads link gperftools' tcmalloc
 # (@gperftools//:tcmalloc) and drive its heap profiler over FFI, the same
 # mechanism C++ uses.

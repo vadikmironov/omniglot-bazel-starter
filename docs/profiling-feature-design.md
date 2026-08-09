@@ -199,6 +199,15 @@ Load-bearing quirks — documented so nobody "simplifies" them away:
 - **pprof-rs**'s default unwinder wants frame pointers — the `.bazelrc`
   `-Cforce-frame-pointers=yes,-Cdebuginfo=2` line exists for it (their DWARF support is weak:
   pprof-rs#152); exactly parallel to the C++ `-g -fno-omit-frame-pointer` line.
+- **The criterion `Profiler` is implemented in-repo** (`//tools/profile/criterion_pprof`), and
+  pprof-rs's own `criterion` feature stays off — that feature carries a criterion 0.5 dependency,
+  and the Rust benches should be free to follow criterion's releases. Two trait methods over
+  pprof's core API; the output contract is unchanged (`profile.pb` in criterion's per-benchmark
+  directory). It lives in `tools/profile` rather than beside the workloads because it is a fixed
+  adapter between two crates with no per-package variation — the same reasoning that puts
+  `jmh_annprocess` and `jfrconv` there. Shims that must be *compiled into* the workload binary
+  (C++'s `benches/prof_main.cpp`, Python's `benches/conftest.py`, the `mem/prof_dump.*` capture
+  shims) stay per-package.
 - **gperftools** capture uses explicit `ProfilerStart`/`ProfilerStop` in a shared `prof_main.cpp`
   driven by `CPUPROF_OUT`, never the `CPUPROFILE` env activation — that path pid-suffixes the real
   file (upstream bug, below).
@@ -256,11 +265,12 @@ Load-bearing quirks — documented so nobody "simplifies" them away:
 
 **Track, don't file:**
 
-- **pprof-rs pins criterion `^0.5`** while criterion is at 0.8.x — the Cargo.toml "keep majors in
-  sync" comment is load-bearing. Upstream tikv/pprof-rs#284 (criterion 0.8) is open, with older
-  #269/#271 (0.6). **Live:** the predicted bump exists as `origin/renovate/criterion-0.x`; hold or
-  close it until pprof-rs widens its pin, since merging it breaks crate resolution for every Rust
-  CPU bench.
+- **pprof-rs's `criterion` feature depends on criterion `^0.5`** while criterion is at 0.8.x.
+  Upstream PRs offering the bump are open (tikv/pprof-rs#284 for 0.8, #269/#271 for 0.6) and the
+  repository has been quiet since October 2025, so no fix is expected on a schedule. **Resolved
+  locally** by implementing criterion's `Profiler` in `//tools/profile/criterion_pprof` and leaving
+  the feature off, which unpinned criterion (see Changelog, 2026-08-09) — nothing left to track
+  unless pprof-rs's core sampling API changes.
 - **`go mod tidy` is broken repo-wide, and not by anything of ours.** From gazelle v0.52.0 the
   `github.com/bazelbuild/bazel-gazelle` packages became shims re-exporting
   `github.com/bazel-contrib/bazel-gazelle/v2/...`, but the published v2 module (v2.0.0-1, v2.0.0-2)
@@ -273,6 +283,18 @@ Load-bearing quirks — documented so nobody "simplifies" them away:
   upstream publishes a complete v2.
 
 ## Changelog
+
+**2026-08-09 — criterion 0.8; Rust CPU capture decoupled from pprof-rs's criterion feature.**
+That feature depends on criterion 0.5, so every Rust bench was held there while criterion shipped
+0.6, 0.7 and 0.8. criterion's `Profiler` trait is two methods and pprof-rs's sampling API is public,
+so the integration now lives in `//tools/profile/criterion_pprof` — modelled on pprof-rs's own,
+minus the `Output` enum, since the runner only ever consumed protobuf. Generated bench targets
+depend on it (bootstrapped repos get it with the feature, as they do `jmh_annprocess`), `pprof`
+keeps `protobuf-codec` alone, and criterion tracks its own releases from here. Two guards came with
+it: a `rust_test` driving the trait directly and parsing the `profile.pb` it writes, and a bootstrap
+regression test asserting every workspace label a gazelle generator emits resolves to a package the
+manifest ships — the failure mode that a capture component beside the example workloads would have
+had, since example modules never scaffold.
 
 **2026-07-26 — memory correctness pass** (unplanned). `felixge/pprofutils` folded a hardcoded sample
 index, so Go and C++ heap renders labelled object counts as bytes; its open fix request

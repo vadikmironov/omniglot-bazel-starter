@@ -34,6 +34,10 @@ _END_RE = re.compile(r"^\s*#\s*---\s*END\s+((?:lang|feature):\S+|exclude)\s*---\
 _EXPORTS_RE = re.compile(r"exports_files\(\s*\[([^\]]*)\]")
 _QUOTED_RE = re.compile(r"""["']([^"']+)["']""")
 
+# A quoted workspace label (`"//tools/lint:linters.bzl"`) as a gazelle
+# generator writes it into a user BUILD file.
+_LABEL_RE = re.compile(r'"(//[A-Za-z0-9_/.+-]*(?::[A-Za-z0-9_.+-]+)?)"')
+
 # Private module-level names a filtered Python source still defines (`def _x`
 # or `_X = ...`), and the `engine._x` uses a filtered test makes of them.
 _DEFINED_RE = re.compile(r"^(?:def\s+)?(_\w+)", re.MULTILINE)
@@ -239,6 +243,65 @@ class TestMarkerIntegrity(unittest.TestCase):
                         lang,
                         known,
                         f"{f} has unknown tag '{lang}' in marker '{tag}'",
+                    )
+
+
+class TestGeneratorLabelsShipped(unittest.TestCase):
+    """Workspace labels a gazelle generator emits must resolve in a scaffold.
+
+    The generators write deps into user BUILD files — ``//tools/profile:
+    jmh_annprocess`` on every Java bench, ``//tools/profile/criterion_pprof``
+    on every Rust one. A label whose package the manifest does not ship gives a
+    derived repo BUILD files that reference nothing: green here, red there, and
+    only after the user runs the generator.
+    """
+
+    source_root: Path
+    manifest: BootstrapManifest
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.source_root = _find_source_root()
+        cls.manifest = load_manifest(cls.source_root / "tools" / "bootstrap" / "bootstrap_manifest.toml")
+
+    def test_emitted_labels_resolve_to_shipped_packages(self) -> None:
+        all_features = set(self.manifest.features)
+        resolved = resolve_files(self.manifest, EXPECTED_LANGUAGES, all_features)
+        excluded = effective_excluded_files(self.manifest, all_features)
+        listed = set(resolved.copy) | set(resolved.composite)
+
+        def is_shipped(rel: str) -> bool:
+            if rel in listed:
+                return True
+            under_dir = any(rel == d or rel.startswith(f"{d}/") for d in resolved.directories)
+            return under_dir and rel not in excluded
+
+        generators = sorted(self.source_root.glob("tools/*/gazelle/*.go"))
+        self.assertTrue(generators, "no gazelle generators found")
+        for generator in generators:
+            rel = generator.relative_to(self.source_root).as_posix()
+            content = filter_sections(generator.read_text(), EXPECTED_LANGUAGES, all_features, filename=rel)
+            for label in sorted(set(_LABEL_RE.findall(content))):
+                package, _, target = label[2:].partition(":")
+                build = next(
+                    (b for b in (f"{package}/BUILD", f"{package}/BUILD.bazel") if (self.source_root / b).is_file()),
+                    None,
+                )
+                self.assertIsNotNone(build, f"{rel} emits '{label}' but {package} has no BUILD file")
+                assert build is not None  # narrowed for the type checker
+                required = [build]
+                # A file target (linters.bzl, a .sh helper) must ship itself,
+                # not merely its package.
+                if "." in target:
+                    required.append(f"{package}/{target}")
+                for need in required:
+                    self.assertTrue(
+                        (self.source_root / need).is_file(),
+                        f"{rel} emits '{label}' but {need} does not exist",
+                    )
+                    self.assertTrue(
+                        is_shipped(need),
+                        f"{rel} emits '{label}' but {need} is not shipped — add it to the manifest",
                     )
 
 
