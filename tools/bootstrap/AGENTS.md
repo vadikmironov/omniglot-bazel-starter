@@ -35,9 +35,12 @@ subset of this repo into the target, rewrites the module name, `git init`s, and
 ## Re-bootstrap override (changing the selection)
 
 Every scaffold writes a `.omniglot_bootstrap.toml` marker (`[repo]` →
-`module_dir`, `languages`, `features`) via `manifest.write_bootstrap_marker`,
-rewritten on each re-bootstrap. `detect.detect_repo` reads it back exactly, so
-re-bootstrap never guesses the code dir or selection from the filesystem.
+`module_dir`, `languages`, `features`, `bootstrapped_at`) via
+`manifest.write_bootstrap_marker`, rewritten on each re-bootstrap.
+`detect.detect_repo` reads it back exactly, so re-bootstrap never guesses the
+code dir or selection from the filesystem. `bootstrapped_at` is write-only —
+nothing reads it, and it exists so a generated file that predates a starter
+change can be dated without resorting to file mtimes.
 
 On a detected repo, `_reuse_detected` reuses the detected languages/features by
 default, but offers to **change** them: it re-presents both checkboxes

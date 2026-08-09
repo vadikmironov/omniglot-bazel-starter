@@ -5,6 +5,7 @@ in a new repository based on the user's language selection.
 """
 
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from pathlib import Path
 
 import tomllib
@@ -300,9 +301,14 @@ def write_bootstrap_marker(
     the exact ``module_dir`` / languages / features a later run needs — no
     filesystem guessing. The repo *name* is intentionally not stored here; it
     stays authoritative in ``MODULE.bazel``.
+
+    ``bootstrapped_at`` records when the scaffold was last written. Nothing reads
+    it back — it answers "how far behind the starter is this repo?" when a
+    generated file turns out to predate a starter change.
     """
     langs = ", ".join(f'"{x}"' for x in sorted(languages))
     feats = ", ".join(f'"{x}"' for x in sorted(features))
+    stamp = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     content = (
         f"# {BOOTSTRAP_MARKER_FILE} — written by the bootstrap tool so a re-bootstrap\n"
         "# recovers this repo's selection exactly. Rewritten on each re-bootstrap;\n"
@@ -311,6 +317,7 @@ def write_bootstrap_marker(
         f'module_dir = "{module_dir}"\n'
         f"languages = [{langs}]\n"
         f"features = [{feats}]\n"
+        f'bootstrapped_at = "{stamp}"\n'
     )
     (target_path / BOOTSTRAP_MARKER_FILE).write_text(content)
 

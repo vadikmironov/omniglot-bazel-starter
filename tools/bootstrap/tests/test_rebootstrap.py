@@ -7,7 +7,9 @@ verifies the edit survived while the starter baseline stayed intact.
 
 import shutil
 import tempfile
+import tomllib
 import unittest
+from datetime import UTC, datetime
 from pathlib import Path
 
 from bootstrap.detect import detect_repo
@@ -368,6 +370,30 @@ class TestBootstrapMarker(_ScaffoldHarness):
         self.assertEqual(module_dir, "services")
         self.assertEqual(languages, {"python", "go"})
         self.assertEqual(features, {"publish"})
+
+    def test_marker_records_when_the_scaffold_was_written(self) -> None:
+        # Nothing reads it back; it exists so a stale generated file can be
+        # dated against the starter's history.
+        target = self._fresh_target()
+        before = datetime.now(UTC).replace(microsecond=0)
+        self._scaffold_into(target, {"python"})
+        stamp = tomllib.loads((target / BOOTSTRAP_MARKER_FILE).read_text())["repo"]["bootstrapped_at"]
+        written = datetime.strptime(stamp, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=UTC)
+        self.assertGreaterEqual(written, before)
+        self.assertLessEqual(written, datetime.now(UTC))
+
+    def test_rebootstrap_refreshes_the_timestamp(self) -> None:
+        target = self._fresh_target()
+        self._scaffold_into(target, {"python"})
+        marker = target / BOOTSTRAP_MARKER_FILE
+        marker.write_text(
+            marker.read_text().replace(
+                tomllib.loads(marker.read_text())["repo"]["bootstrapped_at"], "2000-01-01T00:00:00Z"
+            )
+        )
+        self._scaffold_into(target, {"python"})
+        refreshed = tomllib.loads(marker.read_text())["repo"]["bootstrapped_at"]
+        self.assertNotEqual(refreshed, "2000-01-01T00:00:00Z")
 
     def test_read_marker_drops_unknown_keys(self) -> None:
         target = self._fresh_target()
