@@ -33,6 +33,12 @@ tools/setup/install_bazelisk.sh --system    # apt/.deb, prompts for sudo
 Linux only. Run `bazel version` to verify (restart your shell first if the
 installer added `~/.local/bin` to your PATH).
 
+Downloads go through `tools/setup/download_lib.sh`, which resumes from the bytes
+already on disk instead of restarting when a transfer stops making progress.
+Behind a slow or stalling proxy, raise `DOWNLOAD_STALL_SECONDS` (default 30, the
+seconds under `DOWNLOAD_MIN_SPEED` before an attempt is abandoned) or
+`DOWNLOAD_MAX_STALLED_RETRIES` (default 5).
+
 ## Common Commands
 
 ```bash

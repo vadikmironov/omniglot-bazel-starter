@@ -307,6 +307,11 @@ files = [
     # Palantir Java formatter: disabled alternative kept for documentation.
     # The active Java formatter uses clang-format via the adapter wrapper.
     "tools/format/src/main/java/monorepo/test/PalantirJavaFormatWrapper.java",
+    # This repo's own test for tools/setup/download_lib.sh. tools/setup ships to
+    # every scaffold, but the test is a py_test and rules_python is only a
+    # bazel_dep when Python is selected — so shipping it would break the
+    # MODULE-less selections. The library it covers ships either way.
+    "tools/setup/tests",
 ]
 
 # Feature-conditional excludes: dropped when the named feature is NOT selected,
