@@ -11,12 +11,12 @@
     "org.apache.logging.log4j:log4j-slf4j-impl": 1608875535,
     "org.apache.logging.log4j:log4j-slf4j2-impl": -1564835513,
     "org.jsoup:jsoup": 184888541,
-    "org.junit.jupiter:junit-jupiter-api": 389201227,
-    "org.junit.jupiter:junit-jupiter-engine": -1937974425,
-    "org.junit.jupiter:junit-jupiter-params": -1348746325,
-    "org.junit.platform:junit-platform-console": 850004126,
-    "org.junit.platform:junit-platform-launcher": -768879275,
-    "org.junit.platform:junit-platform-reporting": -192684313,
+    "org.junit.jupiter:junit-jupiter-api": -1418253236,
+    "org.junit.jupiter:junit-jupiter-engine": 549538408,
+    "org.junit.jupiter:junit-jupiter-params": 1138766508,
+    "org.junit.platform:junit-platform-console": -957450337,
+    "org.junit.platform:junit-platform-launcher": 1718633558,
+    "org.junit.platform:junit-platform-reporting": -2000138776,
     "org.openjdk.jmh:jmh-core": 983716932,
     "org.openjdk.jmh:jmh-generator-annprocess": -1162360421,
     "repositories": -1949687017,
@@ -68,14 +68,14 @@
     "org.jline:jline": -1888912200,
     "org.jsoup:jsoup": 1453605484,
     "org.jspecify:jspecify": 117231129,
-    "org.junit.jupiter:junit-jupiter-api": 676925586,
-    "org.junit.jupiter:junit-jupiter-engine": -1414496726,
-    "org.junit.jupiter:junit-jupiter-params": -1261453730,
-    "org.junit.platform:junit-platform-commons": 1600910117,
-    "org.junit.platform:junit-platform-console": 72134275,
-    "org.junit.platform:junit-platform-engine": -529422716,
-    "org.junit.platform:junit-platform-launcher": -207838191,
-    "org.junit.platform:junit-platform-reporting": 837067953,
+    "org.junit.jupiter:junit-jupiter-api": -1170819288,
+    "org.junit.jupiter:junit-jupiter-engine": -362818027,
+    "org.junit.jupiter:junit-jupiter-params": -1666494068,
+    "org.junit.platform:junit-platform-commons": 585098661,
+    "org.junit.platform:junit-platform-console": 1350866550,
+    "org.junit.platform:junit-platform-engine": 1716273321,
+    "org.junit.platform:junit-platform-launcher": -1197157553,
+    "org.junit.platform:junit-platform-reporting": -668997287,
     "org.openjdk.jmh:jmh-core": 262505124,
     "org.openjdk.jmh:jmh-generator-annprocess": 554503664,
     "org.opentest4j.reporting:open-test-reporting-tooling-spi": -1725000643,
@@ -366,51 +366,51 @@
     },
     "org.junit.jupiter:junit-jupiter-api": {
       "shasums": {
-        "jar": "e60794b7d94e03c4bca1c0833cfca18762da5eaac0a61b16281cbbb708103e4c"
+        "jar": "555d6cf20fa1710884dd01b86cc5785397ba73e21ada2d4b784f5f1a14dcafc4"
       },
-      "version": "6.1.2"
+      "version": "6.1.3"
     },
     "org.junit.jupiter:junit-jupiter-engine": {
       "shasums": {
-        "jar": "57227ce289ed84ab205136997d2e5117f6cc695a16b7e235d59f70cdf33c3d7a"
+        "jar": "414559e78bbfa3bdb2eab009ac3ab1e22369ac31117c270a0bd666da115c5c6c"
       },
-      "version": "6.1.2"
+      "version": "6.1.3"
     },
     "org.junit.jupiter:junit-jupiter-params": {
       "shasums": {
-        "jar": "c1ed2164f6ba388518757b38f219dbe350ac098afcd126cbcbd6256fb99666ae"
+        "jar": "05c51cedba2c06a9770707391e006cee825876937dea580b94a265ce145d4939"
       },
-      "version": "6.1.2"
+      "version": "6.1.3"
     },
     "org.junit.platform:junit-platform-commons": {
       "shasums": {
-        "jar": "204894c039d321743ee11e7d1dc8360170d7c64391fbea1211178a645c33a92a"
+        "jar": "a4774ae923c109544034aeae7c762cf017fbcdd1342403ba90e0921984b608c3"
       },
-      "version": "6.1.2"
+      "version": "6.1.3"
     },
     "org.junit.platform:junit-platform-console": {
       "shasums": {
-        "jar": "5735a840f9b679296a8fcd7b54185ca903a29503fd8952df63bba0f27307f427"
+        "jar": "913554ad65b9420936822889a7268a6793a942e5f77ad8b653b8ec05068fa3be"
       },
-      "version": "6.1.2"
+      "version": "6.1.3"
     },
     "org.junit.platform:junit-platform-engine": {
       "shasums": {
-        "jar": "484e90828846ad6b88efe226b6fe014a75941b32b226e914d9a7758802f46f91"
+        "jar": "21ad7ad3a35beda16387979317be1833a72a71d812f9a66ee4b9a7bafb56334c"
       },
-      "version": "6.1.2"
+      "version": "6.1.3"
     },
     "org.junit.platform:junit-platform-launcher": {
       "shasums": {
-        "jar": "858197212c1b2acc257c9eec9b450a31923c61c1bc61e66acf0057d57bbe577a"
+        "jar": "1dec64b1fc0b7c47a11302aa5b4d37d8160c041b396e27067709ce775601a7b6"
       },
-      "version": "6.1.2"
+      "version": "6.1.3"
     },
     "org.junit.platform:junit-platform-reporting": {
       "shasums": {
-        "jar": "61706512382e1d71a2e425246e4380076c908b4698bbe09148061bdc2b34e24a"
+        "jar": "d584a16cd87da5609af5e35428ed4f40b192681a2487dc59d02ecb62f6c417c2"
       },
-      "version": "6.1.2"
+      "version": "6.1.3"
     },
     "org.openjdk.jmh:jmh-core": {
       "shasums": {
