@@ -6,8 +6,11 @@ verifies the edit survived while the starter baseline stayed intact.
 """
 
 import shutil
+import subprocess
 import tempfile
+import tomllib
 import unittest
+from datetime import UTC, datetime
 from pathlib import Path
 
 from bootstrap.detect import detect_repo
@@ -18,6 +21,7 @@ from bootstrap.manifest import (
     load_manifest,
     read_bootstrap_marker,
     resolve_files,
+    starter_revision,
     write_bootstrap_marker,
 )
 from bootstrap.processor import has_user_region
@@ -368,6 +372,57 @@ class TestBootstrapMarker(_ScaffoldHarness):
         self.assertEqual(module_dir, "services")
         self.assertEqual(languages, {"python", "go"})
         self.assertEqual(features, {"publish"})
+
+    def test_marker_records_when_the_scaffold_was_written(self) -> None:
+        # Nothing reads it back; it exists so a stale generated file can be
+        # dated against the starter's history.
+        target = self._fresh_target()
+        before = datetime.now(UTC).replace(microsecond=0)
+        self._scaffold_into(target, {"python"})
+        stamp = tomllib.loads((target / BOOTSTRAP_MARKER_FILE).read_text())["repo"]["bootstrapped_at"]
+        written = datetime.strptime(stamp, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=UTC)
+        self.assertGreaterEqual(written, before)
+        self.assertLessEqual(written, datetime.now(UTC))
+
+    def test_rebootstrap_refreshes_the_timestamp(self) -> None:
+        target = self._fresh_target()
+        self._scaffold_into(target, {"python"})
+        marker = target / BOOTSTRAP_MARKER_FILE
+        marker.write_text(
+            marker.read_text().replace(
+                tomllib.loads(marker.read_text())["repo"]["bootstrapped_at"], "2000-01-01T00:00:00Z"
+            )
+        )
+        self._scaffold_into(target, {"python"})
+        refreshed = tomllib.loads(marker.read_text())["repo"]["bootstrapped_at"]
+        self.assertNotEqual(refreshed, "2000-01-01T00:00:00Z")
+
+    def test_marker_records_the_starter_revision(self) -> None:
+        # The source root is this repo, so the scaffold should be pinned to a
+        # real commit — that is what dates a generated file exactly.
+        target = self._fresh_target()
+        self._scaffold_into(target, {"python"})
+        repo = tomllib.loads((target / BOOTSTRAP_MARKER_FILE).read_text())["repo"]
+        revision = repo["starter_revision"]
+        sha = revision.removesuffix("-dirty")
+        self.assertRegex(sha, r"^[0-9a-f]{40}$")
+        head = subprocess.run(  # noqa: S603
+            ["git", "-C", str(self.source_root), "rev-parse", "HEAD"],  # noqa: S607
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+        self.assertEqual(sha, head)
+
+    def test_starter_revision_omitted_outside_a_git_checkout(self) -> None:
+        # Scaffolding from an unpacked tarball is legitimate; the field is
+        # dropped rather than recorded as a guess.
+        target = self._fresh_target()
+        self.assertIsNone(starter_revision(target))  # fresh temp dir, no git
+        write_bootstrap_marker(target, "modules", {"python"}, set(), source_root=target)
+        repo = tomllib.loads((target / BOOTSTRAP_MARKER_FILE).read_text())["repo"]
+        self.assertNotIn("starter_revision", repo)
+        self.assertIn("bootstrapped_at", repo)
 
     def test_read_marker_drops_unknown_keys(self) -> None:
         target = self._fresh_target()

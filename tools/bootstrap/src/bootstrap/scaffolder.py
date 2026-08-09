@@ -153,7 +153,7 @@ def scaffold_repo(
 
     # 7. Record the selection so a re-bootstrap recovers it exactly. Written
     #    after substitutions (its content carries no original_name to rewrite).
-    write_bootstrap_marker(target_path, module_dir, selected_languages, selected_features)
+    write_bootstrap_marker(target_path, module_dir, selected_languages, selected_features, source_root)
 
     # 8. Git init
     print("  Initializing git repository...")

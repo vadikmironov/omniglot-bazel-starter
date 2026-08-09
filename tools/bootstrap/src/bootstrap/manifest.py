@@ -4,7 +4,9 @@ Parses bootstrap_manifest.toml and resolves the set of files to include
 in a new repository based on the user's language selection.
 """
 
+import subprocess
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from pathlib import Path
 
 import tomllib
@@ -288,11 +290,40 @@ def compute_prune_set(
     return owned | gated
 
 
+def _git(source_root: Path, *args: str) -> str | None:
+    """Run a read-only git command in *source_root*, or None if it can't."""
+    try:
+        result = subprocess.run(  # noqa: S603
+            ["git", "-C", str(source_root), *args],  # noqa: S607
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=10,
+        )
+    except (subprocess.SubprocessError, OSError):
+        return None
+    return result.stdout.strip()
+
+
+def starter_revision(source_root: Path) -> str | None:
+    """The starter checkout's HEAD, ``-dirty`` when it has uncommitted changes.
+
+    None when *source_root* is not a git checkout (or git is unavailable) —
+    a scaffold from a tarball is legitimate, so the field is simply omitted
+    rather than recorded as a guess.
+    """
+    head = _git(source_root, "rev-parse", "HEAD")
+    if not head:
+        return None
+    return f"{head}-dirty" if _git(source_root, "status", "--porcelain") else head
+
+
 def write_bootstrap_marker(
     target_path: Path,
     module_dir: str,
     languages: set[str],
     features: set[str],
+    source_root: Path | None = None,
 ) -> None:
     """Record the scaffolded selection in ``BOOTSTRAP_MARKER_FILE``.
 
@@ -300,9 +331,17 @@ def write_bootstrap_marker(
     the exact ``module_dir`` / languages / features a later run needs — no
     filesystem guessing. The repo *name* is intentionally not stored here; it
     stays authoritative in ``MODULE.bazel``.
+
+    ``bootstrapped_at`` and ``starter_revision`` record when the scaffold was
+    last written and from which starter commit. Nothing reads them back — they
+    answer "how far behind the starter is this repo?" when a generated file
+    turns out to predate a starter change. ``starter_revision`` is omitted when
+    *source_root* is absent or is not a git checkout.
     """
     langs = ", ".join(f'"{x}"' for x in sorted(languages))
     feats = ", ".join(f'"{x}"' for x in sorted(features))
+    stamp = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    revision = starter_revision(source_root) if source_root else None
     content = (
         f"# {BOOTSTRAP_MARKER_FILE} — written by the bootstrap tool so a re-bootstrap\n"
         "# recovers this repo's selection exactly. Rewritten on each re-bootstrap;\n"
@@ -311,7 +350,10 @@ def write_bootstrap_marker(
         f'module_dir = "{module_dir}"\n'
         f"languages = [{langs}]\n"
         f"features = [{feats}]\n"
+        f'bootstrapped_at = "{stamp}"\n'
     )
+    if revision:
+        content += f'starter_revision = "{revision}"\n'
     (target_path / BOOTSTRAP_MARKER_FILE).write_text(content)
 
 
