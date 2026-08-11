@@ -36,7 +36,7 @@ bazel_dep(name = "rules_foreign_cc", version = "0.15.1")
 # Please find documentation here:
 # https://github.com/f0rmiga/gcc-toolchain/releases
 #
-bazel_dep(name = "gcc_toolchain", version = "0.11.0")
+bazel_dep(name = "gcc_toolchain", version = "0.12.0")
 
 gcc_toolchains = use_extension("@gcc_toolchain//toolchain:module_extensions.bzl", "gcc_toolchains")
 gcc_toolchains.toolchain(
