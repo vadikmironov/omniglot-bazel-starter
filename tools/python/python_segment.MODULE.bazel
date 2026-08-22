@@ -18,7 +18,7 @@ PYTHON_VERSION_SNAKE = PYTHON_VERSION.replace(".", "_")
 # Please find documentation here:
 # https://github.com/bazelbuild/rules_python/releases
 #
-bazel_dep(name = "rules_python", version = "2.3.1")
+bazel_dep(name = "rules_python", version = "2.3.2")
 
 python = use_extension("@rules_python//python/extensions:python.bzl", "python")
 

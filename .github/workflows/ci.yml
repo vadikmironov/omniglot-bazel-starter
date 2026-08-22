@@ -90,6 +90,12 @@ jobs:
           echo "build --config=remote-cache" >> user.bazelrc
           echo "Remote cache enabled for lint"
         fi
+    - name: Check MODULE.bazel.lock up-to-date
+      # Fails when a *.MODULE.bazel bump merged without regenerating the lock,
+      # which otherwise lands in whichever branch next runs Bazel. Linux only:
+      # extension results can differ per OS, so a stale-on-macOS lock is not a
+      # signal. --nobuild keeps it to loading + analysis.
+      run: bazel build --nobuild --lockfile_mode=error //...
     - name: Run buildifier check
       run: bazel run //:buildifier.check
     - name: Run formatter check
