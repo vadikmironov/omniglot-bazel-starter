@@ -50,6 +50,7 @@
             "Bash(git log:*)",
             "Bash(git status)",
             "Bash(git push)",
+            "Bash(git ls-remote:*)",
             "Bash(gh run list:*)",
             "Bash(gh run view:*)",
             "Bash(gh issue:*)",
@@ -62,8 +63,7 @@
             "Bash(bazel query:*)",
             "Bash(bazel cquery:*)",
             "Bash(bazel test:*)",
-            "Bash(bazel info:*)",
-            "Bash(./tools/lint/lint.sh:*)"
+            "Bash(bazel info:*)"
         ],
         "deny": []
     },

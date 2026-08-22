@@ -16,6 +16,9 @@
 # Local Bazel settings (API keys, personal preferences)
 user.bazelrc
 
+# Per-machine Claude Code overrides; .claude/settings.json is tracked.
+.claude/settings.local.json
+
 # Directories for the Bazel IntelliJ plugin containing the generated
 # IntelliJ project files and plugin configuration. Seperate directories are
 # for the IntelliJ, Android Studio and CLion versions of the plugin.
