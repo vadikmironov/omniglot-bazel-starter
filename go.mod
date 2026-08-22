@@ -4,7 +4,7 @@ go 1.26.0
 
 require (
 	github.com/bazelbuild/bazel-gazelle v0.53.0
-	github.com/stretchr/testify v1.11.1
+	github.com/stretchr/testify v1.12.1
 )
 
 require (
