@@ -263,25 +263,6 @@ Load-bearing quirks — documented so nobody "simplifies" them away:
   to skip the pausing at all, since it blanks `sys` hooks around calibration, warmup and every
   measurement round, leaving hook-based samplers structurally blind to the benchmark loops.
 
-**Track, don't file:**
-
-- **pprof-rs's `criterion` feature depends on criterion `^0.5`** while criterion is at 0.8.x.
-  Upstream PRs offering the bump are open (tikv/pprof-rs#284 for 0.8, #269/#271 for 0.6) and the
-  repository has been quiet since October 2025, so no fix is expected on a schedule. **Resolved
-  locally** by implementing criterion's `Profiler` in `//tools/profile/criterion_pprof` and leaving
-  the feature off, which unpinned criterion (see Changelog, 2026-08-09) — nothing left to track
-  unless pprof-rs's core sampling API changes.
-- **`go mod tidy` is broken repo-wide, and not by anything of ours.** From gazelle v0.52.0 the
-  `github.com/bazelbuild/bazel-gazelle` packages became shims re-exporting
-  `github.com/bazel-contrib/bazel-gazelle/v2/...`, but the published v2 module (v2.0.0-1, v2.0.0-2)
-  ships only `cmd, flag, internal, label, merger, pathtools, rule, testtools` — the `config`,
-  `resolve`, `language` and `repo` packages our gazelle extensions import do not exist there, and a
-  `replace` cannot bridge it (the republished module's go.mod still declares the bazelbuild path).
-  **Worked around** by holding go.mod at `bazel-gazelle v0.51.3` while MODULE.bazel keeps 0.52.2;
-  Bazel is unaffected because `@gazelle//config` and friends declare the old importpath and build
-  from gazelle's own sources. Cost: a `go_deps` version-skew DEBUG on re-evaluation. Realign once
-  upstream publishes a complete v2.
-
 ## Changelog
 
 **2026-08-09 — criterion 0.8; Rust CPU capture decoupled from pprof-rs's criterion feature.**
