@@ -75,7 +75,7 @@ oci.pull(
 )
 oci.pull(
     name = "gcr_io_distroless_python3",
-    digest = "sha256:eff0a6050f5ea9e8154c3d137d468901864803ce3c7f4657d419e64f3f1f8b40",
+    digest = "sha256:6bfc400d0a6d89f50f5bbc0a4b4ff57214ae5c01647c3a74c2a0c8d830b4cc00",
     image = "gcr.io/distroless/python3-debian13",
     platforms = ["linux/amd64"],
     tag = "nonroot",
