@@ -49,7 +49,7 @@ bazel_dep(name = "buildifier_prebuilt", version = "8.5.1.3", dev_dependency = Tr
 # Please find documentation here:
 # https://github.com/aspect-build/rules_lint/releases
 #
-bazel_dep(name = "aspect_rules_lint", version = "2.7.2")
+bazel_dep(name = "aspect_rules_lint", version = "2.8.0")
 # --- END lang:core ---
 
 # --- BEGIN feature:publish ---
