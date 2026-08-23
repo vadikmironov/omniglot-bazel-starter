@@ -284,9 +284,7 @@ upload_maven() {
 
     if [ -n "${DRY_RUN}" ]; then
         echo "  DRY RUN: would upload ${FILENAME} to ${url}"
-        if [ "${PACKAGING}" != "jar" ]; then
-            echo "  DRY RUN: would upload POM to $(pom_url)"
-        fi
+        echo "  DRY RUN: would upload POM to $(pom_url)"
         return
     fi
 
@@ -313,36 +311,33 @@ upload_maven() {
         exit 1
     fi
 
-    # Upload POM for non-Java artifacts (Java's java_export supplies its own)
-    if [ "${PACKAGING}" != "jar" ]; then
-        local pom_file
-        pom_file=$(generate_pom)
-        local pom_upload_url
-        pom_upload_url=$(pom_url)
-        local pom_sha256
-        pom_sha256=$(compute_sha256 "${pom_file}")
+    local pom_file
+    pom_file=$(generate_pom)
+    local pom_upload_url
+    pom_upload_url=$(pom_url)
+    local pom_sha256
+    pom_sha256=$(compute_sha256 "${pom_file}")
 
-        local -a pom_checksum_header=()
-        if [ -n "${pom_sha256}" ]; then
-            pom_checksum_header=(-H "X-Checksum-Sha256: ${pom_sha256}")
-        fi
-
-        echo "  Uploading POM: ${pom_upload_url}"
-        curl_upload_with_retry \
-            -X PUT \
-            "${pom_checksum_header[@]}" \
-            -T "${pom_file}" \
-            "${pom_upload_url}"
-
-        if [ "${UPLOAD_HTTP_CODE}" -ge 200 ] && [ "${UPLOAD_HTTP_CODE}" -lt 300 ]; then
-            echo "  POM upload successful (HTTP ${UPLOAD_HTTP_CODE})"
-        else
-            echo "WARNING: POM upload failed (HTTP ${UPLOAD_HTTP_CODE})" >&2
-            [ -n "${UPLOAD_CURL_ERROR}" ] && echo "  curl: ${UPLOAD_CURL_ERROR}" >&2
-        fi
-
-        rm -f "${pom_file}"
+    local -a pom_checksum_header=()
+    if [ -n "${pom_sha256}" ]; then
+        pom_checksum_header=(-H "X-Checksum-Sha256: ${pom_sha256}")
     fi
+
+    echo "  Uploading POM: ${pom_upload_url}"
+    curl_upload_with_retry \
+        -X PUT \
+        "${pom_checksum_header[@]}" \
+        -T "${pom_file}" \
+        "${pom_upload_url}"
+
+    if [ "${UPLOAD_HTTP_CODE}" -ge 200 ] && [ "${UPLOAD_HTTP_CODE}" -lt 300 ]; then
+        echo "  POM upload successful (HTTP ${UPLOAD_HTTP_CODE})"
+    else
+        echo "WARNING: POM upload failed (HTTP ${UPLOAD_HTTP_CODE})" >&2
+        [ -n "${UPLOAD_CURL_ERROR}" ] && echo "  curl: ${UPLOAD_CURL_ERROR}" >&2
+    fi
+
+    rm -f "${pom_file}"
 }
 
 prep_pypi() {
