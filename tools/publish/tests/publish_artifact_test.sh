@@ -303,7 +303,8 @@ assert_contains "${output}" "SHA-256:" "SHA-256 checksum printed in maven mode"
 output=$(run_publish "" \
     maven libs-release "${DUMMY_FILE}" \
     com.test my-lib '' jar)
-assert_not_contains "${output}" "POM" "no POM message for jar packaging"
+assert_contains "${output}" "DRY RUN: would upload POM" "DRY RUN POM message for jar packaging"
+assert_contains "${output}" "my-lib-1.0.0.pom" "POM URL uses .pom extension for jar packaging"
 
 # =========================================================================
 # Retry Logic
