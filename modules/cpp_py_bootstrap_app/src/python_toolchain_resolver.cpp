@@ -44,7 +44,12 @@ auto get_python_toolchain_path_via_runfiles(char** argv, const std::string& rel_
 
     // Bazel runfiles paths always use forward slashes regardless of platform
     std::string const prefix = std::string("../");
+#ifdef _WIN32
+    // Windows: the interpreter sits at <prefix>/python.exe, no bin/ segment
+    std::string const suffix = std::string("/python.exe");
+#else
     std::string const suffix = std::string("/bin/python3");
+#endif
     auto interpreter_path_view = std::string_view(rel_interpreter_path);
     if (interpreter_path_view.find(prefix) != std::string_view::npos) {
         interpreter_path_view = interpreter_path_view.substr(prefix.size(), interpreter_path_view.size());

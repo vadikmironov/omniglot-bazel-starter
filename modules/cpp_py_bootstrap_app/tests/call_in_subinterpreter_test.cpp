@@ -33,7 +33,12 @@ public:
     }
 
     void TearDown() override {
-        PyEval_RestoreThread(saved_thread_state_);
+        // SetUp's ASSERTs return early on failure, leaving the state null.
+        // Restoring it then aborts the process with a fatal Python error,
+        // which buries the actual SetUp failure.
+        if (saved_thread_state_ != nullptr) {
+            PyEval_RestoreThread(saved_thread_state_);
+        }
         runtime_.reset();
     }
 
