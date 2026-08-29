@@ -57,6 +57,18 @@ single_version_override(
 #
 bazel_dep(name = "gcc_toolchain", version = "0.12.0")
 
+# This toolchain hand-rolls its cc_toolchain_config instead of delegating to
+# rules_cc's unix_cc_toolchain_config, and never implemented
+# external_include_paths. The .bazelrc --features=external_include_paths is
+# therefore a silent no-op here, and external headers arrive as -I/-iquote
+# rather than -isystem, so their warnings hit our -Werror build.
+# https://github.com/f0rmiga/gcc-toolchain/issues/215
+single_version_override(
+    module_name = "gcc_toolchain",
+    patch_strip = 1,
+    patches = ["//tools/cpp/patches:gcc_toolchain_0.12.0_external_include_paths.patch"],
+)
+
 gcc_toolchains = use_extension("@gcc_toolchain//toolchain:module_extensions.bzl", "gcc_toolchains")
 gcc_toolchains.toolchain(
     name = "gcc_toolchain_x86_64",
