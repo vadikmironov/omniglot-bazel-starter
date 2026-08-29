@@ -7,6 +7,24 @@
 
 namespace test_utils {
 
+/// MSVC's CRT has no POSIX setenv/unsetenv; _putenv_s covers both, with an
+/// empty value removing the variable.
+inline void set_env(const char* name, const char* value) {
+#ifdef _WIN32
+    _putenv_s(name, value);
+#else
+    setenv(name, value, 1);
+#endif
+}
+
+inline void unset_env(const char* name) {
+#ifdef _WIN32
+    _putenv_s(name, "");
+#else
+    unsetenv(name);
+#endif
+}
+
 /// RAII helper to temporarily set an environment variable in tests.
 class ScopedEnvVar {
 public:
@@ -16,14 +34,14 @@ public:
             had_value_ = true;
             old_value_ = old_value;
         }
-        setenv(name.c_str(), value.c_str(), 1);
+        set_env(name.c_str(), value.c_str());
     }
 
     ~ScopedEnvVar() {
         if (had_value_) {
-            setenv(name_.c_str(), old_value_.c_str(), 1);
+            set_env(name_.c_str(), old_value_.c_str());
         } else {
-            unsetenv(name_.c_str());
+            unset_env(name_.c_str());
         }
     }
 
@@ -45,12 +63,12 @@ public:
             had_value_ = true;
             old_value_ = old_value;
         }
-        unsetenv(name.c_str());
+        unset_env(name.c_str());
     }
 
     ~ScopedEnvUnset() {
         if (had_value_) {
-            setenv(name_.c_str(), old_value_.c_str(), 1);
+            set_env(name_.c_str(), old_value_.c_str());
         }
     }
 

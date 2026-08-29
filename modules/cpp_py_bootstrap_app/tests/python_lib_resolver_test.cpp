@@ -17,7 +17,7 @@ using test_utils::TempDir;
 
 class PythonLibResolverEnvTest : public ::testing::Test {
 protected:
-    void SetUp() override { unsetenv("PYTHON_LIB_PATH"); }
+    void SetUp() override { test_utils::unset_env("PYTHON_LIB_PATH"); }
 };
 
 // NOLINTBEGIN(cppcoreguidelines-avoid-non-const-global-variables,cppcoreguidelines-owning-memory,cert-err58-cpp,modernize-use-trailing-return-type)

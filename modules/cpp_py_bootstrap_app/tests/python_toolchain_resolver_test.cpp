@@ -17,7 +17,7 @@ using test_utils::TempDir;
 
 class PythonToolchainEnvTest : public ::testing::Test {
 protected:
-    void SetUp() override { unsetenv("PYTHONHOME"); }
+    void SetUp() override { test_utils::unset_env("PYTHONHOME"); }
 };
 
 // NOLINTBEGIN(cppcoreguidelines-avoid-non-const-global-variables,cppcoreguidelines-owning-memory,cert-err58-cpp,modernize-use-trailing-return-type)
