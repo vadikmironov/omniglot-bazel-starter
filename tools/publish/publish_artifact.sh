@@ -365,6 +365,11 @@ prep_pypi() {
 }
 
 upload_pypi() {
+    if [ -z "${ARTIFACT_ID}" ]; then
+        echo "ERROR: PyPI mode requires artifact_id (the wheel distribution name)" >&2
+        exit 1
+    fi
+
     echo "Uploading wheel to PyPI repository: ${REPO_NAME}"
     echo "  Platform: ${PUBLISH_PLATFORM}"
     echo "  File: ${FILE_PATH}"
@@ -397,9 +402,14 @@ upload_pypi() {
         return
     fi
 
+    # Standard fields of the PyPI upload API. The wheel filename repeats both,
+    # but a registry is not obliged to parse it out — some reject the upload
+    # when they are absent, so they are not safe to drop as redundant.
     curl_upload_with_retry \
         -X POST \
         -F ":action=file_upload" \
+        -F "name=${ARTIFACT_ID}" \
+        -F "version=${VERSION}" \
         -F "sha256_digest=${sha256}" \
         -F "content=@${FILE_PATH};filename=${FILENAME}" \
         "${pypi_url}"
