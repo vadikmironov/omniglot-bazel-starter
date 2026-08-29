@@ -51,7 +51,13 @@ startup --windows_enable_symlinks
 # --- BEGIN feature:publish ---
 # Authenticated downloads from private registries (Artifactory, private BCR, etc.)
 # The credential helper reads ~/.netrc — hosts without an entry get no auth headers.
-common --credential_helper=%workspace%/tools/publish/credential-helper
+# Registered per-platform rather than once: --credential_helper accumulates
+# instead of overriding, so a plain `common` line plus a Windows override would
+# leave both registered. Windows needs the .bat because CreateProcessW cannot
+# launch a shebang script.
+common:linux --credential_helper=%workspace%/tools/publish/credential-helper
+common:macos --credential_helper=%workspace%/tools/publish/credential-helper
+common:windows --credential_helper=%workspace%/tools/publish/credential-helper.bat
 
 # Publish configuration — set registry URL and platform for artifact uploads.
 # Override per-developer in user.bazelrc (gitignored).
