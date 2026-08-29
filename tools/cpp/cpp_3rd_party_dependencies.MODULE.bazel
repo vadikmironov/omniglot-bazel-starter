@@ -11,7 +11,7 @@
 # Googletest home page: https://github.com/google/googletest
 # Documentation: https://google.github.io/googletest/primer.html
 #
-bazel_dep(name = "googletest", version = "1.18.0")
+bazel_dep(name = "googletest", version = "1.18.0.bcr.1")
 
 # --- BEGIN feature:profiling ---
 #
