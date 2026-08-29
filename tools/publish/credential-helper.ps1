@@ -12,9 +12,12 @@
 # Keep this in step with the bash implementation: the two are expected to
 # return the same output for the same input.
 #
-# Compatibility target: the PowerShell that ships with Windows 11, i.e. Windows
-# PowerShell 5.1. No pwsh-only syntax. Constraints, extended as they surface:
-#   1. ASCII only. 5.1 reads a BOM-less .ps1 as ANSI, not UTF-8.
+# Compatibility target: Windows PowerShell 5.1, which is what `powershell`
+# resolves to (the .bat does not call pwsh). Constraints, extended as they
+# surface:
+#   1. ASCII only. 5.1 reads a BOM-less .ps1 as ANSI where 7 reads UTF-8.
+#      UTF-8 with a BOM also works in 5.1, but BOMs break Unix tooling.
+#      https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_character_encoding
 
 $ErrorActionPreference = 'Stop'
 
