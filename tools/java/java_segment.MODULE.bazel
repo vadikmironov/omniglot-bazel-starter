@@ -254,7 +254,7 @@ maven.install(
 
         # --- BEGIN exclude ---
         # jsoup
-        "org.jsoup:jsoup:1.23.1",
+        "org.jsoup:jsoup:1.23.2",
         # --- END exclude ---
     ],
     lock_file = "//tools/java:maven_install.json",
