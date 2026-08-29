@@ -19,7 +19,12 @@ cmake(
         "FMT_DOC": "OFF",
     },
     lib_source = "@fmt_src//:all_srcs",
-    out_static_libs = ["libfmt.a"],
+    # MSVC names the archive fmt.lib, not libfmt.a. rules_foreign_cc matches the
+    # declared name literally, so it has to be spelled per-platform.
+    out_static_libs = select({
+        "@platforms//os:windows": ["fmt.lib"],
+        "//conditions:default": ["libfmt.a"],
+    }),
 )
 
 cc_binary(
