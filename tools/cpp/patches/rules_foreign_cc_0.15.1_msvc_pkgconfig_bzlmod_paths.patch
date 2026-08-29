@@ -1,0 +1,26 @@
+# The MSVC pkg-config bootstrap hardcodes WORKSPACE-era external paths,
+# "external/glib_dev" and "external/glib_src". Under bzlmod those repos are
+# canonically named -- external/rules_foreign_cc++tools+glib_dev and
+# ...+glib_src -- so the directories do not exist, INCLUDE points at nothing,
+# and nmake fails with:
+#
+#   .\pkg.c: fatal error C1083: Cannot open include file:
+#   'msvc_recommended_pragmas.h': No such file or directory
+#
+# Label.workspace_root yields the right path under both WORKSPACE and bzlmod.
+# Not reported upstream yet.
+--- a/foreign_cc/built_tools/pkgconfig_build.bzl
++++ b/foreign_cc/built_tools/pkgconfig_build.bzl
+@@ -160,10 +160,10 @@
+         args = [
+             "-f Makefile.vc",
+             "CFG=release",
+-            "GLIB_PREFIX=\"$$EXT_BUILD_ROOT/external/glib_dev\"",
++            "GLIB_PREFIX=\"$$EXT_BUILD_ROOT/{}\"".format(Label("@glib_dev//:glib_dev").workspace_root),
+         ],
+         out_binaries = ["pkg-config.exe"],
+-        env = {"INCLUDE": "$$EXT_BUILD_ROOT/external/glib_src"},
++        env = {"INCLUDE": "$$EXT_BUILD_ROOT/" + Label("@glib_src//:msvc_hdr").workspace_root},
+         out_static_libs = [],
+         out_shared_libs = [],
+         deps = [
