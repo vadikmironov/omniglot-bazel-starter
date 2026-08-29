@@ -91,6 +91,11 @@ build:windows --features=-default_cpp_std --cxxopt=/std:c++23preview --cxxopt=/W
 # MSVC defaults source and execution charsets to the system codepage; fmt
 # static_asserts against that. Applies to C as well, hence copt not cxxopt.
 build:windows --copt=/utf-8
+# Materialize runfiles as a tree rather than a manifest. A manifest maps files
+# only, so Rlocation cannot resolve a directory -- which the embedded Python
+# runtime does to put library paths on sys.path. Needs the symlink support
+# enabled by the startup flag above.
+build:windows --enable_runfiles
 
 # Hermetic GCC toolchain selection (wiring/rationale in cpp_segment.MODULE.bazel).
 build:gcc_hermetic --extra_toolchains=@gcc_toolchain_x86_64//:cc_toolchain
