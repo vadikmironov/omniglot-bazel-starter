@@ -4,6 +4,7 @@
 // NOLINTBEGIN(misc-include-cleaner) — Python.h is CPython's umbrella header; sub-headers are internal
 #include <Python.h>
 
+#include <cstdlib>
 #include <memory>
 #include <span>
 #include <string>
@@ -77,9 +78,15 @@ auto EmbeddedPythonRuntime::create(char** argv, spdlog::logger* logger,
     std::string const relative_interpreter_path = std::string(toolchain_runfiles_path);
     if (!get_python_toolchain_path_via_runfiles(argv, relative_interpreter_path, abs_interpreter_path)) {
         if (!get_python_toolchain_path_via_env(abs_interpreter_path)) {
+            const char* pythonhome = std::getenv("PYTHONHOME");  // NOLINT(concurrency-mt-unsafe)
+            const char* path_env = std::getenv("PATH");          // NOLINT(concurrency-mt-unsafe)
             logger->error(
                 "Unable to find valid Python toolchain. "
-                "Please check PATH or PYTHONHOME if running outside Bazel.");
+                "Please check PATH or PYTHONHOME if running outside Bazel. "
+                "Tried runfiles path '{}' (from the generated interpreter header; empty means the "
+                "toolchain reported no interpreter), PYTHONHOME '{}', PATH '{}'.",
+                relative_interpreter_path, pythonhome != nullptr ? pythonhome : "<unset>",
+                path_env != nullptr ? path_env : "<unset>");
             return nullptr;
         }
     }
