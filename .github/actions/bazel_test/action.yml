@@ -17,6 +17,10 @@ inputs:
     description: 'Extra --config to apply (e.g. gcc_hermetic). Empty = default toolchain (hermetic Clang).'
     required: false
     default: ''
+  exclude_tags:
+    description: 'Extra tags to exclude, comma-separated without the leading dash (e.g. profiling-cpu,profiling-mem). Appended to the -lint exclusion below.'
+    required: false
+    default: ''
 runs:
   using: "composite"
   steps:
@@ -33,23 +37,29 @@ runs:
       env:
         BUILDBUDDY_API_KEY: ${{ inputs.buildbuddy_api_key }}
         BAZEL_CONFIG: ${{ inputs.bazel_config }}
+        EXCLUDE_TAGS: ${{ inputs.exclude_tags }}
       run: |
         EXTRA_CONFIG=""
         if [ -n "$BAZEL_CONFIG" ]; then
           EXTRA_CONFIG="--config=$BAZEL_CONFIG"
           echo "Extra config: $EXTRA_CONFIG"
         fi
+        TAGS="-lint"
+        if [ -n "$EXCLUDE_TAGS" ]; then
+          TAGS="$TAGS,-${EXCLUDE_TAGS//,/,-}"
+          echo "Tag filters: $TAGS"
+        fi
         if [ -n "$BUILDBUDDY_API_KEY" ]; then
           echo "Remote cache enabled"
           bazel ${{ inputs.bazel_startup_opts }} test --config=ci $EXTRA_CONFIG \
-            --build_tag_filters=-lint \
-            --test_tag_filters=-lint \
+            --build_tag_filters="$TAGS" \
+            --test_tag_filters="$TAGS" \
             --remote_header=x-buildbuddy-api-key="$BUILDBUDDY_API_KEY" \
             ${{ inputs.targets }}
         else
           echo "Remote cache disabled (no API key available)"
           bazel ${{ inputs.bazel_startup_opts }} test $EXTRA_CONFIG \
-            --build_tag_filters=-lint \
-            --test_tag_filters=-lint \
+            --build_tag_filters="$TAGS" \
+            --test_tag_filters="$TAGS" \
             ${{ inputs.targets }}
         fi

@@ -17,7 +17,8 @@ concurrency:
 # Every pull request and push to main runs the full gate: build + test across the
 # hermetic Clang and hermetic GCC toolchains on Linux and hermetic Clang on macOS,
 # plus the lint phase (clang-tidy, GCC -fanalyzer, PMD/SpotBugs/ruff/mypy, and the
-# gazelle/publish/mint drift gates). Windows is currently disabled — see build-windows.
+# gazelle/publish/mint drift gates). Windows builds and tests with the MSVC
+# toolchain, minus the profiling workloads — see build-windows.
 
 jobs:
   # Linux/Clang leg: build + test. Independent of the lint job (no `needs:`) so
@@ -264,10 +265,11 @@ jobs:
       id: deployment
       uses: actions/deploy-pages@v5
 
-  # Windows build - currently disabled. Remove the `if: false` below to re-enable
-  # (it will then run on every PR and push like the other jobs).
+  # Windows leg: build + test on the auto-configured MSVC toolchain (.bazelrc
+  # build:windows). The profiling workloads are excluded because gperftools and
+  # memray are Linux/macOS only; profiling is a local-only feature anyway, so
+  # the tags that drive `bazel run //tools/profile` also scope it out here.
   build-windows:
-    if: false
     runs-on: windows-latest
     name: Build & test (Windows x64)
     permissions:
@@ -287,3 +289,4 @@ jobs:
       with:
         buildbuddy_api_key: ${{ secrets.BUILDBUDDY_API_KEY }}
         bazel_startup_opts: ${{ env.BAZEL_STARTUP_OPTS }}
+        exclude_tags: profiling-cpu,profiling-mem

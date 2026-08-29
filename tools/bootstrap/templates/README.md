@@ -50,7 +50,7 @@ bazel build //...
 bazel test //...                     # excludes lint tests — run lint separately
 
 # Format source (all languages), then Bazel/Starlark files
-bazel run //:buildifier.fix          # Windows: tools\buildifier.bat fix
+bazel run //:buildifier.fix
 bazel run //:format
 ```
 # --- BEGIN feature:lint ---

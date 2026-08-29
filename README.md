@@ -161,7 +161,7 @@ bazel build //...
 bazel test //...                     # excludes lint tests — run lint separately
 
 # Format source (all languages), then Bazel/Starlark files
-bazel run //:buildifier.fix          # Windows: tools\buildifier.bat fix
+bazel run //:buildifier.fix
 bazel run //:format
 
 # Lint: (re)generate per-target lint rules, then run them as tests
@@ -256,7 +256,7 @@ bazel run //tools/python:generate_virtual_env
 ### CI Workflow
 
 - Every PR and push to `main` runs the full gate: build + test on Linux (hermetic Clang and GCC) and macOS (hermetic Clang), plus the lint phase
-- **Windows** builds are currently disabled
+- **Windows** builds and tests on the auto-configured MSVC toolchain, minus the profiling workloads (gperftools and memray are Linux/macOS only)
 - BuildBuddy remote caching speeds up both CI and local builds (each configured with its own API key)
 - Stale CI runs are automatically cancelled when new commits are pushed
 - Trigger a manual run via GitHub Actions `workflow_dispatch`
