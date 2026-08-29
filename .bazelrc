@@ -88,6 +88,9 @@ build --host_features=external_include_paths
 # MSVC spells C++23 /std:c++23preview (VS 17.13+); plain /std:c++23 is not a
 # valid option and cl silently falls back to C++14.
 build:windows --features=-default_cpp_std --cxxopt=/std:c++23preview --cxxopt=/WX
+# MSVC defaults source and execution charsets to the system codepage; fmt
+# static_asserts against that. Applies to C as well, hence copt not cxxopt.
+build:windows --copt=/utf-8
 
 # Hermetic GCC toolchain selection (wiring/rationale in cpp_segment.MODULE.bazel).
 build:gcc_hermetic --extra_toolchains=@gcc_toolchain_x86_64//:cc_toolchain
