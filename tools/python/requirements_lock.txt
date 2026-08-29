@@ -216,9 +216,9 @@ jinja2==3.1.6 \
     --hash=sha256:0137fb05990d35f1275a587e9aee6d56da821fc83491a0fb838183be43f66d6d \
     --hash=sha256:85ece4451f492d0c13c5dd7c13a64681a86afae63a5f347908daf103ce6d2f67
     # via memray
-linkify-it-py==2.1.0 \
-    --hash=sha256:0d252c1594ecba2ecedc444053db5d3a9b7ec1b0dd929c8f1d74dce89f86c05e \
-    --hash=sha256:43360231720999c10e9328dc3691160e27a718e280673d444c38d7d3aaa3b98b
+linkify-it-py==2.2.0 \
+    --hash=sha256:3adc40eb5af300b2605fcfdb968c24e1d780a90f1f2221af7c15e5111e94d443 \
+    --hash=sha256:907acd2d17ac1fbb9ddb62c8957ccbd6158cac602231a15c3b0cd1e215f03cee
     # via markdown-it-py
 markdown-it-py[linkify]==4.2.0 \
     --hash=sha256:04a21681d6fbb623de53f6f364d352309d4094dd4194040a10fd51833e418d49 \
