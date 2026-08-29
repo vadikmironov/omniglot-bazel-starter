@@ -252,6 +252,34 @@ assert_contains "${output}" "Repackaged wheel:" "dev version repackaging runs"
 assert_contains "${output}" "1.0.0.dev3+abc" "dev version in repackaged filename"
 
 # =========================================================================
+# PyPI Upload Form Fields
+# =========================================================================
+echo ""
+echo "--- PyPI Upload Form Fields ---"
+
+# Mock curl that records its arguments so the multipart form can be inspected.
+MOCK_BIN_ARGS="${TMPDIR_TEST}/mock_bin_args"
+mkdir -p "${MOCK_BIN_ARGS}"
+CURL_ARGS_FILE="${TMPDIR_TEST}/curl_args"
+
+cat > "${MOCK_BIN_ARGS}/curl" << 'CURLEOF'
+#!/usr/bin/env bash
+printf '%s\n' "$@" > "${CURL_ARGS_FILE}"
+echo "200"
+CURLEOF
+chmod +x "${MOCK_BIN_ARGS}/curl"
+
+PATH="${MOCK_BIN_ARGS}:${PATH}" run_publish_raw \
+    "PUBLISH_URL=https://test.invalid PUBLISH_PLATFORM=nexus PUBLISH_VERSION=1.2.3 CURL_ARGS_FILE=${CURL_ARGS_FILE}" \
+    pypi pypi-local "${DUMMY_WHEEL}" \
+    '' test_pkg '' whl > /dev/null 2>&1 || true
+
+curl_args=$(cat "${CURL_ARGS_FILE}" 2>/dev/null || echo "")
+assert_contains "${curl_args}" "name=test_pkg" "pypi upload sends name field"
+assert_contains "${curl_args}" "version=1.2.3" "pypi upload sends version field"
+assert_contains "${curl_args}" ":action=file_upload" "pypi upload sends :action field"
+
+# =========================================================================
 # Input Validation
 # =========================================================================
 echo ""
@@ -286,6 +314,11 @@ run_publish_raw "PUBLISH_URL=https://test.invalid DRY_RUN=1 PUBLISH_VERSION=1.0.
     generic test-repo "${DUMMY_FILE}" \
     '' '' '' '' > /dev/null 2>&1 || true
 assert_equals "1" "${LAST_EXIT_CODE}" "generic missing artifact_id fails"
+
+run_publish_raw "PUBLISH_URL=https://test.invalid DRY_RUN=1 PUBLISH_VERSION=1.0.0" \
+    pypi test-repo "${DUMMY_WHEEL}" \
+    '' '' '' whl > /dev/null 2>&1 || true
+assert_equals "1" "${LAST_EXIT_CODE}" "pypi missing artifact_id fails"
 
 # =========================================================================
 # DRY_RUN Output
