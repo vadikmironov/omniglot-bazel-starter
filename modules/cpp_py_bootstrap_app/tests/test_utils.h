@@ -25,6 +25,15 @@ inline void unset_env(const char* name) {
 #endif
 }
 
+/// PATH entry separator, matching what the resolver splits on.
+inline auto path_list_sep() -> const char* {
+#ifdef _WIN32
+    return ";";
+#else
+    return ":";
+#endif
+}
+
 /// RAII helper to temporarily set an environment variable in tests.
 class ScopedEnvVar {
 public:
@@ -99,18 +108,45 @@ public:
 
     [[nodiscard]] auto path() const -> const std::filesystem::path& { return path_; }
 
-    // Create a fake Python installation layout (bin/<name> + lib/pythonX.Y/os.py)
+    /// Directory holding the interpreter, i.e. what a test should put on PATH.
+    /// Windows Python keeps python.exe at the prefix root; Unix uses bin/.
+    [[nodiscard]] auto bin_dir() const -> std::filesystem::path {
+#ifdef _WIN32
+        return path_;
+#else
+        return path_ / "bin";
+#endif
+    }
+
+    /// Interpreter file name as the resolver looks for it.
+    [[nodiscard]] static auto interpreter_name(const std::string& name) -> std::string {
+#ifdef _WIN32
+        return name + ".exe";
+#else
+        return name;
+#endif
+    }
+
+    // Create a fake Python installation layout matching what the resolver
+    // probes for: Unix <prefix>/bin/<name> + <prefix>/lib/pythonX.Y/os.py,
+    // Windows <prefix>/<name>.exe + <prefix>/Lib/os.py (no version segment,
+    // so major/minor are Unix-only).
     auto create_python_layout(const std::string& name = "python3",
                               int major = 3, int minor = 14) -> std::filesystem::path {
-        auto bin_dir = path_ / "bin";
+#ifdef _WIN32
+        (void)major;
+        (void)minor;
+        auto stdlib_dir = path_ / "Lib";
+#else
         auto stdlib_dir = path_ / "lib" / ("python" + std::to_string(major) + "." + std::to_string(minor));
-        std::filesystem::create_directories(bin_dir);
+#endif
+        std::filesystem::create_directories(bin_dir());
         std::filesystem::create_directories(stdlib_dir);
 
         // Create stdlib marker file
         std::ofstream(stdlib_dir / "os.py").close();
 
-        auto interpreter = bin_dir / name;
+        auto interpreter = bin_dir() / interpreter_name(name);
         std::ofstream(interpreter).close();
         std::filesystem::permissions(interpreter,
                                      std::filesystem::perms::owner_exec | std::filesystem::perms::owner_read);
@@ -118,12 +154,11 @@ public:
         return interpreter;
     }
 
-    // Create a Python installation without lib/ directory (invalid)
+    // Create a Python installation without a stdlib directory (invalid)
     auto create_python_layout_no_lib(const std::string& name = "python3") -> std::filesystem::path {
-        auto bin_dir = path_ / "bin";
-        std::filesystem::create_directories(bin_dir);
+        std::filesystem::create_directories(bin_dir());
 
-        auto interpreter = bin_dir / name;
+        auto interpreter = bin_dir() / interpreter_name(name);
         std::ofstream(interpreter).close();
         std::filesystem::permissions(interpreter,
                                      std::filesystem::perms::owner_exec | std::filesystem::perms::owner_read);
