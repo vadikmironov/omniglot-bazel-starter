@@ -21,11 +21,37 @@ bazel_dep(name = "rules_cc", version = "0.2.22")
 # https://github.com/bazel-contrib/rules_foreign_cc/releases
 #
 bazel_dep(name = "rules_foreign_cc", version = "0.15.1")
-# TODO(#1427): on 0.15.1 the from-source pkg-config bundles a glib that fails to
-# build under GCC 15's C23 default, so --config=gcc_hermetic can't build
-# cmake()/make() targets. Fixed upstream past 0.15.1 (-std=gnu90 pkg-config
-# build). On the next bump, re-test --config=gcc_hermetic and remove this note.
-# https://github.com/bazel-contrib/rules_foreign_cc/issues/1427
+
+# Three fixes that landed upstream after 0.15.1, which is 14 months old and
+# still the newest release. All are backported verbatim rather than moving to
+# HEAD: main is ~99 commits ahead and includes a hub/spoke toolchain refactor,
+# which is a lot of unreleased surface for a starter template to carry. Drop all
+# three on the next release bump.
+#
+#   cc_import_load    Windows pkg-config generates BUILD files calling
+#                     cc_import with no load(); Bazel 9 removed the native
+#                     rule, so cmake()/make() fail analysis on Windows.
+#                     https://github.com/bazel-contrib/rules_foreign_cc/pull/1570
+#   pkgconfig_gnu90   the bundled glib doesn't compile under GCC 15's C23
+#                     default, breaking cmake()/make() under
+#                     --config=gcc_hermetic.
+#                     https://github.com/bazel-contrib/rules_foreign_cc/issues/1427
+#                     https://github.com/bazel-contrib/rules_foreign_cc/pull/1458
+#   msvc_pkgconfig_   the MSVC pkg-config bootstrap hardcoded WORKSPACE-era
+#   bzlmod_paths      paths (external/glib_dev, external/glib_src). Under
+#                     bzlmod those repos are canonically named, so nmake finds
+#                     no headers. Carries a coupled transitions.bzl hunk.
+#                     https://github.com/bazel-contrib/rules_foreign_cc/issues/1359
+#                     https://github.com/bazel-contrib/rules_foreign_cc/pull/1459
+single_version_override(
+    module_name = "rules_foreign_cc",
+    patch_strip = 1,
+    patches = [
+        "//tools/cpp/patches:rules_foreign_cc_0.15.1_cc_import_load.patch",
+        "//tools/cpp/patches:rules_foreign_cc_0.15.1_pkgconfig_gnu90.patch",
+        "//tools/cpp/patches:rules_foreign_cc_0.15.1_msvc_pkgconfig_bzlmod_paths.patch",
+    ],
+)
 
 #
 # Hermetic GCC toolchain (f0rmiga/gcc-toolchain), complementing the default
@@ -37,6 +63,18 @@ bazel_dep(name = "rules_foreign_cc", version = "0.15.1")
 # https://github.com/f0rmiga/gcc-toolchain/releases
 #
 bazel_dep(name = "gcc_toolchain", version = "0.12.0")
+
+# This toolchain hand-rolls its cc_toolchain_config instead of delegating to
+# rules_cc's unix_cc_toolchain_config, and never implemented
+# external_include_paths. The .bazelrc --features=external_include_paths is
+# therefore a silent no-op here, and external headers arrive as -I/-iquote
+# rather than -isystem, so their warnings hit our -Werror build.
+# https://github.com/f0rmiga/gcc-toolchain/issues/215
+single_version_override(
+    module_name = "gcc_toolchain",
+    patch_strip = 1,
+    patches = ["//tools/cpp/patches:gcc_toolchain_0.12.0_external_include_paths.patch"],
+)
 
 gcc_toolchains = use_extension("@gcc_toolchain//toolchain:module_extensions.bzl", "gcc_toolchains")
 gcc_toolchains.toolchain(

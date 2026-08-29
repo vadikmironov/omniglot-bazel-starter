@@ -25,15 +25,11 @@ _BUILDIFIER_EXCLUDES = ["./.git/*"]
 
 # Buildifier lints and autoformats bazel (Starlark) files.
 #
-# Mac/Linux: Use the bazel targets directly
 #   bazel run //:buildifier.fix
 #   bazel run //:buildifier.check
 #
-# Windows: The macro has compatibility issues, use the wrapper script instead
-#   tools\buildifier.bat fix
-#   tools\buildifier.bat check
-#
-# See [tools/buildifier.md](tools/buildifier.md) for details on the Windows workaround.
+# Windows works from buildifier_prebuilt 8.5.1.4 on, which fixed the runner's
+# argument escaping (keith/buildifier-prebuilt#168).
 
 buildifier(
     name = "buildifier.check",

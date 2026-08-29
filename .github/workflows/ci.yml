@@ -17,7 +17,8 @@ concurrency:
 # Every pull request and push to main runs the full gate: build + test across the
 # hermetic Clang and hermetic GCC toolchains on Linux and hermetic Clang on macOS,
 # plus the lint phase (clang-tidy, GCC -fanalyzer, PMD/SpotBugs/ruff/mypy, and the
-# gazelle/publish/mint drift gates). Windows is currently disabled — see build-windows.
+# gazelle/publish/mint drift gates). Windows builds and tests //modules/... with
+# the MSVC toolchain — see build-windows.
 
 jobs:
   # Linux/Clang leg: build + test. Independent of the lint job (no `needs:`) so
@@ -36,8 +37,10 @@ jobs:
         buildbuddy_api_key: ${{ secrets.BUILDBUDDY_API_KEY }}
 
   # Linux build + test under the hermetic GCC toolchain (compiler-portability leg).
+  # Both blockers that kept this disabled are patched in cpp_segment.MODULE.bazel:
+  # the pkg-config glib build under GCC 15, and external_include_paths being a
+  # no-op on this toolchain.
   build-linux-gcc:
-    if: false # disabled until https://github.com/bazel-contrib/rules_foreign_cc/issues/1427 is published
     runs-on: ubuntu-latest
     name: Build & test (Linux x64, hermetic GCC)
     permissions:
@@ -264,10 +267,14 @@ jobs:
       id: deployment
       uses: actions/deploy-pages@v5
 
-  # Windows build - currently disabled. Remove the `if: false` below to re-enable
-  # (it will then run on every PR and push like the other jobs).
+  # Windows leg: build + test the language modules on the auto-configured MSVC
+  # toolchain (.bazelrc build:windows).
+  #
+  # Scoped to //modules/... because //tools/... resolves clang-tidy,
+  # clang-format and llvm-symbolizer from the hermetic LLVM, which has no
+  # Windows build (bazel-contrib/toolchains_llvm#4). Profiling workloads are
+  # excluded by tag: gperftools and memray are Linux/macOS only.
   build-windows:
-    if: false
     runs-on: windows-latest
     name: Build & test (Windows x64)
     permissions:
@@ -287,3 +294,5 @@ jobs:
       with:
         buildbuddy_api_key: ${{ secrets.BUILDBUDDY_API_KEY }}
         bazel_startup_opts: ${{ env.BAZEL_STARTUP_OPTS }}
+        targets: //modules/...
+        exclude_tags: profiling-cpu,profiling-mem

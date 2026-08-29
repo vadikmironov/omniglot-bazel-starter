@@ -161,7 +161,7 @@ bazel build //...
 bazel test //...                     # excludes lint tests — run lint separately
 
 # Format source (all languages), then Bazel/Starlark files
-bazel run //:buildifier.fix          # Windows: tools\buildifier.bat fix
+bazel run //:buildifier.fix
 bazel run //:format
 
 # Lint: (re)generate per-target lint rules, then run them as tests
@@ -256,7 +256,7 @@ bazel run //tools/python:generate_virtual_env
 ### CI Workflow
 
 - Every PR and push to `main` runs the full gate: build + test on Linux (hermetic Clang and GCC) and macOS (hermetic Clang), plus the lint phase
-- **Windows** builds are currently disabled
+- **Windows** builds and tests `//modules/...` on the auto-configured MSVC toolchain, minus the profiling workloads (gperftools and memray are Linux/macOS only). The tooling under `//tools/...` is out of scope there: clang-tidy, clang-format and llvm-symbolizer come from the hermetic LLVM, which has no Windows build ([toolchains_llvm#4](https://github.com/bazel-contrib/toolchains_llvm/issues/4)), so C++/Java lint and format are Linux/macOS only
 - BuildBuddy remote caching speeds up both CI and local builds (each configured with its own API key)
 - Stale CI runs are automatically cancelled when new commits are pushed
 - Trigger a manual run via GitHub Actions `workflow_dispatch`

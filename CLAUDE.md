@@ -71,17 +71,11 @@ Auto-fix workflow and full reference: [tools/lint/README.md](tools/lint/README.m
 
 ### Bazel File Formatting
 ```bash
-# Format Bazel/Starlark files (Mac/Linux)
+# Format Bazel/Starlark files
 bazel run //:buildifier.fix
 
-# Check Bazel/Starlark formatting (Mac/Linux)
+# Check Bazel/Starlark formatting
 bazel run //:buildifier.check
-
-# Format Bazel/Starlark files (Windows)
-tools\buildifier.bat fix
-
-# Check Bazel/Starlark formatting (Windows)
-tools\buildifier.bat check
 ```
 
 ## Code Coverage
@@ -206,7 +200,7 @@ bazel build --config=python_host_debug //modules/python_app
 ### Post Development Checks
 
 After any substantial code changes, following steps to be taken to ensure code is ready for commit:
-- **Bazel File Formatting**: run `bazel run //:buildifier.fix` (Mac/Linux) or `tools\buildifier.bat fix` (Windows) if any Bazel files were modified (BUILD, .bzl, MODULE.bazel, WORKSPACE)
+- **Bazel File Formatting**: run `bazel run //:buildifier.fix` if any Bazel files were modified (BUILD, .bzl, MODULE.bazel, WORKSPACE)
 - **Source Code Formatting**: run automated formatting across all languages
 - **Source Code Linting**: run automated linting with fail-on-violation mode enabled
 - **Automated Testing**: run tests on all targets

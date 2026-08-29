@@ -203,6 +203,11 @@ def image_publish(
     # tar.bzl includes runfiles automatically when srcs is an executable.
     # strip_prefix removes the source-tree path; package_dir then anchors
     # the result under the configured app_prefix.
+    # Linux-only, matching the oci_image and wrapper below — nothing else
+    # consumes the layer. It also cannot build under MSVC: tar.bzl pulls gawk,
+    # whose BCR Windows path targets MinGW (it defines __MINGW32__ and links
+    # -lws2_32 through GNU ld), and tar.bzl has no Windows CI of its own
+    # (bazel-contrib/tar.bzl#10).
     app_layer = "_" + name + "_app_layer"
     tar(
         name = app_layer,
@@ -211,6 +216,7 @@ def image_publish(
             package_dir = _package_dir(app_prefix),
             strip_prefix = strip_prefix,
         ),
+        target_compatible_with = ["@platforms//os:linux"],
         visibility = ["//visibility:private"],
     )
 

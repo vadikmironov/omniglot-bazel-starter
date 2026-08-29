@@ -44,13 +44,9 @@ auto get_python_toolchain_path_via_runfiles(char** argv, const std::string& rel_
 
     // Bazel runfiles paths always use forward slashes regardless of platform
     std::string const prefix = std::string("../");
-    std::string const suffix = std::string("/bin/python3");
     auto interpreter_path_view = std::string_view(rel_interpreter_path);
     if (interpreter_path_view.find(prefix) != std::string_view::npos) {
         interpreter_path_view = interpreter_path_view.substr(prefix.size(), interpreter_path_view.size());
-    }
-    if (interpreter_path_view.find(suffix) != std::string_view::npos) {
-        interpreter_path_view = interpreter_path_view.substr(0, interpreter_path_view.size() - suffix.size());
     }
 
     std::string error = std::string();
@@ -59,8 +55,25 @@ auto get_python_toolchain_path_via_runfiles(char** argv, const std::string& rel_
         return false;
     }
 
-    abs_interpreter_path = runfiles->Rlocation(std::string(interpreter_path_view));
-    return !abs_interpreter_path.empty() && std::filesystem::is_directory(abs_interpreter_path);
+    // Look up the interpreter file, not its parent directory: on Windows
+    // runfiles are a manifest, which maps files only, so resolving a directory
+    // yields nothing. Derive the toolchain root from the file instead, exactly
+    // as the PATH-based lookup does.
+    std::string const interpreter = runfiles->Rlocation(std::string(interpreter_path_view));
+    if (interpreter.empty() || !std::filesystem::exists(interpreter)) {
+        return false;
+    }
+
+    std::filesystem::path const interpreter_path(interpreter);
+#ifdef _WIN32
+    // Windows: <root>/python.exe
+    std::filesystem::path const toolchain_root = interpreter_path.parent_path();
+#else
+    // Unix/macOS: <root>/bin/python3
+    std::filesystem::path const toolchain_root = interpreter_path.parent_path().parent_path();
+#endif
+    abs_interpreter_path = toolchain_root.string();
+    return std::filesystem::is_directory(toolchain_root);
 }
 
 auto get_python_toolchain_path_via_env(std::string& abs_interpreter_path) -> bool {
@@ -80,14 +93,12 @@ auto get_python_toolchain_path_via_env(std::string& abs_interpreter_path) -> boo
         return false;
     }
 
-    std::vector<std::string> const interpreters = {"python3", "python"};
 #ifdef _WIN32
     const char path_separator = ';';
-    for (auto& interp : interpreters) {
-        interp += ".exe";
-    }
+    std::vector<std::string> const interpreters = {"python3.exe", "python.exe"};
 #else
     const char path_separator = ':';
+    std::vector<std::string> const interpreters = {"python3", "python"};
 #endif
 
     std::string const path_str(path_env);

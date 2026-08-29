@@ -51,7 +51,13 @@ startup --windows_enable_symlinks
 # --- BEGIN feature:publish ---
 # Authenticated downloads from private registries (Artifactory, private BCR, etc.)
 # The credential helper reads ~/.netrc — hosts without an entry get no auth headers.
-common --credential_helper=%workspace%/tools/publish/credential-helper
+# Registered per-platform rather than once: --credential_helper accumulates
+# instead of overriding, so a plain `common` line plus a Windows override would
+# leave both registered. Windows needs the .bat because CreateProcessW cannot
+# launch a shebang script.
+common:linux --credential_helper=%workspace%/tools/publish/credential-helper
+common:macos --credential_helper=%workspace%/tools/publish/credential-helper
+common:windows --credential_helper=%workspace%/tools/publish/credential-helper.bat
 
 # Publish configuration — set registry URL and platform for artifact uploads.
 # Override per-developer in user.bazelrc (gitignored).
@@ -79,7 +85,17 @@ build --features=external_include_paths
 build --host_features=external_include_paths
 # Windows configuration: Uses auto-configured MSVC toolchain from Visual Studio Build Tools
 # Disable default_cpp_std feature to avoid D9025 warning about conflicting /std flags
-build:windows --features=-default_cpp_std --cxxopt=/std:c++23 --cxxopt=/WX
+# MSVC spells C++23 /std:c++23preview (VS 17.13+); plain /std:c++23 is not a
+# valid option and cl silently falls back to C++14.
+build:windows --features=-default_cpp_std --cxxopt=/std:c++23preview --cxxopt=/WX
+# MSVC defaults source and execution charsets to the system codepage; fmt
+# static_asserts against that. Applies to C as well, hence copt not cxxopt.
+build:windows --copt=/utf-8
+# Materialize runfiles as a tree rather than a manifest. A manifest maps files
+# only, so Rlocation cannot resolve a directory -- which the embedded Python
+# runtime does to put library paths on sys.path. Needs the symlink support
+# enabled by the startup flag above.
+build:windows --enable_runfiles
 
 # Hermetic GCC toolchain selection (wiring/rationale in cpp_segment.MODULE.bazel).
 build:gcc_hermetic --extra_toolchains=@gcc_toolchain_x86_64//:cc_toolchain
@@ -92,6 +108,14 @@ build:gcc_hermetic --linkopt=-l:libstdc++.a
 # libutil; the gcc driver doesn't pull it in, so link it from the hermetic sysroot
 # (needed by the cpp_py_* modules; a harmless no-op for non-Python C++ targets).
 build:gcc_hermetic --linkopt=-lutil
+# rustc appends a crate's link_deps (e.g. gperftools' tcmalloc, C++) after the
+# --linkopt flags above, and GNU ld resolves static archives left to right, so
+# those libraries are consumed before the objects that need them. Repeat them as
+# rustc link-args, which land after the native libs. Same libraries as above, so
+# pure-Rust targets pull nothing extra.
+build:gcc_hermetic --@rules_rust//rust/settings:extra_rustc_flag=-Clink-arg=-l:libstdc++.a
+build:gcc_hermetic --@rules_rust//rust/settings:extra_rustc_flag=-Clink-arg=-lm
+build:gcc_hermetic --@rules_rust//rust/settings:extra_rustc_flag=-Clink-arg=-lc
 # The toolchain's `gcc` is a bash wrapper that runs realpath/dirname (to locate the
 # execroot) before it sanitizes PATH. cc_* actions get a PATH from Bazel's C++
 # machinery, but rules_rust seeds rustc's env from default_shell_env (empty here),

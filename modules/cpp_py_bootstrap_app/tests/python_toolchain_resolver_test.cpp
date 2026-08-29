@@ -17,7 +17,7 @@ using test_utils::TempDir;
 
 class PythonToolchainEnvTest : public ::testing::Test {
 protected:
-    void SetUp() override { unsetenv("PYTHONHOME"); }
+    void SetUp() override { test_utils::unset_env("PYTHONHOME"); }
 };
 
 // NOLINTBEGIN(cppcoreguidelines-avoid-non-const-global-variables,cppcoreguidelines-owning-memory,cert-err58-cpp,modernize-use-trailing-return-type)
@@ -46,7 +46,7 @@ TEST_F(PythonToolchainEnvTest, FindsPython3InPath) {
     TempDir temp;
     temp.create_python_layout("python3");
 
-    ScopedEnvVar path("PATH", temp.path().string() + "/bin");
+    ScopedEnvVar path("PATH", temp.bin_dir().string());
 
     std::string result;
     EXPECT_TRUE(get_python_toolchain_path_via_env(result));
@@ -57,7 +57,7 @@ TEST_F(PythonToolchainEnvTest, FallsBackToPythonWhenPython3NotFound) {
     TempDir temp;
     temp.create_python_layout("python");
 
-    ScopedEnvVar path("PATH", temp.path().string() + "/bin");
+    ScopedEnvVar path("PATH", temp.bin_dir().string());
 
     std::string result;
     EXPECT_TRUE(get_python_toolchain_path_via_env(result));
@@ -85,7 +85,7 @@ TEST_F(PythonToolchainEnvTest, ValidatesPythonHomeHasLibDirectory) {
     TempDir temp;
     temp.create_python_layout_no_lib("python3");
 
-    ScopedEnvVar path("PATH", temp.path().string() + "/bin");
+    ScopedEnvVar path("PATH", temp.bin_dir().string());
 
     std::string result;
     EXPECT_FALSE(get_python_toolchain_path_via_env(result));
@@ -97,7 +97,7 @@ TEST_F(PythonToolchainEnvTest, HandlesMultiplePathEntries) {
     temp2.create_python_layout("python3");
 
     // First path has no Python, second path has Python
-    std::string path_value = temp1.path().string() + ":" + temp2.path().string() + "/bin";
+    std::string path_value = temp1.path().string() + test_utils::path_list_sep() + temp2.bin_dir().string();
     ScopedEnvVar path("PATH", path_value);
 
     std::string result;
@@ -111,7 +111,7 @@ TEST_F(PythonToolchainEnvTest, PrefersFirstValidPythonInPath) {
     temp1.create_python_layout("python3");
     temp2.create_python_layout("python3");
 
-    std::string path_value = temp1.path().string() + "/bin:" + temp2.path().string() + "/bin";
+    std::string path_value = temp1.bin_dir().string() + test_utils::path_list_sep() + temp2.bin_dir().string();
     ScopedEnvVar path("PATH", path_value);
 
     std::string result;
@@ -124,7 +124,8 @@ TEST_F(PythonToolchainEnvTest, SkipsEmptyPathEntries) {
     temp.create_python_layout("python3");
 
     // PATH with empty entries (::)
-    std::string path_value = ":" + temp.path().string() + "/bin:";
+    std::string const sep = test_utils::path_list_sep();
+    std::string path_value = sep + temp.bin_dir().string() + sep;
     ScopedEnvVar path("PATH", path_value);
 
     std::string result;
@@ -139,7 +140,7 @@ TEST_F(PythonToolchainEnvTest, PrefersPythonHomeOverPath) {
     path_dir.create_python_layout("python3");
 
     ScopedEnvVar pythonhome("PYTHONHOME", pythonhome_dir.path().string());
-    ScopedEnvVar path("PATH", path_dir.path().string() + "/bin");
+    ScopedEnvVar path("PATH", path_dir.bin_dir().string());
 
     std::string result;
     EXPECT_TRUE(get_python_toolchain_path_via_env(result));
@@ -153,9 +154,14 @@ TEST_F(PythonToolchainEnvTest, ResolvesSymlinksBeforeDerivingHome) {
     TempDir symlink_dir;
     real_dir.create_python_layout("python3");
 
-    auto symlink_bin = symlink_dir.path() / "bin";
+    auto symlink_bin = symlink_dir.bin_dir();
     std::filesystem::create_directories(symlink_bin);
-    std::filesystem::create_symlink(real_dir.path() / "bin" / "python3", symlink_bin / "python3");
+    auto const link_name = TempDir::interpreter_name("python3");
+    std::error_code link_ec;
+    std::filesystem::create_symlink(real_dir.bin_dir() / link_name, symlink_bin / link_name, link_ec);
+    if (link_ec) {
+        GTEST_SKIP() << "symlink creation unsupported here: " << link_ec.message();
+    }
 
     ScopedEnvVar path("PATH", symlink_bin.string());
 
@@ -166,14 +172,18 @@ TEST_F(PythonToolchainEnvTest, ResolvesSymlinksBeforeDerivingHome) {
 }
 
 TEST_F(PythonToolchainEnvTest, RejectsPathEntryWithoutVersionedStdlib) {
-    // Has lib/ but no lib/pythonX.Y/os.py — should be rejected
+    // Stdlib directory exists but holds no os.py — should be rejected
     TempDir temp;
-    auto bin_dir = temp.path() / "bin";
+    auto bin_dir = temp.bin_dir();
+#ifdef _WIN32
+    auto lib_dir = temp.path() / "Lib";
+#else
     auto lib_dir = temp.path() / "lib";
+#endif
     std::filesystem::create_directories(bin_dir);
     std::filesystem::create_directories(lib_dir);
 
-    auto interpreter = bin_dir / "python3";
+    auto interpreter = bin_dir / TempDir::interpreter_name("python3");
     std::ofstream(interpreter).close();
     std::filesystem::permissions(interpreter,
                                  std::filesystem::perms::owner_exec | std::filesystem::perms::owner_read);
@@ -193,7 +203,7 @@ TEST_F(PythonToolchainEnvTest, FallsThroughFromInvalidPythonHomeToPath) {
     valid_path.create_python_layout("python3");
 
     ScopedEnvVar pythonhome("PYTHONHOME", invalid_home.path().string());
-    ScopedEnvVar path("PATH", valid_path.path().string() + "/bin");
+    ScopedEnvVar path("PATH", valid_path.bin_dir().string());
 
     std::string result;
     EXPECT_TRUE(get_python_toolchain_path_via_env(result));
@@ -202,15 +212,19 @@ TEST_F(PythonToolchainEnvTest, FallsThroughFromInvalidPythonHomeToPath) {
 }
 
 TEST_F(PythonToolchainEnvTest, FindsDifferentPythonVersionStdlib) {
+#ifdef _WIN32
+    GTEST_SKIP() << "Windows stdlib lives at <prefix>/Lib with no version segment";
+#else
     // Layout has python3.13 stdlib — resolver should still accept it
     TempDir temp;
     temp.create_python_layout("python3", 3, 13);
 
-    ScopedEnvVar path("PATH", temp.path().string() + "/bin");
+    ScopedEnvVar path("PATH", temp.bin_dir().string());
 
     std::string result;
     EXPECT_TRUE(get_python_toolchain_path_via_env(result));
     EXPECT_EQ(result, temp.path().string());
+#endif
 }
 
 class PythonToolchainRunfilesTest : public ::testing::Test {};
