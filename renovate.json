@@ -3,6 +3,9 @@
    "extends":[
       "config:recommended"
    ],
+   "labels":[
+      "dependencies"
+   ],
    "prHourlyLimit":0,
    "bazel-module":{
       "managerFilePatterns": [
