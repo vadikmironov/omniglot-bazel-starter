@@ -103,6 +103,14 @@ build:gcc_hermetic --linkopt=-l:libstdc++.a
 # libutil; the gcc driver doesn't pull it in, so link it from the hermetic sysroot
 # (needed by the cpp_py_* modules; a harmless no-op for non-Python C++ targets).
 build:gcc_hermetic --linkopt=-lutil
+# rustc appends a crate's link_deps (e.g. gperftools' tcmalloc, C++) after the
+# --linkopt flags above, and GNU ld resolves static archives left to right, so
+# those libraries are consumed before the objects that need them. Repeat them as
+# rustc link-args, which land after the native libs. Same libraries as above, so
+# pure-Rust targets pull nothing extra.
+build:gcc_hermetic --@rules_rust//rust/settings:extra_rustc_flag=-Clink-arg=-l:libstdc++.a
+build:gcc_hermetic --@rules_rust//rust/settings:extra_rustc_flag=-Clink-arg=-lm
+build:gcc_hermetic --@rules_rust//rust/settings:extra_rustc_flag=-Clink-arg=-lc
 # The toolchain's `gcc` is a bash wrapper that runs realpath/dirname (to locate the
 # execroot) before it sanitizes PATH. cc_* actions get a PATH from Bazel's C++
 # machinery, but rules_rust seeds rustc's env from default_shell_env (empty here),
