@@ -10,13 +10,34 @@
 # Please find documentation here:
 # https://github.com/bazel-contrib/toolchains_llvm/releases
 #
-bazel_dep(name = "toolchains_llvm", version = "1.7.0")
+bazel_dep(name = "toolchains_llvm", version = "1.8.0")
+
+# Two fixes that landed upstream after 1.8.0, which is still the newest release.
+# Drop both on the next release bump.
+#
+#   stdlib_libcxx  1.8.0 selects libc++ headers via -nostdinc++ + -cxx-isystem
+#                  but still emits -stdlib=libc++ on compile, where it does
+#                  nothing except raise -Wunused-command-line-argument on every
+#                  object file -- fatal under our -Werror.
+#                  https://github.com/bazel-contrib/toolchains_llvm/pull/791
+#   llvm_22_1_8    adds the LLVM 22.1.8 checksums the version below needs.
+#                  https://github.com/bazel-contrib/toolchains_llvm/pull/780
+single_version_override(
+    module_name = "toolchains_llvm",
+    patch_strip = 1,
+    patches = [
+        "//tools/cpp/patches:toolchains_llvm_1.8.0_stdlib_libcxx.patch",
+        "//tools/cpp/patches:toolchains_llvm_1.8.0_llvm_22_1_8.patch",
+    ],
+)
 
 # Configure and register the toolchain.
 # This toolchain supports: Linux (x86_64, aarch64, armv7) and macOS (x86_64, aarch64).
+# LLVM 22 rather than 21: clang-tidy 21 mis-parses __has_feature in libc++
+# headers under modernize-use-trailing-return-type (llvm/llvm-project#168360).
 llvm = use_extension("@toolchains_llvm//toolchain/extensions:llvm.bzl", "llvm")
 llvm.toolchain(
-    llvm_version = "21.1.8",
+    llvm_version = "22.1.8",
 )
 use_repo(llvm, "llvm_toolchain", "llvm_toolchain_llvm")
 
