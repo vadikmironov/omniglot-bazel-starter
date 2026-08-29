@@ -6,7 +6,7 @@
 # Please find documentation here:
 # https://github.com/bazelbuild/rules_java/releases
 #
-bazel_dep(name = "rules_java", version = "9.8.0")
+bazel_dep(name = "rules_java", version = "9.9.0")
 
 # --- BEGIN feature:custom_toolchains ---
 #
@@ -217,9 +217,9 @@ maven.install(
         # --- END exclude ---
         # --- BEGIN feature:lint ---
         # PMD and SpotBugs back the Java lint_test aspects (see tools/lint/BUILD).
-        "net.sourceforge.pmd:pmd-core:7.26.0",
-        "net.sourceforge.pmd:pmd-java:7.26.0",
-        "net.sourceforge.pmd:pmd-cli:7.26.0",
+        "net.sourceforge.pmd:pmd-core:7.27.0",
+        "net.sourceforge.pmd:pmd-java:7.27.0",
+        "net.sourceforge.pmd:pmd-cli:7.27.0",
         "com.github.spotbugs:spotbugs:4.10.4",
         # --- END feature:lint ---
 
@@ -254,7 +254,7 @@ maven.install(
 
         # --- BEGIN exclude ---
         # jsoup
-        "org.jsoup:jsoup:1.23.1",
+        "org.jsoup:jsoup:1.23.2",
         # --- END exclude ---
     ],
     lock_file = "//tools/java:maven_install.json",

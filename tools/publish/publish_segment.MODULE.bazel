@@ -68,14 +68,14 @@ oci = use_extension("@rules_oci//oci:extensions.bzl", "oci")
 #   - static/cc carry no version suffix — they encode flavor, not version.
 oci.pull(
     name = "gcr_io_distroless_java17",
-    digest = "sha256:2dcb2b21efab7e9250945985e0b0aab99ec7835db96a7bbc68edd1a0ad2e51ff",
+    digest = "sha256:c97caa04324a70ea594e82ac31d75cdcc3730845dfc528de38847dcbd52bb599",
     image = "gcr.io/distroless/java17-debian13",
     platforms = ["linux/amd64"],
     tag = "nonroot",
 )
 oci.pull(
     name = "gcr_io_distroless_python3",
-    digest = "sha256:6bfc400d0a6d89f50f5bbc0a4b4ff57214ae5c01647c3a74c2a0c8d830b4cc00",
+    digest = "sha256:f3d5ddc6c64a019fe520e7f005f2880be21e6afc461b10a3c15ef2e4edc71e33",
     image = "gcr.io/distroless/python3-debian13",
     platforms = ["linux/amd64"],
     tag = "nonroot",
