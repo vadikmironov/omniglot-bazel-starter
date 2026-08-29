@@ -80,14 +80,12 @@ auto get_python_toolchain_path_via_env(std::string& abs_interpreter_path) -> boo
         return false;
     }
 
-    std::vector<std::string> const interpreters = {"python3", "python"};
 #ifdef _WIN32
     const char path_separator = ';';
-    for (auto& interp : interpreters) {
-        interp += ".exe";
-    }
+    std::vector<std::string> const interpreters = {"python3.exe", "python.exe"};
 #else
     const char path_separator = ':';
+    std::vector<std::string> const interpreters = {"python3", "python"};
 #endif
 
     std::string const path_str(path_env);
