@@ -17,8 +17,8 @@ concurrency:
 # Every pull request and push to main runs the full gate: build + test across the
 # hermetic Clang and hermetic GCC toolchains on Linux and hermetic Clang on macOS,
 # plus the lint phase (clang-tidy, GCC -fanalyzer, PMD/SpotBugs/ruff/mypy, and the
-# gazelle/publish/mint drift gates). Windows builds and tests with the MSVC
-# toolchain, minus the profiling workloads — see build-windows.
+# gazelle/publish/mint drift gates). Windows builds and tests //modules/... with
+# the MSVC toolchain — see build-windows.
 
 jobs:
   # Linux/Clang leg: build + test. Independent of the lint job (no `needs:`) so
@@ -265,10 +265,13 @@ jobs:
       id: deployment
       uses: actions/deploy-pages@v5
 
-  # Windows leg: build + test on the auto-configured MSVC toolchain (.bazelrc
-  # build:windows). The profiling workloads are excluded because gperftools and
-  # memray are Linux/macOS only; profiling is a local-only feature anyway, so
-  # the tags that drive `bazel run //tools/profile` also scope it out here.
+  # Windows leg: build + test the language modules on the auto-configured MSVC
+  # toolchain (.bazelrc build:windows).
+  #
+  # Scoped to //modules/... because //tools/... resolves clang-tidy,
+  # clang-format and llvm-symbolizer from the hermetic LLVM, which has no
+  # Windows build (bazel-contrib/toolchains_llvm#4). Profiling workloads are
+  # excluded by tag: gperftools and memray are Linux/macOS only.
   build-windows:
     runs-on: windows-latest
     name: Build & test (Windows x64)
@@ -289,4 +292,5 @@ jobs:
       with:
         buildbuddy_api_key: ${{ secrets.BUILDBUDDY_API_KEY }}
         bazel_startup_opts: ${{ env.BAZEL_STARTUP_OPTS }}
+        targets: //modules/...
         exclude_tags: profiling-cpu,profiling-mem
