@@ -109,8 +109,12 @@ jobs:
         cpython\PCbuild\amd64\python_d.exe -m pip debug --verbose
         echo === install a release-ABI wheel ===
         cpython\PCbuild\amd64\python_d.exe -m pip install --only-binary=:all: markupsafe pyyaml
-        echo === can the debug interpreter actually import them? ===
-        rem markupsafe falls back to pure Python if _speedups fails to load, so
-        rem import the extension module directly rather than the package.
-        cpython\PCbuild\amd64\python_d.exe -c "import markupsafe._speedups as s; print('  markupsafe._speedups:', s.__file__); print('  escape ok:', s.escape('<b>'))"
-        cpython\PCbuild\amd64\python_d.exe -c "import yaml, _yaml; print('  _yaml:', _yaml.__file__); print('  load ok:', yaml.safe_load('a: 1'))"
+        echo === why release wheels do not work: extension suffixes ===
+        cpython\PCbuild\amd64\python_d.exe -c "import importlib.machinery as m; print('  EXTENSION_SUFFIXES:', m.EXTENSION_SUFFIXES)"
+        echo === what the release wheels actually put on disk ===
+        cpython\PCbuild\amd64\python_d.exe -c "import pathlib,sysconfig; sp=pathlib.Path(sysconfig.get_paths()['purelib']); print('\n'.join('  '+str(p.relative_to(sp)) for p in sorted(sp.rglob('*.pyd'))) or '  (no .pyd found)')"
+        echo === can the debug interpreter import them? ===
+        rem Both packages fall back to pure Python, so import the extension
+        rem directly; a silent fallback would otherwise look like success.
+        cpython\PCbuild\amd64\python_d.exe -c "import markupsafe._speedups" && echo   markupsafe._speedups: loaded || echo   markupsafe._speedups: NOT loaded
+        cpython\PCbuild\amd64\python_d.exe -c "import _yaml" && echo   _yaml: loaded || echo   _yaml: NOT loaded
