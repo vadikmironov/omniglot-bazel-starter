@@ -108,4 +108,9 @@ jobs:
         echo === compatible tags ===
         cpython\PCbuild\amd64\python_d.exe -m pip debug --verbose
         echo === install a release-ABI wheel ===
-        cpython\PCbuild\amd64\python_d.exe -m pip install --only-binary=:all: markupsafe
+        cpython\PCbuild\amd64\python_d.exe -m pip install --only-binary=:all: markupsafe pyyaml
+        echo === can the debug interpreter actually import them? ===
+        rem markupsafe falls back to pure Python if _speedups fails to load, so
+        rem import the extension module directly rather than the package.
+        cpython\PCbuild\amd64\python_d.exe -c "import markupsafe._speedups as s; print('  markupsafe._speedups:', s.__file__); print('  escape ok:', s.escape('<b>'))"
+        cpython\PCbuild\amd64\python_d.exe -c "import yaml, _yaml; print('  _yaml:', _yaml.__file__); print('  load ok:', yaml.safe_load('a: 1'))"
