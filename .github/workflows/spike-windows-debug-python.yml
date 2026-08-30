@@ -38,6 +38,10 @@ concurrency:
   cancel-in-progress: true
 
 env:
+  # Same reason as patch 0002: the checkout is on D: and uv's default cache is
+  # on C:, so uv cannot hardlink. We drive build.py directly rather than running
+  # PBS's own workflow, so the patch alone would not cover this run.
+  UV_CACHE_DIR: ${{ github.workspace }}/.uv-cache
   PBS_REF: ${{ inputs.pbs_ref || 'main' }}
   PBS_OPTIONS: ${{ inputs.pbs_options || 'noopt' }}
   PBS_PYTHON: ${{ inputs.python || 'cpython-3.14' }}
@@ -51,12 +55,28 @@ jobs:
       contents: read
 
     steps:
+    # Ours, for spike/pbs_patches.
+    - uses: actions/checkout@v7
+
     - name: Check out python-build-standalone
       uses: actions/checkout@v7
       with:
         repository: astral-sh/python-build-standalone
         ref: ${{ env.PBS_REF }}
         path: pbs
+
+    # The series we intend to upstream, applied in order. Keep each patch one
+    # self-contained change so it can be sent on its own.
+    - name: Apply the patch series
+      shell: bash
+      working-directory: pbs
+      run: |
+        shopt -s nullglob
+        for p in ../spike/pbs_patches/*.patch; do
+          echo "=== $(basename "$p")"
+          git apply --verbose "$p"
+        done
+        git --no-pager diff --stat
 
     - name: Report free disk space
       shell: pwsh

@@ -1,0 +1,21 @@
+Keep uv's cache on the workspace volume in the Windows build
+
+On GitHub's Windows runners the checkout lands on D: while uv's default
+cache is on C:, so uv cannot hardlink into the build tree and warns that
+it is falling back to full copies. Pointing the cache at the workspace
+puts both on one volume.
+
+diff --git a/.github/workflows/windows.yml b/.github/workflows/windows.yml
+--- a/.github/workflows/windows.yml
++++ b/.github/workflows/windows.yml
+@@ -11,6 +11,10 @@
+ 
+ env:
+   FORCE_COLOR: 1
++  # Keep uv's cache on the same volume as the workspace. The runner's
++  # default cache lives on C: while the checkout is on D:, so uv cannot
++  # hardlink into the build tree and falls back to full copies.
++  UV_CACHE_DIR: ${{ github.workspace }}/.uv-cache
+ 
+ permissions: { }
+ 
