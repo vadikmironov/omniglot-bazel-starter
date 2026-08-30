@@ -1,4 +1,4 @@
-name: Integration Tests
+name: Weekly
 
 on:
   schedule:
@@ -40,3 +40,94 @@ jobs:
         --test_tag_filters=manual
         --test_timeout=5400
         //tools/bootstrap/tests/...
+
+  # The remote toolchains: pinned downloads that no PR ever exercises, so they
+  # rot from upstream change rather than from our commits — which is exactly
+  # what a time-based trigger is for. The *_host and *_local_corretto configs
+  # are deliberately absent: those resolve against whatever the runner happens
+  # to have installed, so a failure would say more about the runner than the
+  # repo.
+  remote-toolchains:
+    runs-on: ubuntu-latest
+    name: Remote toolchains
+    permissions:
+      contents: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # The C++ remote compilers link against the host glibc, so they cover
+          # the C++ modules -- the usage CLAUDE.md documents -- not //...:
+          # cpp_py_ext_module's shared library fails to link under them, which
+          # is a property of the toolchain, not a regression to report.
+          - config: gcc_remote
+            targets: //modules/cpp_app //modules/cpp_app_with_ext_dep //modules/cpp_library
+          - config: clang_remote
+            targets: //modules/cpp_app //modules/cpp_app_with_ext_dep //modules/cpp_library
+          # The remote JDK swaps the Java runtime repo-wide and //... passes
+          # under it, so there is no reason to narrow this one.
+          - config: java_17_remote_corretto_jdk
+            targets: //...
+
+    steps:
+    - uses: actions/checkout@v7
+    - uses: ./.github/actions/setup_linux
+    - uses: ./.github/actions/bazel_test
+      with:
+        buildbuddy_api_key: ${{ secrets.BUILDBUDDY_API_KEY }}
+        bazel_config: ${{ matrix.config }}
+        targets: ${{ matrix.targets }}
+
+  # Profiling is a local-only feature with no PR gate, so its capture paths are
+  # the likeliest thing here to bit-rot: they hook framework internals upstream
+  # is free to change (pytest-benchmark's PauseInstrumentation, the JFR
+  # converter's state filter). Deliberately not --measure -- that skips the
+  # profiler and so would exercise none of it.
+  profiling:
+    runs-on: ubuntu-latest
+    name: Profiling workloads
+    permissions:
+      contents: read
+
+    steps:
+    - uses: actions/checkout@v7
+    - uses: ./.github/actions/setup_linux
+    - name: Configure remote cache
+      env:
+        BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
+      run: |
+        if [ -n "$BUILDBUDDY_API_KEY" ]; then
+          echo "build:remote-cache --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" > user.bazelrc
+          echo "build --config=remote-cache" >> user.bazelrc
+        fi
+    - name: Run every profiling workload
+      run: bazel run //tools/profile -- --all
+
+  # A weekly job nobody is waiting on gets ignored when it goes red, so funnel
+  # failures into one issue instead of the Actions tab.
+  report-failure:
+    if: failure()
+    needs: [integration-linux, remote-toolchains, profiling]
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+
+    steps:
+    - name: Open or update the tracking issue
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      run: |
+        title="Weekly run failing"
+        existing=$(gh issue list --state open --label ci-weekly --json number --jq '.[0].number')
+        body="The weekly run failed: $RUN_URL
+
+        Jobs cover the remote toolchains, the profiling workloads and the
+        bootstrap integration suite. None gate a merge, so this issue is the
+        only signal."
+        if [ -n "$existing" ]; then
+          gh issue comment "$existing" --body "$body"
+        else
+          gh issue create --title "$title" --label ci-weekly --body "$body"
+        fi

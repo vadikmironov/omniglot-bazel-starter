@@ -21,6 +21,10 @@ inputs:
     description: 'Extra tags to exclude, comma-separated without the leading dash (e.g. profiling-cpu,profiling-mem). Appended to the -lint exclusion below.'
     required: false
     default: ''
+  compilation_mode:
+    description: 'Bazel -c value (dbg / opt). Empty leaves the default, fastbuild.'
+    required: false
+    default: ''
 runs:
   using: "composite"
   steps:
@@ -38,11 +42,16 @@ runs:
         BUILDBUDDY_API_KEY: ${{ inputs.buildbuddy_api_key }}
         BAZEL_CONFIG: ${{ inputs.bazel_config }}
         EXCLUDE_TAGS: ${{ inputs.exclude_tags }}
+        COMPILATION_MODE: ${{ inputs.compilation_mode }}
       run: |
         EXTRA_CONFIG=""
         if [ -n "$BAZEL_CONFIG" ]; then
           EXTRA_CONFIG="--config=$BAZEL_CONFIG"
           echo "Extra config: $EXTRA_CONFIG"
+        fi
+        if [ -n "$COMPILATION_MODE" ]; then
+          EXTRA_CONFIG="$EXTRA_CONFIG -c $COMPILATION_MODE"
+          echo "Compilation mode: $COMPILATION_MODE"
         fi
         TAGS="-lint"
         if [ -n "$EXCLUDE_TAGS" ]; then

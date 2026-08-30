@@ -19,8 +19,47 @@ concurrency:
 # plus the lint phase (clang-tidy, GCC -fanalyzer, PMD/SpotBugs/ruff/mypy, and the
 # gazelle/publish/mint drift gates). Windows builds and tests //modules/... with
 # the MSVC toolchain — see build-windows.
+#
+# Tiers
+# -----
+#   0  preflight   buildifier + format, split out so a slip reports in minutes
+#                  rather than after the ~12-minute lint job
+#   1  build-*     the four platforms at fastbuild, plus lint and coverage
+#   2  build-modes the same four under -c dbg and -c opt, post-merge only:
+#                  the code already passed tier 1 as a PR, and one run maps to
+#                  one squashed commit so failures stay attributable
+#   3  (weekly.yml) remote toolchains and profiling — things that rot from
+#                  upstream change rather than from our commits
 
 jobs:
+  # Tier 0 — the cheap checks, split out of `lint` so they fail fast. buildifier
+  # needs only its own binary; format.check pulls the hermetic LLVM for
+  # clang-format, which the build jobs fetch anyway, so it costs nothing extra
+  # across the run as a whole.
+  preflight:
+    runs-on: ubuntu-latest
+    name: Preflight (format & buildifier)
+    permissions:
+      contents: read
+
+    steps:
+    - uses: actions/checkout@v7
+    - uses: ./.github/actions/setup_linux
+    - name: Configure remote cache
+      env:
+        BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
+      run: |
+        if [ -n "$BUILDBUDDY_API_KEY" ]; then
+          echo "build:remote-cache --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" > user.bazelrc
+          echo "build --config=remote-cache" >> user.bazelrc
+        fi
+    # Cheapest first: buildifier needs no toolchain download, so a Starlark
+    # formatting slip reports before the LLVM fetch that format.check triggers.
+    - name: Run buildifier check
+      run: bazel run //:buildifier.check
+    - name: Run formatter check
+      run: bazel run //tools/format:format.check
+
   # Linux/Clang leg: build + test. Independent of the lint job (no `needs:`) so
   # build/test feedback isn't gated on lint.
   build-linux-clang:
@@ -99,10 +138,6 @@ jobs:
       # extension results can differ per OS, so a stale-on-macOS lock is not a
       # signal. --nobuild keeps it to loading + analysis.
       run: bazel build --nobuild --lockfile_mode=error //...
-    - name: Run buildifier check
-      run: bazel run //:buildifier.check
-    - name: Run formatter check
-      run: bazel run //tools/format:format.check
     - name: Run linter check
       run: bazel test --test_tag_filters=lint //...
     - name: GCC static analysis (-fanalyzer, the clang-tidy analog)
@@ -144,6 +179,73 @@ jobs:
       # touching any registry. Catches engine regressions the gazelle
       # drift gate above can't see.
       run: bazel run //tools/publish:mint -- --mode dev --include-pub-targets all --dry-run
+
+  # Tier 2 — the same matrix as tier 1 under -c dbg and -c opt.
+  #
+  # Post-merge only: the code has already passed tier 1 as a PR, so gating a PR
+  # on eight more jobs would buy little and cost a lot. On push to main each run
+  # maps to exactly one squashed commit, so a failure is attributable without
+  # bisecting. workflow_dispatch is kept so a risky branch can be checked first.
+  #
+  # These modes are not cosmetic: opt is where UB the optimiser exposes and
+  # -Wmaybe-uninitialized show up, and dbg is where assertions stay live and
+  # libraries pick up debug-postfixed names. A cmake() output name that only
+  # differs under -c dbg went unnoticed for months for want of this.
+  build-modes:
+    if: github.event_name != 'pull_request'
+    name: Build & test (${{ matrix.name }}, -c ${{ matrix.mode }})
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [dbg, opt]
+        platform: [linux-clang, linux-gcc, macos, windows]
+        include:
+          - platform: linux-clang
+            name: Linux x64, hermetic Clang
+            os: ubuntu-latest
+            setup: linux
+          - platform: linux-gcc
+            name: Linux x64, hermetic GCC
+            os: ubuntu-latest
+            setup: linux
+            bazel_config: gcc_hermetic
+          - platform: macos
+            name: macOS ARM64, hermetic Clang
+            os: macos-latest
+            setup: macos
+          # Same scoping as tier 1, and for the same reasons: //tools/... needs
+          # the hermetic LLVM, which has no Windows build, and the profiling
+          # workloads need gperftools and memray, which are Linux/macOS only.
+          - platform: windows
+            name: Windows x64
+            os: windows-latest
+            setup: windows
+            targets: //modules/...
+            exclude_tags: profiling-cpu,profiling-mem
+            startup_opts: --output_base=C:/bazel_build
+
+    steps:
+    - uses: actions/checkout@v7
+    - uses: ./.github/actions/setup_linux
+      if: matrix.setup == 'linux'
+    - uses: ./.github/actions/setup_macos
+      if: matrix.setup == 'macos'
+    - uses: ./.github/actions/setup_windows
+      if: matrix.setup == 'windows'
+      with:
+        bazel_startup_opts: ${{ matrix.startup_opts }}
+    - uses: ./.github/actions/bazel_test
+      with:
+        buildbuddy_api_key: ${{ secrets.BUILDBUDDY_API_KEY }}
+        bazel_startup_opts: ${{ matrix.startup_opts }}
+        bazel_config: ${{ matrix.bazel_config }}
+        targets: ${{ matrix.targets || '//...' }}
+        exclude_tags: ${{ matrix.exclude_tags }}
+        compilation_mode: ${{ matrix.mode }}
 
   # Code coverage: builds the merged LCOV across all languages, renders it to HTML
   # with the hermetic lcov genhtml, uploads it as a workflow artifact, and posts
