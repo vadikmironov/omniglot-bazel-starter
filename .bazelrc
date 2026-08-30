@@ -58,6 +58,11 @@ startup --windows_enable_symlinks
 common:linux --credential_helper=%workspace%/tools/publish/credential-helper
 common:macos --credential_helper=%workspace%/tools/publish/credential-helper
 common:windows --credential_helper=%workspace%/tools/publish/credential-helper.bat
+# Launching cmd.exe then powershell.exe per lookup is slow enough on a loaded
+# runner to blow the 10s default, which fails the build rather than degrading to
+# an unauthenticated fetch. The helper itself returns in milliseconds once
+# started; this buys headroom for process creation under contention.
+common:windows --credential_helper_timeout=60s
 
 # Publish configuration — set registry URL and platform for artifact uploads.
 # Override per-developer in user.bazelrc (gitignored).
