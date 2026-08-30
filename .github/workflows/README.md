@@ -1,7 +1,6 @@
-# CI
+# CI workflows
 
-Two workflows: `.github/workflows/ci.yml` on every PR and push, and
-`.github/workflows/integration.yml` weekly.
+`ci.yml` runs on every PR and push to `main`; `integration.yml` runs weekly.
 
 ## What runs when
 

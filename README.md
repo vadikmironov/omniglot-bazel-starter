@@ -255,7 +255,7 @@ bazel run //tools/python:generate_virtual_env
 
 ### CI Workflow
 
-Tiered across preflight, the per-PR build/test/lint gate, post-merge `-c dbg`/`-c opt` runs and a weekly schedule — see [docs/ci.md](docs/ci.md).
+Tiered across preflight, the per-PR build/test/lint gate, post-merge `-c dbg`/`-c opt` runs and a weekly schedule — see [.github/workflows/README.md](.github/workflows/README.md).
 
 ### Code Coverage
 
