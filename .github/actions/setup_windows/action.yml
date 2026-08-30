@@ -14,6 +14,17 @@ runs:
         bazelisk-cache: true
         disk-cache: true
         repository-cache: true
+    # Bazel takes the highest-numbered toolset installed, not the install
+    # default, and this image carries three VC versions. Printing the selection
+    # to make it easier to explain issues due to toolset changes when new runner
+    # image appears (see the /std note in .bazelrc).
+    - name: Print MSVC toolset
+      shell: pwsh
+      run: |
+        $vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath
+        Write-Host "VS install: $vs"
+        Write-Host "install default: $(Get-Content "$vs\VC\Auxiliary\Build\Microsoft.VCToolsVersion.default.txt")"
+        Get-ChildItem "$vs\VC\Tools\MSVC" -Name | ForEach-Object { Write-Host "  installed: $_" }
     - name: Print debug info
       shell: pwsh
       run: |
