@@ -1,11 +1,11 @@
 #define PY_SSIZE_T_CLEAN
 #include "py_result_converter.h"
 
-#include <Python.h>
 #include <gtest/gtest.h>
 
 #include <string>
 
+#include "python_h.h"
 #include "spdlog/logger.h"
 
 namespace test_utils {

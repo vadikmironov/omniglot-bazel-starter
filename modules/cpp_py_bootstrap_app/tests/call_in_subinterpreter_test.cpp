@@ -1,5 +1,4 @@
 #define PY_SSIZE_T_CLEAN
-#include <Python.h>
 #include <gtest/gtest.h>
 
 #include <memory>
@@ -7,6 +6,7 @@
 #include <string>
 
 #include "embedded_python_runtime.h"
+#include "python_h.h"
 #include "rules_python_current_interpreter_path_header.h"
 #include "spdlog/sinks/stdout_color_sinks.h"
 #include "spdlog/spdlog.h"

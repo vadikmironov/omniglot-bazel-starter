@@ -1,8 +1,7 @@
 #pragma once
 
 #define PY_SSIZE_T_CLEAN
-#include <Python.h>
-
+#include "python_h.h"
 #include "spdlog/logger.h"
 
 /// RAII wrapper for Python subinterpreter lifecycle.
