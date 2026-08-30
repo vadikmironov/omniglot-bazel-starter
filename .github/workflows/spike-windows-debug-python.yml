@@ -1,0 +1,111 @@
+name: Spike - Windows debug CPython
+
+# TEMPORARY. Q1 of #183: does a real debug CPython make Windows `-c dbg` work?
+# Builds stock CPython with PCbuild in Debug, then compiles an embedder /MDd
+# against it with no _DEBUG workaround. Deliberately avoids Bazel, rules_python
+# and python-build-standalone so that a failure points at exactly one thing.
+#
+# No disk cleanup: setup_linux frees space for the 12 GB LLVM toolchain and the
+# Bazel caches, and this job fetches neither. The free-space report below is
+# there to prove that rather than assume it.
+#
+# Delete this workflow, and spike/, once #183 has its answer.
+
+on:
+  # Runs on any spike/** branch. workflow_dispatch only lists a workflow that
+  # exists on the default branch, so pushing the branch is the trigger until
+  # this lands on main.
+  push:
+    branches: [ "spike/**" ]
+  workflow_dispatch:
+    inputs:
+      cpython_ref:
+        description: CPython tag to build
+        default: v3.14.4
+        type: string
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CPYTHON_REF: ${{ inputs.cpython_ref || 'v3.14.4' }}
+
+jobs:
+  debug-cpython:
+    runs-on: windows-latest
+    name: Build debug CPython and probe embedding
+    timeout-minutes: 120
+    permissions:
+      contents: read
+
+    steps:
+    - uses: actions/checkout@v7
+
+    - name: Report free disk space
+      shell: pwsh
+      run: Get-PSDrive -PSProvider FileSystem | Select-Object Name, Used, Free | Format-Table
+
+    - name: Check out CPython ${{ env.CPYTHON_REF }}
+      uses: actions/checkout@v7
+      with:
+        repository: python/cpython
+        ref: ${{ env.CPYTHON_REF }}
+        path: cpython
+        fetch-depth: 1
+
+    - name: Cache debug build
+      id: cpython-cache
+      uses: actions/cache@v4
+      with:
+        path: cpython/PCbuild/amd64
+        key: cpython-debug-${{ env.CPYTHON_REF }}-x64-v1
+
+    # -d Debug, -e fetch/build externals, tkinter is dead weight here.
+    - name: Build debug CPython
+      if: steps.cpython-cache.outputs.cache-hit != 'true'
+      shell: cmd
+      working-directory: cpython/PCbuild
+      run: build.bat -d -e -p x64 --no-tkinter
+
+    - name: Show what the debug build produced
+      shell: cmd
+      run: |
+        dir cpython\PCbuild\amd64\python*_d.* 2>nul
+        if not exist cpython\PCbuild\amd64\python314_d.lib (
+          echo MISSING python314_d.lib - the rest of this run is meaningless
+          exit /b 1
+        )
+
+    # The whole point: /MDd defines _DEBUG, pyconfig.h asks for python314_d.lib
+    # via #pragma comment(lib, ...), and only a LIBPATH is supplied. If this
+    # links, the workaround in modules/cpp_py_bootstrap_app is unnecessary.
+    - name: Compile the probe /MDd, no _DEBUG workaround
+      shell: cmd
+      run: |
+        for /f "usebackq tokens=*" %%i in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath`) do set VSPATH=%%i
+        call "%VSPATH%\VC\Auxiliary\Build\vcvars64.bat" || exit /b 1
+        cl /nologo /std:c++20 /EHsc /MDd /Zi /utf-8 ^
+           /I cpython\Include /I cpython\PC ^
+           spike\windows_debug_python\embed_probe.cpp ^
+           /Fe:embed_probe.exe ^
+           /link /LIBPATH:cpython\PCbuild\amd64 || exit /b 1
+
+    - name: Run the probe
+      shell: cmd
+      run: |
+        set PATH=%CD%\cpython\PCbuild\amd64;%PATH%
+        embed_probe.exe %CD%\cpython
+
+    # Informational, for #183's Windows wheel question: which tags does a debug
+    # interpreter accept, and can it install a release-ABI wheel? Never fatal.
+    - name: Wheel compatibility of the debug interpreter
+      continue-on-error: true
+      shell: cmd
+      run: |
+        set PATH=%CD%\cpython\PCbuild\amd64;%PATH%
+        cpython\PCbuild\amd64\python_d.exe -m ensurepip
+        echo === compatible tags ===
+        cpython\PCbuild\amd64\python_d.exe -m pip debug --verbose
+        echo === install a release-ABI wheel ===
+        cpython\PCbuild\amd64\python_d.exe -m pip install --only-binary=:all: markupsafe
