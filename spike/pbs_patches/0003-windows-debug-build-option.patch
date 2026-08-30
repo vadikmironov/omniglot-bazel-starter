@@ -14,6 +14,9 @@ Follows the Unix spelling: `debug` is a peer of noopt and pgo in the
 option set, so debug+pgo is simply not a valid combination. The set is
 renamed to `options` to match, since debug is not an optimization.
 
+PC/layout is passed --debug, which is what makes it expect the _d
+suffixed artifacts a Debug configuration produces.
+
 diff --git a/cpython-windows/build.py b/cpython-windows/build.py
 --- a/cpython-windows/build.py
 +++ b/cpython-windows/build.py
@@ -78,7 +81,17 @@ diff --git a/cpython-windows/build.py b/cpython-windows/build.py
  
          install_dir = out_dir / "python" / "install"
  
-@@ -1946,10 +1949,10 @@
+@@ -1675,6 +1678,9 @@
+         if freethreaded:
+             args.append("--include-freethreaded")
+ 
++        if debug:
++            args.append("--debug")
++
+         # CPython 3.12 removed distutils.
+         if not meets_python_minimum_version(python_version, "3.12"):
+             args.append("--include-distutils")
+@@ -1946,10 +1952,10 @@
          default="cpython-3.11",
          help="Python distribution to build",
      )
