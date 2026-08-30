@@ -135,3 +135,49 @@ jobs:
         rem directly; a silent fallback would otherwise look like success.
         cpython\PCbuild\amd64\python_d.exe -c "import markupsafe._speedups" && echo   markupsafe._speedups: loaded || echo   markupsafe._speedups: NOT loaded
         cpython\PCbuild\amd64\python_d.exe -c "import _yaml" && echo   _yaml: loaded || echo   _yaml: NOT loaded
+
+  # Which MSVC toolset does *Bazel* pick? vswhere and MSBuild each answered
+  # differently on this image (14.51 and 14.44), and neither speaks for Bazel.
+  # CC_CONFIGURE_DEBUG is in the cc_autoconf repo rule's `environ`, so setting it
+  # both invalidates the rule and makes it report its own choice.
+  msvc-selection:
+    runs-on: windows-latest
+    name: Which MSVC toolset Bazel picks
+    timeout-minutes: 30
+    permissions:
+      contents: read
+
+    steps:
+    - uses: bazel-contrib/setup-bazel@0.19.0
+      with:
+        bazelisk-cache: true
+
+    # A scratch module, so the answer is about the image and not our dep graph.
+    - name: Create a minimal workspace
+      shell: bash
+      run: |
+        mkdir -p msvc_probe
+        cd msvc_probe
+        printf '9.2.0\n' > .bazelversion
+        printf 'bazel_dep(name = "rules_cc", version = "0.2.22")\n' > MODULE.bazel
+        printf 'load("@rules_cc//cc:defs.bzl", "cc_binary")\ncc_binary(name = "probe", srcs = ["probe.cc"])\n' > BUILD.bazel
+        printf 'int main() { return 0; }\n' > probe.cc
+
+    - name: Ask Bazel which toolset it chose
+      shell: pwsh
+      working-directory: msvc_probe
+      env:
+        CC_CONFIGURE_DEBUG: "1"
+      run: |
+        bazel --output_base=C:/bzl_probe build //:probe 2>&1 | Tee-Object -FilePath bazel.log
+        Write-Host "=== selection trace ==="
+        Select-String -Path bazel.log -Pattern "vswhere|VC versions|Choosing the latest|build tools found|BAZEL_VC"
+
+    - name: Compiler Bazel actually wired up
+      shell: pwsh
+      working-directory: msvc_probe
+      run: |
+        Get-ChildItem C:/bzl_probe/external -Directory -Filter "*local_config_cc*" -ErrorAction SilentlyContinue |
+          ForEach-Object { Write-Host "repo: $($_.Name)" }
+        Select-String -Path "C:/bzl_probe/external/*local_config_cc*/*" -Pattern "Tools\\MSVC\\[0-9.]+" -ErrorAction SilentlyContinue |
+          ForEach-Object { $_.Matches[0].Value } | Sort-Object -Unique
