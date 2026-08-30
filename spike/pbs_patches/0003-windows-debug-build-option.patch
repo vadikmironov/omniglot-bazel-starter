@@ -7,11 +7,12 @@ produce a debug interpreter.
 
 That matters for embedding. MSVC's pyconfig.h selects the import library
 from _DEBUG, which the debug CRT defines, so a consumer building with
--MDd asks for python3XX_d.lib and cannot link against a release
+/MDd asks for python3XX_d.lib and cannot link against a release
 distribution.
 
 Follows the Unix spelling: `debug` is a peer of noopt and pgo in the
-option set, so debug+pgo is simply not a valid combination.
+option set, so debug+pgo is simply not a valid combination. The set is
+renamed to `options` to match, since debug is not an optimization.
 
 diff --git a/cpython-windows/build.py b/cpython-windows/build.py
 --- a/cpython-windows/build.py
@@ -34,19 +35,7 @@ diff --git a/cpython-windows/build.py b/cpython-windows/build.py
  
      # Copy object files for core sources into their own directory.
      core_dir = out_dir / "build" / "core"
-@@ -1233,7 +1234,10 @@
-     assert "build/core/config.obj" in res["core"]["objs"]
-     res["inittab_object"] = "build/core/config.obj"
-     res["inittab_source"] = "build/core/config.c"
--    res["inittab_cflags"] = ["-DNDEBUG", "-DPy_BUILD_CORE"]
-+    if config == "Debug":
-+        res["inittab_cflags"] = ["-DPy_BUILD_CORE"]
-+    else:
-+        res["inittab_cflags"] = ["-DNDEBUG", "-DPy_BUILD_CORE"]
- 
-     exts = ("lib", "exp")
- 
-@@ -1372,6 +1376,7 @@
+@@ -1372,6 +1373,7 @@
      openssl_entry: str,
  ) -> pathlib.Path:
      parsed_build_options = set(build_options.split("+"))
@@ -54,7 +43,7 @@ diff --git a/cpython-windows/build.py b/cpython-windows/build.py
      pgo = "pgo" in parsed_build_options
      freethreaded = "freethreaded" in parsed_build_options
  
-@@ -1426,13 +1431,14 @@
+@@ -1426,13 +1428,14 @@
          # as we do for Unix builds.
          mpdecimal_archive = None
  
@@ -73,7 +62,7 @@ diff --git a/cpython-windows/build.py b/cpython-windows/build.py
  
      # Python 3.15 uses the default name for the executable in a suffixed directory
      instrumented_python_exe = python_exe
-@@ -1635,13 +1641,13 @@
+@@ -1635,13 +1638,13 @@
              run_msbuild(
                  msbuild,
                  pcbuild_path,
@@ -89,7 +78,7 @@ diff --git a/cpython-windows/build.py b/cpython-windows/build.py
  
          install_dir = out_dir / "python" / "install"
  
-@@ -1946,10 +1952,10 @@
+@@ -1946,10 +1949,10 @@
          default="cpython-3.11",
          help="Python distribution to build",
      )
