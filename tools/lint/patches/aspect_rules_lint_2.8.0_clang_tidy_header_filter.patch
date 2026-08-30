@@ -1,0 +1,43 @@
+# 2.8.0 shell-quotes -header-filter, but nothing unquotes it: the wrapper runs
+# clang-tidy directly, and the --fix path hands args to spawnSync without a
+# shell. clang-tidy therefore sees literal quotes and treats the flag as an
+# input path, failing with clang-diagnostic-error. Hits every aspect using
+# lint_target_headers or header_filter.
+#
+# The regression came from #867, which removed the wrapper's eval that used to
+# consume the quoting.
+#
+# Reported upstream: https://github.com/aspect-build/rules_lint/issues/984
+--- a/lint/clang_tidy.bzl
++++ b/lint/clang_tidy.bzl
+@@ -231,9 +231,6 @@
+         print("target header dirs: " + ",".join(dirs))
+     return regex
+ 
+-def _quoted_arg(arg):
+-    return "\"" + arg + "\""
+-
+ def _get_env(ctx, srcs):
+     sources_are_cxx = _is_cxx(srcs[0])
+     if (sources_are_cxx):
+@@ -251,16 +248,18 @@
+     return env
+ 
+ def _get_args(ctx, compilation_context, srcs):
++    # These reach clang-tidy verbatim; the wrapper runs it directly, so shell
++    # quoting added here arrives as literal characters.
+     args = []
+     if (any(ctx.files._global_config)):
+         args.append("--config-file=" + ctx.files._global_config[0].path)
+     if (ctx.attr._lint_target_headers):
+         regex = _aggregate_regex(ctx, compilation_context)
+         if (regex):
+-            args.append(_quoted_arg("-header-filter=" + regex))
++            args.append("-header-filter=" + regex)
+     elif (ctx.attr._header_filter):
+         regex = ctx.attr._header_filter
+-        args.append(_quoted_arg("-header-filter=" + regex))
++        args.append("-header-filter=" + regex)
+     args.extend([src.path for src in srcs])
+     return args
+ 
