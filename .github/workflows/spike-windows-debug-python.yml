@@ -117,6 +117,22 @@ jobs:
       working-directory: pbs
       run: uv run --no-dev build.py --help
 
+    # build.py already treats build/ as a cache: it skips OpenSSL and libffi
+    # when their archives exist, and the downloaded perl/nasm/jom live there
+    # too. OpenSSL alone is ~15 minutes at jom /J 4, so restoring this is the
+    # difference between a 20 minute iteration and a 5 minute one.
+    #
+    # Keyed on downloads.py, which pins the dependency versions, rather than on
+    # build.py, so the patch series does not invalidate it. Bump v1 by hand if a
+    # patch ever changes how a dependency is built.
+    - name: Restore the PBS dependency cache
+      id: pbs-cache
+      uses: actions/cache/restore@v4
+      with:
+        path: pbs/build
+        key: pbs-build-v1-${{ env.PBS_PYTHON }}-${{ hashFiles('pbs/pythonbuild/downloads.py') }}
+        restore-keys: pbs-build-v1-${{ env.PBS_PYTHON }}-
+
     - name: Build ${{ env.PBS_PYTHON }} --options ${{ env.PBS_OPTIONS }}
       shell: cmd
       working-directory: pbs
@@ -124,6 +140,14 @@ jobs:
         for /f "usebackq tokens=*" %%i in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath`) do set VSPATH=%%i
         call "%VSPATH%\VC\Auxiliary\Build\vcvars64.bat" || exit /b 1
         uv run --no-dev build.py --python %PBS_PYTHON% --sh c:\cygwin\bin\sh.exe --options %PBS_OPTIONS% --vs 2026
+
+    # Only on success, so a half-built dependency cannot poison later runs.
+    - name: Save the PBS dependency cache
+      if: success() && steps.pbs-cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: pbs/build
+        key: ${{ steps.pbs-cache.outputs.cache-primary-key }}
 
     - name: What it produced
       if: always()
