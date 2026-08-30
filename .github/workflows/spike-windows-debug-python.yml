@@ -43,7 +43,10 @@ env:
   # PBS's own workflow, so the patch alone would not cover this run.
   UV_CACHE_DIR: ${{ github.workspace }}/.uv-cache
   PBS_REF: ${{ inputs.pbs_ref || 'main' }}
-  PBS_OPTIONS: ${{ inputs.pbs_options || 'noopt' }}
+  # Q2 is testing the debug option patch 0003 adds. workflow_dispatch only
+  # lists workflows present on the default branch, so until this merges the
+  # push trigger and this default are how it runs.
+  PBS_OPTIONS: ${{ inputs.pbs_options || 'debug' }}
   PBS_PYTHON: ${{ inputs.python || 'cpython-3.14' }}
 
 jobs:
@@ -125,13 +128,17 @@ jobs:
     # Keyed on downloads.py, which pins the dependency versions, rather than on
     # build.py, so the patch series does not invalidate it. Bump v1 by hand if a
     # patch ever changes how a dependency is built.
+    #
+    # The options go in the key because build.py names the dependency archives
+    # after them (openssl-3.5-<triple>-<options>-no-uplink.tar), so a debug run
+    # would hit a noopt cache, rebuild what it needs, and then decline to save.
     - name: Restore the PBS dependency cache
       id: pbs-cache
       uses: actions/cache/restore@v4
       with:
         path: pbs/build
-        key: pbs-build-v1-${{ env.PBS_PYTHON }}-${{ hashFiles('pbs/pythonbuild/downloads.py') }}
-        restore-keys: pbs-build-v1-${{ env.PBS_PYTHON }}-
+        key: pbs-build-v1-${{ env.PBS_PYTHON }}-${{ env.PBS_OPTIONS }}-${{ hashFiles('pbs/pythonbuild/downloads.py') }}
+        restore-keys: pbs-build-v1-${{ env.PBS_PYTHON }}-${{ env.PBS_OPTIONS }}-
 
     - name: Build ${{ env.PBS_PYTHON }} --options ${{ env.PBS_OPTIONS }}
       shell: cmd
