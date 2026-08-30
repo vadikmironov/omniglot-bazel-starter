@@ -14,26 +14,6 @@ runs:
         bazelisk-cache: true
         disk-cache: true
         repository-cache: true
-    # Windows never unpacks the LLVM toolchain, so it should be the least
-    # pressured of the three - but the Bazel output_base is on C:, not the
-    # roomier D: the workspace lives on, so report both before deciding.
-    - name: Report disk space
-      shell: pwsh
-      run: |
-        Get-PSDrive -PSProvider FileSystem |
-          Select-Object Name, @{n='UsedGB';e={[math]::Round($_.Used/1GB,1)}},
-                              @{n='FreeGB';e={[math]::Round($_.Free/1GB,1)}} |
-          Format-Table
-    # windows-latest ships VS2026 (14.51) alongside the VS2022 17.14 toolset
-    # (14.44). Bazel picks the installation default, and only 14.51 accepts
-    # /std:c++23, so .bazelrc's /std:c++23preview pin turns on this number.
-    - name: Print MSVC toolset
-      shell: pwsh
-      run: |
-        $vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath
-        Write-Host "VS install: $vs"
-        Write-Host "default toolset: $(Get-Content "$vs\VC\Auxiliary\Build\Microsoft.VCToolsVersion.default.txt")"
-        Get-ChildItem "$vs\VC\Tools\MSVC" -Name | ForEach-Object { Write-Host "  installed: $_" }
     - name: Print debug info
       shell: pwsh
       run: |
