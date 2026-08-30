@@ -1,27 +1,36 @@
-name: Spike - Windows debug CPython
+name: Spike - Q2 PBS Windows build
 
-# TEMPORARY. Q1 of #183: does a real debug CPython make Windows `-c dbg` work?
-# Builds stock CPython with PCbuild in Debug, then compiles an embedder /MDd
-# against it with no _DEBUG workaround. Deliberately avoids Bazel, rules_python
-# and python-build-standalone so that a failure points at exactly one thing.
+# TEMPORARY, for #183.
 #
-# No disk cleanup: setup_linux frees space for the 12 GB LLVM toolchain and the
-# Bazel caches, and this job fetches neither. The free-space report below is
-# there to prove that rather than assume it.
+# Q1 (answered): a debug CPython makes Windows `-c dbg` link without the _DEBUG
+# workaround. Recorded in #183; the probe that proved it is kept at
+# spike/windows_debug_python/embed_probe.cpp as the acceptance test for whatever
+# distribution Q2 eventually produces.
+#
+# Q2 (this workflow): can we drive python-build-standalone's Windows pipeline at
+# all? It has no debug build option -- `--options` accepts only noopt/pgo and
+# their freethreaded pairs, and `configuration="Release"` is hardcoded in
+# cpython-windows/build.py. Before patching any of that, reproduce their build
+# unmodified so we know the harness runs and what an iteration costs.
 #
 # Delete this workflow, and spike/, once #183 has its answer.
 
 on:
-  # Runs on any spike/** branch. workflow_dispatch only lists a workflow that
-  # exists on the default branch, so pushing the branch is the trigger until
-  # this lands on main.
   push:
     branches: [ "spike/**" ]
   workflow_dispatch:
     inputs:
-      cpython_ref:
-        description: CPython tag to build
-        default: v3.14.4
+      pbs_ref:
+        description: python-build-standalone ref
+        default: main
+        type: string
+      pbs_options:
+        description: --options value (noopt/pgo; debug once we add it)
+        default: noopt
+        type: string
+      python:
+        description: --python value
+        default: cpython-3.14
         type: string
 
 concurrency:
@@ -29,155 +38,89 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  CPYTHON_REF: ${{ inputs.cpython_ref || 'v3.14.4' }}
+  PBS_REF: ${{ inputs.pbs_ref || 'main' }}
+  PBS_OPTIONS: ${{ inputs.pbs_options || 'noopt' }}
+  PBS_PYTHON: ${{ inputs.python || 'cpython-3.14' }}
 
 jobs:
-  debug-cpython:
+  pbs-baseline:
     runs-on: windows-latest
-    name: Build debug CPython and probe embedding
+    name: Reproduce the PBS Windows build
     timeout-minutes: 120
     permissions:
       contents: read
 
     steps:
-    - uses: actions/checkout@v7
+    - name: Check out python-build-standalone
+      uses: actions/checkout@v7
+      with:
+        repository: astral-sh/python-build-standalone
+        ref: ${{ env.PBS_REF }}
+        path: pbs
 
     - name: Report free disk space
       shell: pwsh
       run: Get-PSDrive -PSProvider FileSystem | Select-Object Name, Used, Free | Format-Table
 
-    - name: Check out CPython ${{ env.CPYTHON_REF }}
-      uses: actions/checkout@v7
+    # build.py shells out to autoconf/libtool for libffi.
+    - name: Install Cygwin
+      uses: cygwin/cygwin-install-action@v6
       with:
-        repository: python/cpython
-        ref: ${{ env.CPYTHON_REF }}
-        path: cpython
-        fetch-depth: 1
+        packages: autoconf automake libtool
 
-    - name: Cache debug build
-      id: cpython-cache
+    - uses: astral-sh/setup-uv@v9
+      with:
+        enable-cache: false
+
+    - name: Cache the pythonbuild crate
       uses: actions/cache@v4
       with:
-        path: cpython/PCbuild/amd64
-        key: cpython-debug-${{ env.CPYTHON_REF }}-x64-v1
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          pbs/target
+        key: pbs-crate-${{ hashFiles('pbs/Cargo.lock') }}
 
-    # -d Debug, -e fetch/build externals, tkinter is dead weight here.
-    - name: Build debug CPython
-      if: steps.cpython-cache.outputs.cache-hit != 'true'
-      shell: cmd
-      working-directory: cpython/PCbuild
-      run: build.bat -d -e -p x64 --no-tkinter
-
-    - name: Show what the debug build produced
-      shell: cmd
+    # The real workflow builds this in a separate job and downloads it to the
+    # repo root, where build.py expects to find it.
+    - name: Build pythonbuild.exe
+      shell: pwsh
+      working-directory: pbs
       run: |
-        dir cpython\PCbuild\amd64\python*_d.* 2>nul
-        if not exist cpython\PCbuild\amd64\python314_d.lib (
-          echo MISSING python314_d.lib - the rest of this run is meaningless
-          exit /b 1
-        )
+        cargo build --release
+        Copy-Item target/release/pythonbuild.exe . -Force
+        ./pythonbuild.exe --help | Select-Object -First 3
 
-    # The whole point: /MDd defines _DEBUG, pyconfig.h asks for python314_d.lib
-    # via #pragma comment(lib, ...), and only a LIBPATH is supplied. If this
-    # links, the workaround in modules/cpp_py_bootstrap_app is unnecessary.
-    - name: Compile the probe /MDd, no _DEBUG workaround
+    # Upstream does this before activating VC++, or binary packages compile wrong.
+    - name: Bootstrap the Python environment
+      shell: pwsh
+      working-directory: pbs
+      run: uv run --no-dev build.py --help
+
+    - name: Build ${{ env.PBS_PYTHON }} --options ${{ env.PBS_OPTIONS }}
       shell: cmd
+      working-directory: pbs
       run: |
         for /f "usebackq tokens=*" %%i in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath`) do set VSPATH=%%i
         call "%VSPATH%\VC\Auxiliary\Build\vcvars64.bat" || exit /b 1
-        cl /nologo /std:c++20 /EHsc /MDd /Zi /utf-8 ^
-           /I cpython\Include /I cpython\PC ^
-           spike\windows_debug_python\embed_probe.cpp ^
-           /Fe:embed_probe.exe ^
-           /link /LIBPATH:cpython\PCbuild\amd64 || exit /b 1
+        uv run --no-dev build.py --python %PBS_PYTHON% --sh c:\cygwin\bin\sh.exe --options %PBS_OPTIONS% --vs 2026
 
-    - name: Run the probe
-      shell: cmd
-      run: |
-        set PATH=%CD%\cpython\PCbuild\amd64;%PATH%
-        embed_probe.exe %CD%\cpython
-
-    # windows-latest is now the VS2026 image, which carries both the 14.51
-    # (VS2026) and 14.44 (VS2022 17.14) toolsets. Docs still document only
-    # /std:c++23preview, so probe what cl actually accepts: .bazelrc pins
-    # --cxxopt=/std:c++23preview and would drop the suffix if it were real.
-    - name: MSVC /std support
-      continue-on-error: true
-      shell: cmd
-      run: |
-        for /f "usebackq tokens=*" %%i in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath`) do set VSPATH=%%i
-        call "%VSPATH%\VC\Auxiliary\Build\vcvars64.bat" >nul || exit /b 1
-        echo === toolset picked by vswhere -latest ===
-        cl 2>&1 | findstr /C:"Version"
-        echo int main(){return 0;} > %TEMP%\std_probe.cpp
-        for %%s in (c++20 c++23 c++23preview c++latest) do (
-          cl /nologo /std:%%s /c /Fo%TEMP%\ %TEMP%\std_probe.cpp >nul 2>&1 && echo   /std:%%s accepted || echo   /std:%%s REJECTED
-        )
-
-    # Informational, for #183's Windows wheel question: which tags does a debug
-    # interpreter accept, and can it install a release-ABI wheel? Never fatal.
-    - name: Wheel compatibility of the debug interpreter
-      continue-on-error: true
-      shell: cmd
-      run: |
-        set PATH=%CD%\cpython\PCbuild\amd64;%PATH%
-        cpython\PCbuild\amd64\python_d.exe -m ensurepip
-        echo === compatible tags ===
-        cpython\PCbuild\amd64\python_d.exe -m pip debug --verbose
-        echo === install a release-ABI wheel ===
-        cpython\PCbuild\amd64\python_d.exe -m pip install --only-binary=:all: markupsafe pyyaml
-        echo === why release wheels do not work: extension suffixes ===
-        cpython\PCbuild\amd64\python_d.exe -c "import importlib.machinery as m; print('  EXTENSION_SUFFIXES:', m.EXTENSION_SUFFIXES)"
-        echo === what the release wheels actually put on disk ===
-        cpython\PCbuild\amd64\python_d.exe -c "import pathlib,sysconfig; sp=pathlib.Path(sysconfig.get_paths()['purelib']); print('\n'.join('  '+str(p.relative_to(sp)) for p in sorted(sp.rglob('*.pyd'))) or '  (no .pyd found)')"
-        echo === can the debug interpreter import them? ===
-        rem Both packages fall back to pure Python, so import the extension
-        rem directly; a silent fallback would otherwise look like success.
-        cpython\PCbuild\amd64\python_d.exe -c "import markupsafe._speedups" && echo   markupsafe._speedups: loaded || echo   markupsafe._speedups: NOT loaded
-        cpython\PCbuild\amd64\python_d.exe -c "import _yaml" && echo   _yaml: loaded || echo   _yaml: NOT loaded
-
-  # Which MSVC toolset does *Bazel* pick? vswhere and MSBuild each answered
-  # differently on this image (14.51 and 14.44), and neither speaks for Bazel.
-  # CC_CONFIGURE_DEBUG is in the cc_autoconf repo rule's `environ`, so setting it
-  # both invalidates the rule and makes it report its own choice.
-  msvc-selection:
-    runs-on: windows-latest
-    name: Which MSVC toolset Bazel picks
-    timeout-minutes: 30
-    permissions:
-      contents: read
-
-    steps:
-    - uses: bazel-contrib/setup-bazel@0.19.0
-      with:
-        bazelisk-cache: true
-
-    # A scratch module, so the answer is about the image and not our dep graph.
-    - name: Create a minimal workspace
-      shell: bash
-      run: |
-        mkdir -p msvc_probe
-        cd msvc_probe
-        printf '9.2.0\n' > .bazelversion
-        printf 'bazel_dep(name = "rules_cc", version = "0.2.22")\n' > MODULE.bazel
-        printf 'load("@rules_cc//cc:defs.bzl", "cc_binary")\ncc_binary(name = "probe", srcs = ["probe.cc"])\n' > BUILD.bazel
-        printf 'int main() { return 0; }\n' > probe.cc
-
-    - name: Ask Bazel which toolset it chose
+    - name: What it produced
+      if: always()
       shell: pwsh
-      working-directory: msvc_probe
-      env:
-        CC_CONFIGURE_DEBUG: "1"
+      working-directory: pbs
       run: |
-        bazel --output_base=C:/bzl_probe build //:probe 2>&1 | Tee-Object -FilePath bazel.log
-        Write-Host "=== selection trace ==="
-        Select-String -Path bazel.log -Pattern "vswhere|VC versions|Choosing the latest|build tools found|BAZEL_VC"
+        Get-ChildItem dist -ErrorAction SilentlyContinue |
+          Select-Object Name, @{n='MB';e={[math]::Round($_.Length/1MB,1)}} | Format-Table
+        if (Test-Path build/build.log) {
+          Write-Host "=== tail of build.log ==="
+          Get-Content build/build.log -Tail 40
+        }
 
-    - name: Compiler Bazel actually wired up
+    - name: Validate the distribution
+      if: success()
       shell: pwsh
-      working-directory: msvc_probe
+      working-directory: pbs
       run: |
-        Get-ChildItem C:/bzl_probe/external -Directory -Filter "*local_config_cc*" -ErrorAction SilentlyContinue |
-          ForEach-Object { Write-Host "repo: $($_.Name)" }
-        Select-String -Path "C:/bzl_probe/external/*local_config_cc*/*" -Pattern "Tools\\MSVC\\[0-9.]+" -ErrorAction SilentlyContinue |
-          ForEach-Object { $_.Matches[0].Value } | Sort-Object -Unique
+        $dists = Resolve-Path -Path "dist/*.tar.zst" -Relative
+        ./pythonbuild.exe validate-distribution $dists
