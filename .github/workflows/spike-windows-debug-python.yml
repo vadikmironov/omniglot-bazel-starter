@@ -97,6 +97,23 @@ jobs:
         set PATH=%CD%\cpython\PCbuild\amd64;%PATH%
         embed_probe.exe %CD%\cpython
 
+    # windows-latest is now the VS2026 image, which carries both the 14.51
+    # (VS2026) and 14.44 (VS2022 17.14) toolsets. Docs still document only
+    # /std:c++23preview, so probe what cl actually accepts: .bazelrc pins
+    # --cxxopt=/std:c++23preview and would drop the suffix if it were real.
+    - name: MSVC /std support
+      continue-on-error: true
+      shell: cmd
+      run: |
+        for /f "usebackq tokens=*" %%i in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath`) do set VSPATH=%%i
+        call "%VSPATH%\VC\Auxiliary\Build\vcvars64.bat" >nul || exit /b 1
+        echo === toolset picked by vswhere -latest ===
+        cl 2>&1 | findstr /C:"Version"
+        echo int main(){return 0;} > %TEMP%\std_probe.cpp
+        for %%s in (c++20 c++23 c++23preview c++latest) do (
+          cl /nologo /std:%%s /c /Fo%TEMP%\ %TEMP%\std_probe.cpp >nul 2>&1 && echo   /std:%%s accepted || echo   /std:%%s REJECTED
+        )
+
     # Informational, for #183's Windows wheel question: which tags does a debug
     # interpreter accept, and can it install a release-ABI wheel? Never fatal.
     - name: Wheel compatibility of the debug interpreter
