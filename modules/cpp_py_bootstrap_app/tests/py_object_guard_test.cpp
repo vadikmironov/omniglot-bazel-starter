@@ -1,10 +1,11 @@
 #define PY_SSIZE_T_CLEAN
 #include "py_object_guard.h"
 
-#include <Python.h>
 #include <gtest/gtest.h>
 
 #include <utility>
+
+#include "python_h.h"
 
 namespace {
 

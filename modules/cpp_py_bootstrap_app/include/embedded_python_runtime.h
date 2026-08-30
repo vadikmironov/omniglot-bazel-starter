@@ -2,8 +2,6 @@
 
 #define PY_SSIZE_T_CLEAN
 // NOLINTNEXTLINE(misc-include-cleaner)
-#include <Python.h>
-
 #include <initializer_list>
 #include <memory>
 #include <optional>
@@ -15,6 +13,7 @@
 #include "gil_release_guard.h"
 #include "py_arg.h"
 #include "py_result_converter.h"
+#include "python_h.h"
 #include "spdlog/logger.h"
 
 /// RAII wrapper managing the lifecycle of an embedded Python runtime.

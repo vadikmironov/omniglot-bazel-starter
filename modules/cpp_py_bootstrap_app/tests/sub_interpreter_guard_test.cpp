@@ -1,8 +1,9 @@
 #define PY_SSIZE_T_CLEAN
 #include "sub_interpreter_guard.h"
 
-#include <Python.h>
 #include <gtest/gtest.h>
+
+#include "python_h.h"
 
 namespace {
 

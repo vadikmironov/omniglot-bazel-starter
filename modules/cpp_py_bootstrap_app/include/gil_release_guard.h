@@ -1,7 +1,7 @@
 #pragma once
 
 #define PY_SSIZE_T_CLEAN
-#include <Python.h>
+#include "python_h.h"
 
 /// RAII guard: releases the GIL on construction, reacquires on destruction.
 ///

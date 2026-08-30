@@ -1,7 +1,7 @@
 #define PY_SSIZE_T_CLEAN
-#include <Python.h>
 #include <gtest/gtest.h>
 
+#include "python_h.h"
 #include "spdlog/sinks/null_sink.h"
 #include "spdlog/spdlog.h"
 

@@ -1,7 +1,7 @@
 #pragma once
 
 #define PY_SSIZE_T_CLEAN
-#include <Python.h>
+#include "python_h.h"
 
 /// RAII wrapper for PyObject* (calls Py_XDECREF on destruction).
 /// Follows the "stolen reference" pattern — constructing a PyObjectGuard takes

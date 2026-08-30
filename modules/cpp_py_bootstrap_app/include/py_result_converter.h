@@ -1,10 +1,9 @@
 #pragma once
 
 #define PY_SSIZE_T_CLEAN
-#include <Python.h>
-
 #include <string>
 
+#include "python_h.h"
 #include "spdlog/logger.h"
 
 /// Function pointer type for type-erased result conversion.

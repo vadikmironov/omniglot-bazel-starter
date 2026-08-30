@@ -1,6 +1,17 @@
 // NOLINTBEGIN(misc-include-cleaner) — Python.h is CPython's umbrella header; sub-headers are internal
 #define PY_SSIZE_T_CLEAN
+// MSVC's pyconfig.h selects the import library with a #pragma comment(lib, ...)
+// guarded on _DEBUG, and asks for python3XX_d.lib when it is set. Bazel's -c dbg
+// uses the debug CRT, which defines it, but a standard CPython ships only the
+// release import library. Undefining _DEBUG across the include steers just that
+// pragma and leaves the CRT selection alone.
+#ifdef _DEBUG
+#undef _DEBUG
 #include <Python.h>
+#define _DEBUG
+#else
+#include <Python.h>
+#endif
 
 #include <atomic>
 #include <cstdint>

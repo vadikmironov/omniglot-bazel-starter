@@ -2,8 +2,6 @@
 #include "embedded_python_runtime.h"
 
 // NOLINTBEGIN(misc-include-cleaner) — Python.h is CPython's umbrella header; sub-headers are internal
-#include <Python.h>
-
 #include <cstdlib>
 #include <memory>
 #include <span>
@@ -16,6 +14,7 @@
 #include "gil_release_guard.h"
 #include "py_object_guard.h"
 #include "py_result_converter.h"
+#include "python_h.h"
 #include "python_lib_resolver.h"
 #include "python_toolchain_resolver.h"
 #include "spdlog/logger.h"
