@@ -23,6 +23,8 @@ runs:
     - name: Free disk space
       shell: bash
       run: |
+        avail() { df -BG --output=avail / | tail -1 | tr -dc '0-9'; }
+        before=$(avail)
         rm -rf /opt/hostedtoolcache        # ~8 GB  — cached language runtimes
         sudo rm -rf /usr/local/lib/android # ~11 GB — Android SDK
         sudo rm -rf /usr/share/dotnet      # ~3 GB  — .NET SDK
@@ -31,6 +33,7 @@ runs:
         # Unset ANDROID_HOME so rules_android creates an empty stub
         # instead of failing on the now-deleted SDK directory.
         echo "ANDROID_HOME=" >> "$GITHUB_ENV"
+        echo "free GB on /: $before -> $(avail)"
     - name: Install libtinfo5 (dependency for clang)
       shell: bash
       run: |

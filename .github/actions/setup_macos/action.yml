@@ -14,6 +14,16 @@ runs:
         bazelisk-cache: true
         disk-cache: ${{ hashFiles('.bazelversion', 'MODULE.bazel') }}
         repository-cache: true
+    # macOS frees nothing today, yet it fetches the same ~12 GB hermetic LLVM
+    # toolchain as Linux (see the libc++ patch below, and #184). Measure before
+    # deciding what to delete: the image ships seven Xcode versions under
+    # /Applications, so the headroom question is worth an actual number.
+    - name: Report disk space
+      shell: bash
+      run: |
+        df -h / /System/Volumes/Data 2>/dev/null || df -h /
+        echo "=== largest items in /Applications ==="
+        sudo du -sh /Applications/* 2>/dev/null | sort -rh | head -12
     - name: Install bash 4+ via Homebrew
       shell: bash
       run: brew install bash

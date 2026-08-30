@@ -14,6 +14,16 @@ runs:
         bazelisk-cache: true
         disk-cache: true
         repository-cache: true
+    # Windows never unpacks the LLVM toolchain, so it should be the least
+    # pressured of the three - but the Bazel output_base is on C:, not the
+    # roomier D: the workspace lives on, so report both before deciding.
+    - name: Report disk space
+      shell: pwsh
+      run: |
+        Get-PSDrive -PSProvider FileSystem |
+          Select-Object Name, @{n='UsedGB';e={[math]::Round($_.Used/1GB,1)}},
+                              @{n='FreeGB';e={[math]::Round($_.Free/1GB,1)}} |
+          Format-Table
     - name: Print debug info
       shell: pwsh
       run: |
