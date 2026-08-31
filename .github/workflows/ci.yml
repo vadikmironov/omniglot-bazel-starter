@@ -5,6 +5,7 @@ on:
     branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
+    types: [opened, synchronize, reopened, labeled]
   workflow_dispatch:
 
 # Cancel stale runs when new commits are pushed
@@ -25,7 +26,7 @@ concurrency:
 #   0  preflight   buildifier + format, split out so a slip reports in minutes
 #                  rather than after the ~12-minute lint job
 #   1  build-*     the four platforms at fastbuild, plus lint and coverage
-#   2  build-modes the same four under -c dbg and -c opt, post-merge only:
+#   2  build-modes the same four under -c dbg and -c opt, post-merge by default:
 #                  the code already passed tier 1 as a PR, and one run maps to
 #                  one squashed commit so failures stay attributable
 #   3  (weekly.yml) remote toolchains and profiling — things that rot from
@@ -192,7 +193,9 @@ jobs:
   # libraries pick up debug-postfixed names. A cmake() output name that only
   # differs under -c dbg went unnoticed for months for want of this.
   build-modes:
-    if: github.event_name != 'pull_request'
+    if: >-
+      github.event_name != 'pull_request' ||
+      contains(github.event.pull_request.labels.*.name, 'ci-full-matrix')
     name: Build & test (${{ matrix.name }}, -c ${{ matrix.mode }})
     runs-on: ${{ matrix.os }}
     permissions:

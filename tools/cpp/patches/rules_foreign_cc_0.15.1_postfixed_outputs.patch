@@ -1,0 +1,322 @@
+Resolve declared outputs against what the build says it produced
+
+out_static_libs has to name library files exactly, and the name a build
+produces is not knowable when the rule is written. Two cases bite.
+
+The default is wrong for CMake on unix. With nothing declared, the rule
+expects lib_name + ".a", so a cmake(name = "fmt") target declares fmt.a
+while CMake produces libfmt.a, and the action fails in every compilation
+mode:
+
+  ERROR: output 'fmt/lib/fmt.a' was not created
+  ERROR: Foreign Cc - CMake: Building fmt failed: not all outputs were
+         created or valid
+
+Debug builds rename further. rules_foreign_cc sets CMAKE_BUILD_TYPE=Debug
+itself for -c dbg, and projects append a postfix in that configuration
+through CMAKE_DEBUG_POSTFIX or a variable of their own, so libfmt.a
+becomes libfmtd.a. Pinning the postfix off does not help either: an empty
+cache entry already means "omit this variable", so the empty string
+cannot be expressed.
+
+Bazel's contract is that a declared output exists when the action ends,
+not that it is named whatever the underlying tool chose. So ask the build
+rather than guess. A codemodel-v2 query is written before configure, and
+each target's reply carries nameOnDisk, so a declared fmt.a or libfmt.a
+resolves through target fmt to whatever that target became.
+
+Guessing is not good enough here. fmt builds both fmt and fmt-c, and only
+fmt passes through the helper that sets DEBUG_POSTFIX, so a Debug tree
+holds libfmtd.a beside an unpostfixed libfmt-c.a. A libfmt*.a glob cannot
+tell which is a renamed libfmt.a, and a postfix candidate list only
+happens to work because nothing declared fmt-c. Asking the build makes it
+structural.
+
+When no target claims a declared name the pass fails the script, so the
+build log reaches the console with a list of what was produced. Bazel's
+own error names only the file that is missing. Builds that leave no
+reply, such as make or ninja, take the same path.
+
+The fragment is identical across the four platforms, using only test,
+grep, cut, find and cp, so macOS needs no realpath special case.
+
+diff --git a/foreign_cc/private/cmake_script.bzl b/foreign_cc/private/cmake_script.bzl
+--- a/foreign_cc/private/cmake_script.bzl
++++ b/foreign_cc/private/cmake_script.bzl
+@@ -174,6 +174,11 @@
+ 
+     directory = "$$EXT_BUILD_ROOT$$/" + root
+ 
++    # Ask CMake to describe the build system it is about to generate. The reply
++    # names each target's artifact on disk, which is how a declared output can
++    # be satisfied when a configuration postfix renamed it.
++    script.append("mkdir -p .cmake/api/v1/query && :> .cmake/api/v1/query/codemodel-v2")
++
+     script.append("##enable_tracing##")
+ 
+     # Configure the CMake generate command
+diff --git a/foreign_cc/private/framework.bzl b/foreign_cc/private/framework.bzl
+--- a/foreign_cc/private/framework.bzl
++++ b/foreign_cc/private/framework.bzl
+@@ -499,6 +499,13 @@
+         installdir_copy.script,
+         "cd $$EXT_BUILD_ROOT$$",
+     ] + [
++        "##resolve_postfixed_output## {}".format(file.path)
++        for file in (
++            outputs.libraries.static_libraries +
++            outputs.libraries.shared_libraries +
++            outputs.libraries.interface_libraries
++        )
++    ] + [
+         "##replace_symlink## {}".format(file.path)
+         for file in (
+             outputs.out_binary_files +
+diff --git a/foreign_cc/private/framework/toolchains/macos_commands.bzl b/foreign_cc/private/framework/toolchains/macos_commands.bzl
+--- a/foreign_cc/private/framework/toolchains/macos_commands.bzl
++++ b/foreign_cc/private/framework/toolchains/macos_commands.bzl
+@@ -254,6 +254,44 @@
+         abs_path = abs_path,
+     )
+ 
++def resolve_postfixed_output(file):
++    # A build may decorate an artifact name with a configuration postfix
++    # (CMAKE_DEBUG_POSTFIX, or a project's own), so -c dbg produces libfood.a
++    # where libfoo.a was declared and the action fails on a missing output.
++    #
++    # Rather than guess the postfix, ask the build. CMake's file API reply names
++    # each target's artifact on disk, so a declared libfoo.a resolves through
++    # target foo to whatever it was actually called. Builds that leave no reply,
++    # such as make or ninja, fall through to reporting what was produced, since
++    # Bazel's own error names only the file that is missing.
++    return """\
++if [[ ! -e "{file}" ]]; then
++  _decl="{file}"
++  _dir="$(dirname "${{_decl}}")"
++  _base="$(basename "${{_decl}}")"
++  _target="${{_base%.*}}"
++  _target="${{_target#lib}}"
++  _found=""
++  for _tj in "${{BUILD_TMPDIR}}/.cmake/api/v1/reply/target-${{_target}}-"*.json; do
++    [[ -e "${{_tj}}" ]] || continue
++    _ondisk="$(grep -o '"nameOnDisk"[^,}}]*' "${{_tj}}" | head -n 1 | cut -d'"' -f4)"
++    if [[ -n "${{_ondisk}}" && -e "${{_dir}}/${{_ondisk}}" ]]; then
++      _found="${{_dir}}/${{_ondisk}}"
++      break
++    fi
++  done
++  if [[ -n "${{_found}}" ]]; then
++    echo "rules_foreign_cc: target ${{_target}} is on disk as $(basename "${{_found}}"), satisfying ${{_base}}"
++    cp -a "${{_found}}" "${{_decl}}"
++  else
++    echo "rules_foreign_cc: ${{_decl}} was not produced, and no target named ${{_target}} claims it"
++    find "${{_dir}}" -maxdepth 1 -type f -printf "rules_foreign_cc:   produced %f\n" 2>/dev/null
++    exit 1
++  fi
++fi
++""".format(file = file)
++
++
+ def replace_symlink(file):
+     # On macos, the `readlink` binary doesn't have a `-f` argument like the linux
+     # equivilant. As a result, we need another way to fully resolve chaining symlinks.
+@@ -290,6 +328,7 @@
+     replace_absolute_paths = replace_absolute_paths,
+     replace_in_files = replace_in_files,
+     replace_sandbox_paths = replace_sandbox_paths,
++    resolve_postfixed_output = resolve_postfixed_output,
+     replace_symlink = replace_symlink,
+     rm_rf = rm_rf,
+     script_extension = script_extension,
+diff --git a/foreign_cc/private/framework/toolchains/linux_commands.bzl b/foreign_cc/private/framework/toolchains/linux_commands.bzl
+--- a/foreign_cc/private/framework/toolchains/linux_commands.bzl
++++ b/foreign_cc/private/framework/toolchains/linux_commands.bzl
+@@ -245,6 +245,44 @@
+         abs_path = abs_path,
+     )
+ 
++def resolve_postfixed_output(file):
++    # A build may decorate an artifact name with a configuration postfix
++    # (CMAKE_DEBUG_POSTFIX, or a project's own), so -c dbg produces libfood.a
++    # where libfoo.a was declared and the action fails on a missing output.
++    #
++    # Rather than guess the postfix, ask the build. CMake's file API reply names
++    # each target's artifact on disk, so a declared libfoo.a resolves through
++    # target foo to whatever it was actually called. Builds that leave no reply,
++    # such as make or ninja, fall through to reporting what was produced, since
++    # Bazel's own error names only the file that is missing.
++    return """\
++if [[ ! -e "{file}" ]]; then
++  _decl="{file}"
++  _dir="$(dirname "${{_decl}}")"
++  _base="$(basename "${{_decl}}")"
++  _target="${{_base%.*}}"
++  _target="${{_target#lib}}"
++  _found=""
++  for _tj in "${{BUILD_TMPDIR}}/.cmake/api/v1/reply/target-${{_target}}-"*.json; do
++    [[ -e "${{_tj}}" ]] || continue
++    _ondisk="$(grep -o '"nameOnDisk"[^,}}]*' "${{_tj}}" | head -n 1 | cut -d'"' -f4)"
++    if [[ -n "${{_ondisk}}" && -e "${{_dir}}/${{_ondisk}}" ]]; then
++      _found="${{_dir}}/${{_ondisk}}"
++      break
++    fi
++  done
++  if [[ -n "${{_found}}" ]]; then
++    echo "rules_foreign_cc: target ${{_target}} is on disk as $(basename "${{_found}}"), satisfying ${{_base}}"
++    cp -a "${{_found}}" "${{_decl}}"
++  else
++    echo "rules_foreign_cc: ${{_decl}} was not produced, and no target named ${{_target}} claims it"
++    find "${{_dir}}" -maxdepth 1 -type f -printf "rules_foreign_cc:   produced %f\n" 2>/dev/null
++    exit 1
++  fi
++fi
++""".format(file = file)
++
++
+ def replace_symlink(file):
+     return """\
+ if [[ -L "{file}" ]]; then
+@@ -277,6 +315,7 @@
+     replace_absolute_paths = replace_absolute_paths,
+     replace_in_files = replace_in_files,
+     replace_sandbox_paths = replace_sandbox_paths,
++    resolve_postfixed_output = resolve_postfixed_output,
+     replace_symlink = replace_symlink,
+     rm_rf = rm_rf,
+     script_extension = script_extension,
+diff --git a/foreign_cc/private/framework/toolchains/freebsd_commands.bzl b/foreign_cc/private/framework/toolchains/freebsd_commands.bzl
+--- a/foreign_cc/private/framework/toolchains/freebsd_commands.bzl
++++ b/foreign_cc/private/framework/toolchains/freebsd_commands.bzl
+@@ -263,6 +263,44 @@
+         abs_path = abs_path,
+     )
+ 
++def resolve_postfixed_output(file):
++    # A build may decorate an artifact name with a configuration postfix
++    # (CMAKE_DEBUG_POSTFIX, or a project's own), so -c dbg produces libfood.a
++    # where libfoo.a was declared and the action fails on a missing output.
++    #
++    # Rather than guess the postfix, ask the build. CMake's file API reply names
++    # each target's artifact on disk, so a declared libfoo.a resolves through
++    # target foo to whatever it was actually called. Builds that leave no reply,
++    # such as make or ninja, fall through to reporting what was produced, since
++    # Bazel's own error names only the file that is missing.
++    return """\
++if [[ ! -e "{file}" ]]; then
++  _decl="{file}"
++  _dir="$(dirname "${{_decl}}")"
++  _base="$(basename "${{_decl}}")"
++  _target="${{_base%.*}}"
++  _target="${{_target#lib}}"
++  _found=""
++  for _tj in "${{BUILD_TMPDIR}}/.cmake/api/v1/reply/target-${{_target}}-"*.json; do
++    [[ -e "${{_tj}}" ]] || continue
++    _ondisk="$(grep -o '"nameOnDisk"[^,}}]*' "${{_tj}}" | head -n 1 | cut -d'"' -f4)"
++    if [[ -n "${{_ondisk}}" && -e "${{_dir}}/${{_ondisk}}" ]]; then
++      _found="${{_dir}}/${{_ondisk}}"
++      break
++    fi
++  done
++  if [[ -n "${{_found}}" ]]; then
++    echo "rules_foreign_cc: target ${{_target}} is on disk as $(basename "${{_found}}"), satisfying ${{_base}}"
++    cp -a "${{_found}}" "${{_decl}}"
++  else
++    echo "rules_foreign_cc: ${{_decl}} was not produced, and no target named ${{_target}} claims it"
++    find "${{_dir}}" -maxdepth 1 -type f -printf "rules_foreign_cc:   produced %f\n" 2>/dev/null
++    exit 1
++  fi
++fi
++""".format(file = file)
++
++
+ def replace_symlink(file):
+     return """\
+ if [[ -L "{file}" ]]; then
+@@ -295,6 +333,7 @@
+     replace_absolute_paths = replace_absolute_paths,
+     replace_in_files = replace_in_files,
+     replace_sandbox_paths = replace_sandbox_paths,
++    resolve_postfixed_output = resolve_postfixed_output,
+     replace_symlink = replace_symlink,
+     rm_rf = rm_rf,
+     script_extension = script_extension,
+diff --git a/foreign_cc/private/framework/toolchains/windows_commands.bzl b/foreign_cc/private/framework/toolchains/windows_commands.bzl
+--- a/foreign_cc/private/framework/toolchains/windows_commands.bzl
++++ b/foreign_cc/private/framework/toolchains/windows_commands.bzl
+@@ -280,6 +280,44 @@
+         abs_path = abs_path,
+     )
+ 
++def resolve_postfixed_output(file):
++    # A build may decorate an artifact name with a configuration postfix
++    # (CMAKE_DEBUG_POSTFIX, or a project's own), so -c dbg produces libfood.a
++    # where libfoo.a was declared and the action fails on a missing output.
++    #
++    # Rather than guess the postfix, ask the build. CMake's file API reply names
++    # each target's artifact on disk, so a declared libfoo.a resolves through
++    # target foo to whatever it was actually called. Builds that leave no reply,
++    # such as make or ninja, fall through to reporting what was produced, since
++    # Bazel's own error names only the file that is missing.
++    return """\
++if [[ ! -e "{file}" ]]; then
++  _decl="{file}"
++  _dir="$(dirname "${{_decl}}")"
++  _base="$(basename "${{_decl}}")"
++  _target="${{_base%.*}}"
++  _target="${{_target#lib}}"
++  _found=""
++  for _tj in "${{BUILD_TMPDIR}}/.cmake/api/v1/reply/target-${{_target}}-"*.json; do
++    [[ -e "${{_tj}}" ]] || continue
++    _ondisk="$(grep -o '"nameOnDisk"[^,}}]*' "${{_tj}}" | head -n 1 | cut -d'"' -f4)"
++    if [[ -n "${{_ondisk}}" && -e "${{_dir}}/${{_ondisk}}" ]]; then
++      _found="${{_dir}}/${{_ondisk}}"
++      break
++    fi
++  done
++  if [[ -n "${{_found}}" ]]; then
++    echo "rules_foreign_cc: target ${{_target}} is on disk as $(basename "${{_found}}"), satisfying ${{_base}}"
++    cp -a "${{_found}}" "${{_decl}}"
++  else
++    echo "rules_foreign_cc: ${{_decl}} was not produced, and no target named ${{_target}} claims it"
++    find "${{_dir}}" -maxdepth 1 -type f -printf "rules_foreign_cc:   produced %f\n" 2>/dev/null
++    exit 1
++  fi
++fi
++""".format(file = file)
++
++
+ def replace_symlink(file):
+     return """\
+ if [[ -L "{file}" ]]; then
+@@ -312,6 +350,7 @@
+     replace_absolute_paths = replace_absolute_paths,
+     replace_in_files = replace_in_files,
+     replace_sandbox_paths = replace_sandbox_paths,
++    resolve_postfixed_output = resolve_postfixed_output,
+     replace_symlink = replace_symlink,
+     rm_rf = rm_rf,
+     script_extension = script_extension,
+diff --git a/foreign_cc/private/framework/toolchains/commands.bzl b/foreign_cc/private/framework/toolchains/commands.bzl
+--- a/foreign_cc/private/framework/toolchains/commands.bzl
++++ b/foreign_cc/private/framework/toolchains/commands.bzl
+@@ -191,6 +191,20 @@
+         ],
+         doc = "Replaces sandbox path 'abs_path' inside 'dir_' with a placeholder value",
+     ),
++    "resolve_postfixed_output": _command_info(
++        arguments = [
++            _argument_info(
++                name = "file",
++                data_type = type(""),
++                doc = "Declared output file",
++            ),
++        ],
++        doc = (
++            "Satisfy a declared output from an unambiguously matching artifact when the " +
++            "build decorated the name with a configuration postfix, and otherwise report " +
++            "what was produced"
++        ),
++    ),
+     "replace_symlink": _command_info(
+         arguments = [
+             _argument_info(
