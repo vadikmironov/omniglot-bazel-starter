@@ -1,0 +1,61 @@
+Allow debug artifacts in the PE validator
+
+validate-distribution rejects a Windows `debug` build, because the PE
+allow list carries only release names:
+
+  error: python/install/python_d.exe loads illegal library python314_d.dll
+  error: python/install/python_d.exe loads illegal library VCRUNTIME140D.dll
+  error: python/install/python_d.exe loads illegal library ucrtbased.dll
+
+All three are correct for a debug distribution. The Mach-O and ELF allow
+lists already carry their debug equivalents unconditionally --
+@rpath/libpython3.13d.dylib, libpython3.14d.so.1.0 -- so this brings PE
+into line rather than gating on build options.
+
+ucrtbased.dll is listed because a release build reaches the UCRT through
+the api-ms-win-crt-* forwarders, while a debug build imports it directly.
+
+diff --git a/src/validation.rs b/src/validation.rs
+--- a/src/validation.rs
++++ b/src/validation.rs
+@@ -109,6 +109,10 @@
+     "VERSION.dll",
+     "VCRUNTIME140.dll",
+     "VCRUNTIME140_1.dll",
++    // Debug CRT, imported by `debug` builds.
++    "ucrtbased.dll",
++    "VCRUNTIME140D.dll",
++    "VCRUNTIME140_1D.dll",
+     "WINMM.dll",
+     "WS2_32.dll",
+     // Our libraries.
+@@ -124,17 +128,29 @@
+     "libssl-3-arm64.dll",
+     "libssl-3-x64.dll",
+     "python3.dll",
++    "python3_d.dll",
+     "python3t.dll",
++    "python3t_d.dll",
+     "python39.dll",
++    "python39_d.dll",
+     "python310.dll",
++    "python310_d.dll",
+     "python311.dll",
++    "python311_d.dll",
+     "python312.dll",
++    "python312_d.dll",
+     "python313.dll",
++    "python313_d.dll",
+     "python313t.dll",
++    "python313t_d.dll",
+     "python314.dll",
++    "python314_d.dll",
+     "python314t.dll",
++    "python314t_d.dll",
+     "python315.dll",
++    "python315_d.dll",
+     "python315t.dll",
++    "python315t_d.dll",
+     "sqlite3.dll",
+     "tcl86t.dll",
+     "tk86t.dll",
