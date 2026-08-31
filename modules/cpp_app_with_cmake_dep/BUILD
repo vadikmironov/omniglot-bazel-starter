@@ -19,28 +19,20 @@ cmake(
         "FMT_DOC": "OFF",
     },
     lib_source = "@fmt_src//:all_srcs",
-    # rules_foreign_cc matches out_static_libs literally, and the name varies on
-    # two axes: MSVC produces fmt.lib rather than libfmt.a, and fmt appends
-    # FMT_DEBUG_POSTFIX ("d") in Debug builds, which -c dbg selects. The postfix
-    # cannot simply be pinned off -- rules_foreign_cc drops any cache entry whose
-    # value is empty (_wipe_empty_values), so fmt's own default would win.
+    # Below block is not strictly required and is only added to demonstrate a
+    # linkage for CMake project with multiple targets . Unfortunately, this
+    # forces special branch for Windows to avoid producing ar archives with
+    # lib extension on Linux/MacOS.
     out_static_libs = select({
-        ":windows_dbg": ["fmtd.lib"],
-        "@platforms//os:windows": ["fmt.lib"],
-        ":dbg": ["libfmtd.a"],
-        "//conditions:default": ["libfmt.a"],
+        "@platforms//os:windows": [
+            "fmt.lib",
+            "fmt-c.lib",
+        ],
+        "//conditions:default": [
+            "libfmt.a",
+            "libfmt-c.a",
+        ],
     }),
-)
-
-config_setting(
-    name = "dbg",
-    values = {"compilation_mode": "dbg"},
-)
-
-config_setting(
-    name = "windows_dbg",
-    constraint_values = ["@platforms//os:windows"],
-    values = {"compilation_mode": "dbg"},
 )
 
 cc_binary(

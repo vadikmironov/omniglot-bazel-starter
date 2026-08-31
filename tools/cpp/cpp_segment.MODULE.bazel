@@ -50,6 +50,7 @@ single_version_override(
         "//tools/cpp/patches:rules_foreign_cc_0.15.1_cc_import_load.patch",
         "//tools/cpp/patches:rules_foreign_cc_0.15.1_pkgconfig_gnu90.patch",
         "//tools/cpp/patches:rules_foreign_cc_0.15.1_msvc_pkgconfig_bzlmod_paths.patch",
+        "//tools/cpp/patches:rules_foreign_cc_0.15.1_postfixed_outputs.patch",
     ],
 )
 

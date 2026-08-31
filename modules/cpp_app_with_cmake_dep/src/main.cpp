@@ -1,4 +1,7 @@
 #include <fmt/base.h>
+#include <fmt/fmt-c.h>
+
+#include <cstdio>
 
 // fmt::println comes from <fmt/base.h>, the lightweight core of {fmt}. The
 // library was compiled from its upstream CMakeLists.txt by the cmake() rule in
@@ -17,4 +20,8 @@ auto main() -> int {
 #endif
 
     fmt::println("Hello, World! Printed by fmt, built from CMake via rules_foreign_cc.");
+
+    // fmt-c is the second library from the same CMake project, and the one
+    // that carries no debug postfix.
+    fmt_vprint(stdout, "Hello, World! Printed by the fmt-c API, built from CMake via rules_foreign_cc.\n", nullptr, 0);
 }
