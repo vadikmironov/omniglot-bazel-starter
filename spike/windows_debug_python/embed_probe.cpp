@@ -61,10 +61,28 @@ auto main(int argc, char** argv) -> int {
 
     // The interpreter is only a debug build if these are present.
     if (not run("import sys, sysconfig\n"
+                "assert sysconfig.get_config_var('Py_DEBUG') == 1, 'not a debug interpreter'\n"
+                "assert hasattr(sys, 'gettotalrefcount'), 'no gettotalrefcount'\n"
                 "print('  Py_DEBUG      :', sysconfig.get_config_var('Py_DEBUG'))\n"
-                "print('  gettotalrefcount:', hasattr(sys, 'gettotalrefcount'))\n"
-                "print('  refcount      :', sys.gettotalrefcount() if hasattr(sys, 'gettotalrefcount') else 'n/a')\n")) {
+                "print('  ABIFLAGS      :', sysconfig.get_config_var('ABIFLAGS'))\n"
+                "print('  EXT_SUFFIX    :', sysconfig.get_config_var('EXT_SUFFIX'))\n")) {
         std::printf("FAIL: debug-interpreter probe raised\n");
+        return 1;
+    }
+
+    // What the debug build actually buys: sys.gettotalrefcount does not exist
+    // on a release interpreter, so leaks like this one are invisible there.
+    if (not run("import sys\n"
+                "base = sys.gettotalrefcount()\n"
+                "held = [object() for _ in range(1000)]\n"
+                "leaked = sys.gettotalrefcount() - base\n"
+                "del held\n"
+                "recovered = leaked - (sys.gettotalrefcount() - base)\n"
+                "print('  refs held by 1000 objects :', leaked)\n"
+                "print('  refs returned on release  :', recovered)\n"
+                "assert leaked >= 1000, 'refcount did not track allocations'\n"
+                "assert recovered >= 1000, 'refcount did not track frees'\n")) {
+        std::printf("FAIL: refcount tracking probe raised\n");
         return 1;
     }
 

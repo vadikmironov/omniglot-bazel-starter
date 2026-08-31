@@ -175,3 +175,31 @@ jobs:
       run: |
         $dists = Resolve-Path -Path "dist/*.tar.zst" -Relative
         ./pythonbuild.exe validate-distribution $dists
+
+    # Everything below answers what the build alone cannot: does the
+    # distribution work, and does it give us something release cannot?
+
+    - name: Unpack and inspect the distribution
+      shell: pwsh
+      working-directory: pbs
+      run: uv run --no-project --script ../spike/windows_debug_python/inspect_dist.py
+
+    # The claim #183 rests on: /MDd defines _DEBUG, so pyconfig.h asks for
+    # python314_d.lib through its own #pragma comment(lib, ...). No workaround
+    # here, only a LIBPATH. If this links, python_h.h can be deleted.
+    - name: Link an embedder against it, with no _DEBUG workaround
+      shell: cmd
+      run: |
+        for /f "usebackq tokens=*" %%i in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath`) do set VSPATH=%%i
+        call "%VSPATH%\VC\Auxiliary\Build\vcvars64.bat" || exit /b 1
+        cl /nologo /std:c++20 /EHsc /MDd /Zi /utf-8 ^
+           /I pbs\unpacked\python\install\include ^
+           spike\windows_debug_python\embed_probe.cpp ^
+           /Fe:embed_probe.exe ^
+           /link /LIBPATH:pbs\unpacked\python\install\libs || exit /b 1
+
+    - name: Run the embedder
+      shell: cmd
+      run: |
+        set PATH=%CD%\pbs\unpacked\python\install;%PATH%
+        embed_probe.exe %CD%\pbs\unpacked\python\install
