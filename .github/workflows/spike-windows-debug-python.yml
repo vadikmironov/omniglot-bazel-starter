@@ -51,10 +51,11 @@ env:
 
 jobs:
   pbs-baseline:
-    # 3.15 needs VS2026; everything older needs VS2022, which windows-latest no
-    # longer carries now that it resolves to the VS2026 image. build.py asks
-    # vswhere for [17,18) when given --vs 2022, so the runner has to match.
-    runs-on: ${{ matrix.python == 'cpython-3.15' && 'windows-2025-vs2026' || 'windows-2025' }}
+    # 3.15 needs VS2026, everything older needs VS2022, and build.py resolves
+    # --vs 2022 by asking vswhere for [17,18), so the runner has to carry it.
+    # windows-latest and windows-2025 both resolve to the VS2026 image now, so
+    # windows-2022 is the only free label that still has VS2022.
+    runs-on: ${{ matrix.python == 'cpython-3.15' && 'windows-2025-vs2026' || 'windows-2022' }}
     # Every version ci-targets.yaml lists for x86_64-pc-windows-msvc. One
     # green run proves the option works for 3.14; the matrix proves the patch
     # is not version specific.
