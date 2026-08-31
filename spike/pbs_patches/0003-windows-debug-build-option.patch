@@ -14,8 +14,9 @@ Follows the Unix spelling: `debug` is a peer of noopt and pgo in the
 option set, so debug+pgo is simply not a valid combination. The set is
 renamed to `options` to match, since debug is not an optimization.
 
-PC/layout is passed --debug, which is what makes it expect the _d
-suffixed artifacts a Debug configuration produces.
+The rest is naming. A Debug configuration suffixes its artifacts with
+$(PyDebugExt), so PC/layout is passed --debug, and the executables,
+extension libraries and dependency libraries pick up the _d suffix.
 
 diff --git a/cpython-windows/build.py b/cpython-windows/build.py
 --- a/cpython-windows/build.py
@@ -38,6 +39,26 @@ diff --git a/cpython-windows/build.py b/cpython-windows/build.py
  
      # Copy object files for core sources into their own directory.
      core_dir = out_dir / "build" / "core"
+@@ -1345,15 +1346,15 @@
+ 
+     # Copy libraries for dependencies into the lib directory.
+     for depend in sorted(depends_projects):
+-        static_source = outputs_path / ("%s.lib" % depend)
+-        static_dest = lib_dir / ("%s.lib" % depend)
++        static_source = outputs_path / ("%s%s.lib" % (depend, debug_suffix))
++        static_dest = lib_dir / ("%s%s.lib" % (depend, debug_suffix))
+ 
+         log("copying link library %s" % static_source)
+         shutil.copyfile(static_source, static_dest)
+ 
+-        shared_source = outputs_path / ("%s.dll" % depend)
++        shared_source = outputs_path / ("%s%s.dll" % (depend, debug_suffix))
+         if shared_source.exists():
+-            shared_dest = lib_dir / ("%s.dll" % depend)
++            shared_dest = lib_dir / ("%s%s.dll" % (depend, debug_suffix))
+             log("copying shared library %s" % shared_source)
+             shutil.copyfile(shared_source, shared_dest)
+ 
 @@ -1372,6 +1373,7 @@
      openssl_entry: str,
  ) -> pathlib.Path:
