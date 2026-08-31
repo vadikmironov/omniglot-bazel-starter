@@ -51,7 +51,10 @@ env:
 
 jobs:
   pbs-baseline:
-    runs-on: windows-latest
+    # 3.15 needs VS2026; everything older needs VS2022, which windows-latest no
+    # longer carries now that it resolves to the VS2026 image. build.py asks
+    # vswhere for [17,18) when given --vs 2022, so the runner has to match.
+    runs-on: ${{ matrix.python == 'cpython-3.15' && 'windows-2025-vs2026' || 'windows-2025' }}
     # Every version ci-targets.yaml lists for x86_64-pc-windows-msvc. One
     # green run proves the option works for 3.14; the matrix proves the patch
     # is not version specific.
@@ -151,9 +154,16 @@ jobs:
       shell: cmd
       working-directory: pbs
       run: |
+        rem ci-targets.yaml pins vs_version 2022 for this triple and overrides
+        rem to 2026 only from 3.15. Older CPython has no BasePlatformToolset
+        rem mapping for VisualStudioVersion 18.0, so it falls through to v140
+        rem and fails with MSB8020.
+        set MATRIX_VS=2022
+        if "%MATRIX_PYTHON%"=="cpython-3.15" set MATRIX_VS=2026
+        echo building %MATRIX_PYTHON% with Visual Studio %MATRIX_VS%
         for /f "usebackq tokens=*" %%i in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath`) do set VSPATH=%%i
         call "%VSPATH%\VC\Auxiliary\Build\vcvars64.bat" || exit /b 1
-        uv run --no-dev build.py --python %MATRIX_PYTHON% --sh c:\cygwin\bin\sh.exe --options %PBS_OPTIONS% --vs 2026
+        uv run --no-dev build.py --python %MATRIX_PYTHON% --sh c:\cygwin\bin\sh.exe --options %PBS_OPTIONS% --vs %MATRIX_VS%
       env:
         MATRIX_PYTHON: ${{ matrix.python }}
 
