@@ -35,7 +35,13 @@ def unpack() -> pathlib.Path:
 def check_artifacts(install: pathlib.Path) -> list[str]:
     """The _d files an embedder links against have to exist."""
     errors = []
-    for name in ("python_d.exe", "python314_d.dll", "libs/python314_d.lib"):
+    for name in (
+        "python_d.exe",
+        "python314_d.dll",
+        "libs/python314_d.lib",
+        "include/Python.h",
+        "include/pyconfig.h",
+    ):
         path = install / name
         if path.exists():
             print(f"  present: {name:<28} {path.stat().st_size:>10,} bytes")
@@ -72,11 +78,12 @@ def check_metadata(root: pathlib.Path) -> list[str]:
 
 
 def main() -> int:
-    root = unpack()
-    install = root / "python" / "install"
+    # Everything in the tar is prefixed with python/, and PYTHON.json sits at
+    # the top of that rather than beside it.
+    root = unpack() / "python"
 
     print("=== artifacts ===")
-    errors = check_artifacts(install)
+    errors = check_artifacts(root / "install")
     print("=== metadata ===")
     errors += check_metadata(root)
 
