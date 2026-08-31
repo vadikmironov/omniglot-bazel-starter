@@ -28,13 +28,14 @@ The abiflags check is also POSIX-shaped:
   error: abiflags does not contain 'd'
 
 CPython deliberately keeps the lowercase `abiflags` empty on Windows,
-because it is widely used to calculate paths there, and exposes the
-marker through an emulated uppercase `ABIFLAGS` instead -- `_d` for a
-debug build, `t_d` when free-threaded:
+because it is widely used to calculate paths there. The uppercase
+`ABIFLAGS` carries the marker, but only from 3.14:
 
   https://github.com/python/cpython/blob/v3.14.7/Lib/sysconfig/__init__.py#L407
 
-So consult that key on Windows.
+So consult EXT_SUFFIX instead, which every supported version derives from
+the importer and which a debug build suffixes with _d. That also drops an
+unwrap() that would panic on a distribution missing the key.
 
 diff --git a/src/validation.rs b/src/validation.rs
 --- a/src/validation.rs
@@ -86,33 +87,37 @@ diff --git a/src/validation.rs b/src/validation.rs
      "tcl86t.dll",
      "tk86t.dll",
  ];
-@@ -1931,14 +1947,25 @@
+@@ -1931,14 +1947,26 @@
          ));
      }
  
 -    if is_debug
 -        && !json
-+    if is_debug {
-+        // Windows keeps the lowercase `abiflags` empty on purpose -- it feeds
-+        // path construction there -- and carries the `_d` marker in an emulated
-+        // uppercase `ABIFLAGS` instead.
-+        // https://github.com/python/cpython/blob/v3.14.7/Lib/sysconfig/__init__.py#L407
-+        let abiflags_key = if triple.contains("-windows-") {
-+            "ABIFLAGS"
-+        } else {
-+            "abiflags"
-+        };
-+
-+        if !json
-             .python_config_vars
+-            .python_config_vars
 -            .get("abiflags")
-+            .get(abiflags_key)
-             .unwrap()
-             .contains('d')
+-            .unwrap()
+-            .contains('d')
 -    {
 -        errors.push("abiflags does not contain 'd'".to_string());
-+        {
-+            errors.push(format!("{abiflags_key} does not contain 'd'"));
++    if is_debug {
++        // Windows keeps the lowercase `abiflags` empty on purpose, because it
++        // feeds path construction there. The uppercase `ABIFLAGS` carries the
++        // marker, but only from 3.14, so consult EXT_SUFFIX instead: every
++        // supported version derives it from the importer, and a debug build
++        // suffixes it with `_d`.
++        // https://github.com/python/cpython/blob/v3.14.7/Lib/sysconfig/__init__.py#L407
++        let (key, marker) = if triple.contains("-windows-") {
++            ("EXT_SUFFIX", "_d")
++        } else {
++            ("abiflags", "d")
++        };
++
++        match json.python_config_vars.get(key) {
++            Some(value) if value.contains(marker) => {}
++            Some(value) => {
++                errors.push(format!("{key} is {value:?}, expected to contain {marker:?}"))
++            }
++            None => errors.push(format!("{key} is not set")),
 +        }
      }
  

@@ -47,12 +47,19 @@ env:
   # lists workflows present on the default branch, so until this merges the
   # push trigger and this default are how it runs.
   PBS_OPTIONS: ${{ inputs.pbs_options || 'debug' }}
-  PBS_PYTHON: ${{ inputs.python || 'cpython-3.14' }}
+  # PBS_PYTHON comes from the matrix; see the strategy block below.
 
 jobs:
   pbs-baseline:
     runs-on: windows-latest
-    name: Reproduce the PBS Windows build
+    # Every version ci-targets.yaml lists for x86_64-pc-windows-msvc. One
+    # green run proves the option works for 3.14; the matrix proves the patch
+    # is not version specific.
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ${{ fromJson(inputs.python && format('["{0}"]', inputs.python) || '["cpython-3.10","cpython-3.11","cpython-3.12","cpython-3.13","cpython-3.14","cpython-3.15"]') }}
+    name: ${{ matrix.python }} --options ${{ inputs.pbs_options || 'debug' }}
     timeout-minutes: 120
     permissions:
       contents: read
@@ -137,16 +144,18 @@ jobs:
       uses: actions/cache/restore@v4
       with:
         path: pbs/build
-        key: pbs-build-v1-${{ env.PBS_PYTHON }}-${{ env.PBS_OPTIONS }}-${{ hashFiles('pbs/pythonbuild/downloads.py') }}
-        restore-keys: pbs-build-v1-${{ env.PBS_PYTHON }}-${{ env.PBS_OPTIONS }}-
+        key: pbs-build-v1-${{ matrix.python }}-${{ env.PBS_OPTIONS }}-${{ hashFiles('pbs/pythonbuild/downloads.py') }}
+        restore-keys: pbs-build-v1-${{ matrix.python }}-${{ env.PBS_OPTIONS }}-
 
-    - name: Build ${{ env.PBS_PYTHON }} --options ${{ env.PBS_OPTIONS }}
+    - name: Build ${{ matrix.python }} --options ${{ env.PBS_OPTIONS }}
       shell: cmd
       working-directory: pbs
       run: |
         for /f "usebackq tokens=*" %%i in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath`) do set VSPATH=%%i
         call "%VSPATH%\VC\Auxiliary\Build\vcvars64.bat" || exit /b 1
-        uv run --no-dev build.py --python %PBS_PYTHON% --sh c:\cygwin\bin\sh.exe --options %PBS_OPTIONS% --vs 2026
+        uv run --no-dev build.py --python %MATRIX_PYTHON% --sh c:\cygwin\bin\sh.exe --options %PBS_OPTIONS% --vs 2026
+      env:
+        MATRIX_PYTHON: ${{ matrix.python }}
 
     # Only on success, so a half-built dependency cannot poison later runs.
     - name: Save the PBS dependency cache

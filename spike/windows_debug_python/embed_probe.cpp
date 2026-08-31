@@ -15,12 +15,14 @@
 
 namespace {
 
+#if PY_VERSION_HEX >= 0x030E0000
 auto report_init_error(PyInitConfig* config, const char* what) -> int {
     const char* err_msg = nullptr;
     (void)PyInitConfig_GetError(config, &err_msg);
     std::printf("FAIL: %s: %s\n", what, err_msg != nullptr ? err_msg : "(unknown error)");
     return 1;
 }
+#endif
 
 auto run(const char* snippet) -> bool { return PyRun_SimpleString(snippet) == 0; }
 
@@ -38,6 +40,8 @@ auto main(int argc, char** argv) -> int {
     std::printf("compiled WITHOUT _DEBUG - not the configuration under test\n");
 #endif
 
+#if PY_VERSION_HEX >= 0x030E0000
+    // 3.14+: PEP 741 PyInitConfig, narrow char* strings.
     PyInitConfig* config = PyInitConfig_Create();
     if (config == nullptr) {
         std::printf("FAIL: PyInitConfig_Create\n");
@@ -56,6 +60,27 @@ auto main(int argc, char** argv) -> int {
         return rc;
     }
     PyInitConfig_Free(config);
+#else
+    // 3.8 - 3.13: PyConfig, wchar_t internally.
+    PyConfig config;
+    PyConfig_InitPythonConfig(&config);
+
+    PyStatus status = PyConfig_SetBytesString(&config, &config.home, argv[1]);
+    if (PyStatus_Exception(status)) {
+        std::printf("FAIL: PyConfig_SetBytesString(home): %s\n",
+                    status.err_msg != nullptr ? status.err_msg : "(unknown error)");
+        PyConfig_Clear(&config);
+        return 1;
+    }
+
+    status = Py_InitializeFromConfig(&config);
+    PyConfig_Clear(&config);
+    if (PyStatus_Exception(status)) {
+        std::printf("FAIL: Py_InitializeFromConfig: %s\n",
+                    status.err_msg != nullptr ? status.err_msg : "(unknown error)");
+        return 1;
+    }
+#endif
 
     std::printf("initialized: %s\n", Py_GetVersion());
 
@@ -104,9 +129,11 @@ auto main(int argc, char** argv) -> int {
     PyEval_RestoreThread(saved);
     std::printf("  GIL save/restore: ok\n");
 
-    // Own-GIL sub-interpreter, as sub_interpreter_guard.h does.
+    // Sub-interpreter, as sub_interpreter_guard.h does. Its own GIL needs
+    // Py_NewInterpreterFromConfig, which arrived in 3.12.
     PyThreadState* main_ts = PyThreadState_Get();
     PyThreadState* sub_ts = nullptr;
+#if PY_VERSION_HEX >= 0x030C0000
     const PyInterpreterConfig sub_config = {
         .use_main_obmalloc = 0,
         .allow_fork = 0,
@@ -117,12 +144,19 @@ auto main(int argc, char** argv) -> int {
         .gil = PyInterpreterConfig_OWN_GIL,
     };
 
-    const PyStatus status = Py_NewInterpreterFromConfig(&sub_ts, &sub_config);
-    if (PyStatus_Exception(status) != 0) {
+    const PyStatus sub_status = Py_NewInterpreterFromConfig(&sub_ts, &sub_config);
+    if (PyStatus_Exception(sub_status) != 0) {
         std::printf("FAIL: Py_NewInterpreterFromConfig: %s\n",
-                    status.err_msg != nullptr ? status.err_msg : "(unknown error)");
+                    sub_status.err_msg != nullptr ? sub_status.err_msg : "(unknown error)");
         return 1;
     }
+#else
+    sub_ts = Py_NewInterpreter();
+    if (sub_ts == nullptr) {
+        std::printf("FAIL: Py_NewInterpreter\n");
+        return 1;
+    }
+#endif
 
     const bool sub_ok = run("print('  sub-interpreter : ok')\n");
     Py_EndInterpreter(sub_ts);

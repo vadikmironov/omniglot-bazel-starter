@@ -32,13 +32,13 @@ def unpack() -> pathlib.Path:
     return OUT
 
 
-def check_artifacts(install: pathlib.Path) -> list[str]:
+def check_artifacts(install: pathlib.Path, nodot: str) -> list[str]:
     """The _d files an embedder links against have to exist."""
     errors = []
     for name in (
         "python_d.exe",
-        "python314_d.dll",
-        "libs/python314_d.lib",
+        f"python{nodot}_d.dll",
+        f"libs/python{nodot}_d.lib",
         "include/Python.h",
         "include/pyconfig.h",
     ):
@@ -72,8 +72,10 @@ def check_metadata(root: pathlib.Path) -> list[str]:
         errors.append(f"build_options does not contain debug: {meta.get('build_options')}")
     if str(config_vars.get("Py_DEBUG")) != "1":
         errors.append(f"Py_DEBUG is {config_vars.get('Py_DEBUG')}, expected 1")
-    if "_d" not in str(config_vars.get("ABIFLAGS", "")):
-        errors.append(f"ABIFLAGS is {config_vars.get('ABIFLAGS')!r}, expected to contain _d")
+    # ABIFLAGS is only emulated on Windows from 3.14, so EXT_SUFFIX is the
+    # signal that holds across every version PBS supports.
+    if "_d" not in str(config_vars.get("EXT_SUFFIX", "")):
+        errors.append(f"EXT_SUFFIX is {config_vars.get('EXT_SUFFIX')!r}, expected to contain _d")
     return errors
 
 
@@ -82,8 +84,13 @@ def main() -> int:
     # the top of that rather than beside it.
     root = unpack() / "python"
 
-    print("=== artifacts ===")
-    errors = check_artifacts(root / "install")
+    # The DLL and import library are named after the version, so read it from
+    # the metadata rather than assuming one.
+    meta = json.loads((root / "PYTHON.json").read_text())
+    nodot = meta["python_version"].split(".")[0] + meta["python_version"].split(".")[1]
+
+    print(f"=== artifacts (python{nodot}) ===")
+    errors = check_artifacts(root / "install", nodot)
     print("=== metadata ===")
     errors += check_metadata(root)
 
