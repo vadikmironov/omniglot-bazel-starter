@@ -70,8 +70,8 @@ def check_metadata(root: pathlib.Path) -> list[str]:
 
     if "debug" not in meta.get("build_options", ""):
         errors.append(f"build_options does not contain debug: {meta.get('build_options')}")
-    if str(config_vars.get("Py_DEBUG")) != "1":
-        errors.append(f"Py_DEBUG is {config_vars.get('Py_DEBUG')}, expected 1")
+    # Py_DEBUG and ABIFLAGS only reach Windows config vars from 3.14, so they
+    # are reported but not asserted. EXT_SUFFIX carries the marker everywhere.
     # ABIFLAGS is only emulated on Windows from 3.14, so EXT_SUFFIX is the
     # signal that holds across every version PBS supports.
     if "_d" not in str(config_vars.get("EXT_SUFFIX", "")):

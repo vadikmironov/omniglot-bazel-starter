@@ -86,7 +86,9 @@ auto main(int argc, char** argv) -> int {
 
     // The interpreter is only a debug build if these are present.
     if (not run("import sys, sysconfig\n"
-                "assert sysconfig.get_config_var('Py_DEBUG') == 1, 'not a debug interpreter'\n"
+                // Py_DEBUG reaches Windows config vars only from 3.14; EXT_SUFFIX
+                // and gettotalrefcount mark a debug build on every version.
+                "assert '_d' in sysconfig.get_config_var('EXT_SUFFIX'), 'not a debug interpreter'\n"
                 "assert hasattr(sys, 'gettotalrefcount'), 'no gettotalrefcount'\n"
                 "print('  Py_DEBUG      :', sysconfig.get_config_var('Py_DEBUG'), flush=True)\n"
                 "print('  ABIFLAGS      :', sysconfig.get_config_var('ABIFLAGS'), flush=True)\n"
