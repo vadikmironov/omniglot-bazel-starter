@@ -19,6 +19,20 @@ cmake(
         "FMT_DOC": "OFF",
     },
     lib_source = "@fmt_src//:all_srcs",
+    # Below block is not strictly required and is only added to demonstrate a
+    # linkage for CMake project with multiple targets . Unfortunately, this
+    # forces special branch for Windows to avoid producing ar archives with
+    # lib extension on Linux/MacOS.
+    out_static_libs = select({
+        "@platforms//os:windows": [
+            "fmt.lib",
+            "fmt-c.lib",
+        ],
+        "//conditions:default": [
+            "libfmt.a",
+            "libfmt-c.a",
+        ],
+    }),
 )
 
 cc_binary(
