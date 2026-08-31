@@ -18,10 +18,32 @@ The rest is naming. A Debug configuration suffixes its artifacts with
 $(PyDebugExt), so PC/layout is passed --debug, and the executables,
 extension libraries and dependency libraries pick up the _d suffix.
 
+The tail-calling interpreter is disabled for Debug. PBS turns it on for
+3.15 on x64, but a guaranteed tail call needs optimisations that /Od
+removes, so MSVC reports C4737 for each one until the error count trips
+C1003 and the build stops.
+
+
 diff --git a/cpython-windows/build.py b/cpython-windows/build.py
 --- a/cpython-windows/build.py
 +++ b/cpython-windows/build.py
-@@ -1211,12 +1211,13 @@
+@@ -777,8 +777,13 @@
+     if freethreaded:
+         args.append("/property:DisableGil=true")
+ 
+-    # Build tail-calling Python for 3.15+
+-    if python_version.startswith("3.15") and platform == "x64":
++    # Build tail-calling Python for 3.15+. Not in Debug: /Od leaves MSVC unable
++    # to guarantee the tail calls, and it reports C4737 for every one of them.
++    if (
++        python_version.startswith("3.15")
++        and platform == "x64"
++        and configuration != "Debug"
++    ):
+         args.append("/property:UseTailCallInterp=true")
+ 
+     exec_and_log(args, str(pcbuild_path), os.environ)
+@@ -1211,12 +1216,13 @@
      else:
          raise Exception("unhandled architecture: %s" % arch)
  
@@ -39,7 +61,7 @@ diff --git a/cpython-windows/build.py b/cpython-windows/build.py
  
      # Copy object files for core sources into their own directory.
      core_dir = out_dir / "build" / "core"
-@@ -1345,15 +1346,15 @@
+@@ -1345,15 +1351,15 @@
  
      # Copy libraries for dependencies into the lib directory.
      for depend in sorted(depends_projects):
@@ -59,7 +81,7 @@ diff --git a/cpython-windows/build.py b/cpython-windows/build.py
              log("copying shared library %s" % shared_source)
              shutil.copyfile(shared_source, shared_dest)
  
-@@ -1372,6 +1373,7 @@
+@@ -1372,6 +1378,7 @@
      openssl_entry: str,
  ) -> pathlib.Path:
      parsed_build_options = set(build_options.split("+"))
@@ -67,7 +89,7 @@ diff --git a/cpython-windows/build.py b/cpython-windows/build.py
      pgo = "pgo" in parsed_build_options
      freethreaded = "freethreaded" in parsed_build_options
  
-@@ -1426,13 +1428,14 @@
+@@ -1426,13 +1433,14 @@
          # as we do for Unix builds.
          mpdecimal_archive = None
  
@@ -86,7 +108,7 @@ diff --git a/cpython-windows/build.py b/cpython-windows/build.py
  
      # Python 3.15 uses the default name for the executable in a suffixed directory
      instrumented_python_exe = python_exe
-@@ -1635,13 +1638,13 @@
+@@ -1635,13 +1643,13 @@
              run_msbuild(
                  msbuild,
                  pcbuild_path,
@@ -102,7 +124,7 @@ diff --git a/cpython-windows/build.py b/cpython-windows/build.py
  
          install_dir = out_dir / "python" / "install"
  
-@@ -1675,6 +1678,9 @@
+@@ -1675,6 +1683,9 @@
          if freethreaded:
              args.append("--include-freethreaded")
  
@@ -112,7 +134,7 @@ diff --git a/cpython-windows/build.py b/cpython-windows/build.py
          # CPython 3.12 removed distutils.
          if not meets_python_minimum_version(python_version, "3.12"):
              args.append("--include-distutils")
-@@ -1946,10 +1952,10 @@
+@@ -1946,10 +1957,10 @@
          default="cpython-3.11",
          help="Python distribution to build",
      )
