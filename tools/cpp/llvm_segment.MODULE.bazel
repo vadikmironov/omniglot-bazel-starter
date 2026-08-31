@@ -3,15 +3,33 @@
 #
 # Hermetic LLVM toolchain for Bazel which is also dependent on by rules_lint.
 #
-# NOTE: Windows is NOT supported by toolchains_llvm (as of version 1.9.0;
-# bazel-contrib/toolchains_llvm#4).
+# NOTE: Windows is NOT supported by toolchains_llvm (as of version 1.6.0).
 # On Windows, Bazel uses the auto-configured MSVC toolchain from Visual Studio Build Tools.
 # The LLVM toolchain below is used on Linux and macOS platforms only.
 #
 # Please find documentation here:
 # https://github.com/bazel-contrib/toolchains_llvm/releases
 #
-bazel_dep(name = "toolchains_llvm", version = "1.9.0")
+bazel_dep(name = "toolchains_llvm", version = "1.8.0")
+
+# Two fixes that landed upstream after 1.8.0, which is still the newest release.
+# Drop both on the next release bump.
+#
+#   stdlib_libcxx  1.8.0 selects libc++ headers via -nostdinc++ + -cxx-isystem
+#                  but still emits -stdlib=libc++ on compile, where it does
+#                  nothing except raise -Wunused-command-line-argument on every
+#                  object file -- fatal under our -Werror.
+#                  https://github.com/bazel-contrib/toolchains_llvm/pull/791
+#   llvm_22_1_8    adds the LLVM 22.1.8 checksums the version below needs.
+#                  https://github.com/bazel-contrib/toolchains_llvm/pull/780
+single_version_override(
+    module_name = "toolchains_llvm",
+    patch_strip = 1,
+    patches = [
+        "//tools/cpp/patches:toolchains_llvm_1.8.0_stdlib_libcxx.patch",
+        "//tools/cpp/patches:toolchains_llvm_1.8.0_llvm_22_1_8.patch",
+    ],
+)
 
 # Configure and register the toolchain.
 # This toolchain supports: Linux (x86_64, aarch64, armv7) and macOS (x86_64, aarch64).
