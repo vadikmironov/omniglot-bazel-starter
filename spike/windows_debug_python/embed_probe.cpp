@@ -63,28 +63,41 @@ auto main(int argc, char** argv) -> int {
     if (not run("import sys, sysconfig\n"
                 "assert sysconfig.get_config_var('Py_DEBUG') == 1, 'not a debug interpreter'\n"
                 "assert hasattr(sys, 'gettotalrefcount'), 'no gettotalrefcount'\n"
-                "print('  Py_DEBUG      :', sysconfig.get_config_var('Py_DEBUG'))\n"
-                "print('  ABIFLAGS      :', sysconfig.get_config_var('ABIFLAGS'))\n"
-                "print('  EXT_SUFFIX    :', sysconfig.get_config_var('EXT_SUFFIX'))\n")) {
+                "print('  Py_DEBUG      :', sysconfig.get_config_var('Py_DEBUG'), flush=True)\n"
+                "print('  ABIFLAGS      :', sysconfig.get_config_var('ABIFLAGS'), flush=True)\n"
+                "print('  EXT_SUFFIX    :', sysconfig.get_config_var('EXT_SUFFIX'), flush=True)\n")) {
         std::printf("FAIL: debug-interpreter probe raised\n");
         return 1;
     }
 
     // What the debug build actually buys: sys.gettotalrefcount does not exist
-    // on a release interpreter, so leaks like this one are invisible there.
+    // on a release interpreter, so a leak like the one below is invisible
+    // there. Only the allocation delta is asserted -- the total covers every
+    // object alive in the interpreter, so the figure after a free is reported
+    // rather than pinned to a threshold.
+    std::fflush(stdout);
     if (not run("import sys\n"
-                "base = sys.gettotalrefcount()\n"
+                "def total():\n"
+                "    return sys.gettotalrefcount()\n"
+                "base = total()\n"
                 "held = [object() for _ in range(1000)]\n"
-                "leaked = sys.gettotalrefcount() - base\n"
+                "allocated = total() - base\n"
                 "del held\n"
-                "recovered = leaked - (sys.gettotalrefcount() - base)\n"
-                "print('  refs held by 1000 objects :', leaked)\n"
-                "print('  refs returned on release  :', recovered)\n"
-                "assert leaked >= 1000, 'refcount did not track allocations'\n"
-                "assert recovered >= 1000, 'refcount did not track frees'\n")) {
+                "after_free = total() - base\n"
+                "sys._probe_leak = [object() for _ in range(1000)]\n"
+                "with_leak = total() - base\n"
+                "del sys._probe_leak\n"
+                "without_leak = total() - base\n"
+                "print(f'  refs added by 1000 objects : {allocated}', flush=True)\n"
+                "print(f'  refs still held after free : {after_free}', flush=True)\n"
+                "print(f'  refs while a leak is held  : {with_leak}', flush=True)\n"
+                "print(f'  refs after releasing it    : {without_leak}', flush=True)\n"
+                "assert allocated >= 1000, f'refcount ignored allocations: {allocated}'\n"
+                "assert with_leak > without_leak, 'refcount ignored a retained reference'\n")) {
         std::printf("FAIL: refcount tracking probe raised\n");
         return 1;
     }
+    std::fflush(stdout);
 
     // GIL release / restore, as gil_release_guard.h does.
     PyThreadState* saved = PyEval_SaveThread();
