@@ -90,8 +90,12 @@ build --features=external_include_paths
 build --host_features=external_include_paths
 # Windows configuration: Uses auto-configured MSVC toolchain from Visual Studio Build Tools
 # Disable default_cpp_std feature to avoid D9025 warning about conflicting /std flags
-# MSVC spells C++23 /std:c++23preview (VS 17.13+); plain /std:c++23 is not a
-# valid option and cl silently falls back to C++14.
+# Bazel picks the compiler itself: newest VS install from vswhere, then the
+# highest-numbered VC\Tools\MSVC toolset under it, not the install default
+# (BAZEL_VC_FULL_VERSION pins one; CC_CONFIGURE_DEBUG=1 prints the choice).
+# Plain /std:c++23 needs 14.51 (VS2026); older toolsets drop it with D9002 and
+# silently fall back to C++14. Both accept preview, so it stays: switching would
+# make VS2026 a hard requirement for anyone building on Windows.
 build:windows --features=-default_cpp_std --cxxopt=/std:c++23preview --cxxopt=/WX
 # MSVC defaults source and execution charsets to the system codepage; fmt
 # static_asserts against that. Applies to C as well, hence copt not cxxopt.
