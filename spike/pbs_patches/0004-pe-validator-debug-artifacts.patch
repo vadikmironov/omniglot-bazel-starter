@@ -1,17 +1,18 @@
-Allow debug artifacts in the PE validator
+Accept a Windows debug distribution in the validator
 
-validate-distribution rejects a Windows `debug` build, because the PE
-allow list carries only release names:
+validate-distribution rejects a Windows `debug` build on two counts.
+
+The PE allow list carries only release names:
 
   error: python/install/python_d.exe loads illegal library python314_d.dll
   error: python/install/python_d.exe loads illegal library VCRUNTIME140D.dll
   error: python/install/python_d.exe loads illegal library ucrtbased.dll
+  error: python/install/DLLs/_sqlite3_d.pyd loads illegal library sqlite3_d.dll
 
-All three are correct for a debug distribution, and the other two
-formats already accommodate this. The Mach-O list pairs every release
-name with its debug counterpart (@rpath/libpython3.14.dylib next to
-@rpath/libpython3.14d.dylib, and td for free-threaded debug), and the
-ELF list pushes libpython{ver}d.so.1.0 and libpython{ver}td.so.1.0
+The other two formats already accommodate this. The Mach-O list pairs
+every release name with its debug counterpart (@rpath/libpython3.14.dylib
+next to @rpath/libpython3.14d.dylib, and td for free-threaded debug), and
+the ELF list pushes libpython{ver}d.so.1.0 and libpython{ver}td.so.1.0
 unconditionally. Neither gates on build options, so neither does this.
 
 Windows spells the suffix _d, after $(PyDebugExt), which combines with
@@ -21,6 +22,19 @@ ucrtbased.dll sits in alphabetical position rather than beside a
 counterpart because it has none: a release build reaches the UCRT
 through the api-ms-win-crt-* forwarders, while a debug build imports it
 directly.
+
+The abiflags check is also POSIX-shaped:
+
+  error: abiflags does not contain 'd'
+
+CPython deliberately keeps the lowercase `abiflags` empty on Windows,
+because it is widely used to calculate paths there, and exposes the
+marker through an emulated uppercase `ABIFLAGS` instead -- `_d` for a
+debug build, `t_d` when free-threaded:
+
+  https://github.com/python/cpython/blob/v3.14.7/Lib/sysconfig/__init__.py#L407
+
+So consult that key on Windows.
 
 diff --git a/src/validation.rs b/src/validation.rs
 --- a/src/validation.rs
@@ -40,7 +54,7 @@ diff --git a/src/validation.rs b/src/validation.rs
      "WINMM.dll",
      "WS2_32.dll",
      // Our libraries.
-@@ -124,17 +127,29 @@
+@@ -124,18 +127,31 @@
      "libssl-3-arm64.dll",
      "libssl-3-x64.dll",
      "python3.dll",
@@ -68,5 +82,38 @@ diff --git a/src/validation.rs b/src/validation.rs
      "python315t.dll",
 +    "python315t_d.dll",
      "sqlite3.dll",
++    "sqlite3_d.dll",
      "tcl86t.dll",
      "tk86t.dll",
+ ];
+@@ -1931,14 +1947,25 @@
+         ));
+     }
+ 
+-    if is_debug
+-        && !json
++    if is_debug {
++        // Windows keeps the lowercase `abiflags` empty on purpose -- it feeds
++        // path construction there -- and carries the `_d` marker in an emulated
++        // uppercase `ABIFLAGS` instead.
++        // https://github.com/python/cpython/blob/v3.14.7/Lib/sysconfig/__init__.py#L407
++        let abiflags_key = if triple.contains("-windows-") {
++            "ABIFLAGS"
++        } else {
++            "abiflags"
++        };
++
++        if !json
+             .python_config_vars
+-            .get("abiflags")
++            .get(abiflags_key)
+             .unwrap()
+             .contains('d')
+-    {
+-        errors.push("abiflags does not contain 'd'".to_string());
++        {
++            errors.push(format!("{abiflags_key} does not contain 'd'"));
++        }
+     }
+ 
+     for extension in json.build_info.extensions.keys() {
