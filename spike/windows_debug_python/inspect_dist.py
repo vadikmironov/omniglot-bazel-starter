@@ -11,6 +11,7 @@ Run from the python-build-standalone checkout:
 
 import glob
 import json
+import os
 import pathlib
 import sys
 import tarfile
@@ -66,8 +67,17 @@ def check_metadata(root: pathlib.Path) -> list[str]:
         print(f"  {key:<16}: {meta.get(key)}")
 
     config_vars = meta["python_config_vars"]
-    for key in ("Py_DEBUG", "ABIFLAGS", "EXT_SUFFIX"):
+    for key in ("Py_DEBUG", "Py_GIL_DISABLED", "ABIFLAGS", "EXT_SUFFIX"):
         print(f"  {key:<16}: {config_vars.get(key)}")
+
+    # A free-threaded build has to say so here, because from 3.14 this config
+    # var is the only thing that tells a consumer. See gil_define() below.
+    freethreaded = "freethreaded" in meta.get("build_options", "")
+    if freethreaded and str(config_vars.get("Py_GIL_DISABLED")) != "1":
+        errors.append(
+            f"build_options says free-threaded but Py_GIL_DISABLED is "
+            f"{config_vars.get('Py_GIL_DISABLED')!r}"
+        )
 
     if "debug" not in meta.get("build_options", ""):
         errors.append(f"build_options does not contain debug: {meta.get('build_options')}")
@@ -78,6 +88,36 @@ def check_metadata(root: pathlib.Path) -> list[str]:
     if "_d" not in str(config_vars.get("EXT_SUFFIX", "")):
         errors.append(f"EXT_SUFFIX is {config_vars.get('EXT_SUFFIX')!r}, expected to contain _d")
     return errors
+
+
+def gil_define(config_vars: dict) -> str:
+    """The /D an embedder needs so the auto-link pragma names the right lib.
+
+    Up to 3.13 the installed pyconfig.h was generated per configuration and a
+    free-threaded install defined Py_GIL_DISABLED itself. 3.14 ships a static
+    pyconfig.h that only normalises an externally supplied value, so the
+    consumer has to define it or `#pragma comment(lib, ...)` asks for
+    python3XX_d.lib and the link fails against a free-threaded distribution.
+    Read it the way a build backend would rather than infer it from the
+    version.
+    """
+    if str(config_vars.get("Py_GIL_DISABLED")) == "1":
+        return "/DPy_GIL_DISABLED=1"
+    return ""
+
+
+def export_gil_define(config_vars: dict) -> None:
+    """Hand gil_define() to later workflow steps, always setting the variable.
+
+    cmd.exe leaves %VAR% literal when it is unset, which would reach cl as a
+    stray argument, so the empty case has to be written too.
+    """
+    define = gil_define(config_vars)
+    print(f"  embedder needs   : {define or '(nothing)'}")
+    github_env = os.environ.get("GITHUB_ENV")
+    if github_env:
+        with open(github_env, "a", encoding="utf-8") as fh:
+            fh.write(f"GIL_DEFINE={define}\n")
 
 
 def main() -> int:
@@ -97,6 +137,7 @@ def main() -> int:
     errors = check_artifacts(root / "install", stem)
     print("=== metadata ===")
     errors += check_metadata(root)
+    export_gil_define(meta["python_config_vars"])
 
     if errors:
         print("\nFAIL")
