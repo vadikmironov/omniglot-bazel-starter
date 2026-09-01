@@ -72,6 +72,11 @@ cc_library(
             "-D_DARWIN_C_SOURCE",
         ],
     }),
+    # libpkgconf-api.h marks the API dllimport on Windows unless this says the
+    # build is static. It has to reach the CLI too, hence defines rather than
+    # copts. Elsewhere it drops the default-visibility attribute, which a static
+    # library does not need either.
+    defines = ["PKGCONFIG_IS_STATIC"],
     # Sources include <libpkgconf/...>, so the archive root is the include root.
     includes = ["."],
     linkstatic = True,
