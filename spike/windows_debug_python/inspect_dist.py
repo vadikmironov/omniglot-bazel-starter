@@ -32,13 +32,12 @@ def unpack() -> pathlib.Path:
     return OUT
 
 
-def check_artifacts(install: pathlib.Path, nodot: str) -> list[str]:
+def check_artifacts(install: pathlib.Path, stem: str) -> list[str]:
     """The _d files an embedder links against have to exist."""
     errors = []
     for name in (
-        "python_d.exe",
-        f"python{nodot}_d.dll",
-        f"libs/python{nodot}_d.lib",
+        f"{stem}.dll",
+        f"libs/{stem}.lib",
         "include/Python.h",
         "include/pyconfig.h",
     ):
@@ -84,13 +83,16 @@ def main() -> int:
     # the top of that rather than beside it.
     root = unpack() / "python"
 
-    # The DLL and import library are named after the version, so read it from
-    # the metadata rather than assuming one.
+    # The interpreter library is named for the version, plus t when
+    # free-threaded and _d for a debug build, so build the stem from metadata
+    # rather than assuming any of it.
     meta = json.loads((root / "PYTHON.json").read_text())
-    nodot = meta["python_version"].split(".")[0] + meta["python_version"].split(".")[1]
+    major, minor, _ = meta["python_version"].split(".")
+    freethreaded = "freethreaded" in meta.get("build_options", "")
+    stem = f"python{major}{minor}{'t' if freethreaded else ''}_d"
 
-    print(f"=== artifacts (python{nodot}) ===")
-    errors = check_artifacts(root / "install", nodot)
+    print(f"=== artifacts ({stem}) ===")
+    errors = check_artifacts(root / "install", stem)
     print("=== metadata ===")
     errors += check_metadata(root)
 

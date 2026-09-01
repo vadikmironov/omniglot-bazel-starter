@@ -1,0 +1,67 @@
+Build the Windows debug configurations in CI
+
+The debug option is only useful if something builds it. Unix targets
+already carry debug and freethreaded+debug beside their optimised
+options, so bring Windows into line: debug and freethreaded+debug on
+x86_64 and i686, and debug on aarch64.
+
+aarch64 gets the plain option only. Its free-threaded builds are newer
+and less exercised than the x64 ones, and pairing a new configuration
+with a new option is a poor way to learn which of the two failed.
+
+windows-11-arm is also marked free, which it has been since the arm64
+runners entered public preview. With free: false, find_runner cannot
+match an aarch64 Windows runner and falls back to an x64 one, so these
+builds cross-compile when a native runner is available.
+
+diff --git a/ci-runners.yaml b/ci-runners.yaml
+index e6bdd0f..b8740e6 100644
+--- a/ci-runners.yaml
++++ b/ci-runners.yaml
+@@ -45,7 +45,9 @@ windows-2025-vs2026:
+   platform: windows
+   free: true
+ 
++# Free for public repositories since the arm64 runners went into public
++# preview: https://github.com/orgs/community/discussions/155713
+ windows-11-arm:
+   arch: aarch64
+   platform: windows
+-  free: false
++  free: true
+diff --git a/ci-targets.yaml b/ci-targets.yaml
+index d75eb60..ec5db0f 100644
+--- a/ci-targets.yaml
++++ b/ci-targets.yaml
+@@ -387,9 +387,11 @@ windows:
+       - "3.15"
+     vs_version: "2022"
+     build_options:
++      - debug
+       - pgo
+     build_options_conditional:
+       - options:
++          - freethreaded+debug
+           - freethreaded+pgo
+         minimum-python-version: "3.13"
+ 
+@@ -408,9 +410,11 @@ windows:
+       vs_version: "2026"
+       minimum-python-version: "3.15"
+     build_options:
++      - debug
+       - pgo
+     build_options_conditional:
+       - options:
++          - freethreaded+debug
+           - freethreaded+pgo
+         minimum-python-version: "3.13"
+ 
+@@ -427,6 +431,7 @@ windows:
+       - "3.15"
+     vs_version: "2022"
+     build_options:
++      - debug
+       - pgo
+     build_options_conditional:
+       - options:

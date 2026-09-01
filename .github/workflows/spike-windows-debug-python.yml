@@ -24,10 +24,6 @@ on:
         description: python-build-standalone ref
         default: main
         type: string
-      pbs_options:
-        description: --options value (noopt/pgo; debug once we add it)
-        default: noopt
-        type: string
       python:
         description: --python value
         default: cpython-3.14
@@ -46,24 +42,27 @@ env:
   # Q2 is testing the debug option patch 0003 adds. workflow_dispatch only
   # lists workflows present on the default branch, so until this merges the
   # push trigger and this default are how it runs.
-  PBS_OPTIONS: ${{ inputs.pbs_options || 'debug' }}
   # PBS_PYTHON comes from the matrix; see the strategy block below.
 
 jobs:
   pbs-baseline:
-    # 3.15 needs VS2026, everything older needs VS2022, and build.py resolves
-    # --vs 2022 by asking vswhere for [17,18), so the runner has to carry it.
-    # windows-latest and windows-2025 both resolve to the VS2026 image now, so
-    # windows-2022 is the only free label that still has VS2022.
-    runs-on: ${{ matrix.python == 'cpython-3.15' && 'windows-2025-vs2026' || 'windows-2022' }}
-    # Every version ci-targets.yaml lists for x86_64-pc-windows-msvc. One
-    # green run proves the option works for 3.14; the matrix proves the patch
-    # is not version specific.
+    # 3.15 needs VS2026 and everything older needs VS2022, and build.py
+    # resolves --vs by asking vswhere for a matching range, so the runner has
+    # to carry it. windows-latest and windows-2025 both resolve to the VS2026
+    # image now, leaving windows-2022 as the only free label with VS2022.
+    runs-on: >-
+      ${{ matrix.build == 'native'
+          && (matrix.python == 'cpython-3.15' && 'windows-11-vs2026-arm' || 'windows-11-arm')
+          || (matrix.python == 'cpython-3.15' && 'windows-2025-vs2026' || 'windows-2022') }}
     strategy:
       fail-fast: false
       matrix:
-        python: ${{ fromJson(inputs.python && format('["{0}"]', inputs.python) || '["cpython-3.10","cpython-3.11","cpython-3.12","cpython-3.13","cpython-3.14","cpython-3.15"]') }}
-    name: ${{ matrix.python }} --options ${{ inputs.pbs_options || 'debug' }}
+        # Every configuration patch 0005 turns on, across the versions
+        # ci-targets.yaml lists for each: x64 and x86 for both options, arm64
+        # for plain debug from 3.11. arm64 appears twice, cross-compiled as PBS
+        # builds it today and native on the free arm64 runner.
+        include: ${{ fromJson('[{"python":"cpython-3.10","arch":"x64","options":"debug","build":"cross"},{"python":"cpython-3.10","arch":"x86","options":"debug","build":"cross"},{"python":"cpython-3.11","arch":"x64","options":"debug","build":"cross"},{"python":"cpython-3.11","arch":"x86","options":"debug","build":"cross"},{"python":"cpython-3.12","arch":"x64","options":"debug","build":"cross"},{"python":"cpython-3.12","arch":"x86","options":"debug","build":"cross"},{"python":"cpython-3.13","arch":"x64","options":"debug","build":"cross"},{"python":"cpython-3.13","arch":"x86","options":"debug","build":"cross"},{"python":"cpython-3.14","arch":"x64","options":"debug","build":"cross"},{"python":"cpython-3.14","arch":"x86","options":"debug","build":"cross"},{"python":"cpython-3.15","arch":"x64","options":"debug","build":"cross"},{"python":"cpython-3.15","arch":"x86","options":"debug","build":"cross"},{"python":"cpython-3.13","arch":"x64","options":"freethreaded+debug","build":"cross"},{"python":"cpython-3.13","arch":"x86","options":"freethreaded+debug","build":"cross"},{"python":"cpython-3.14","arch":"x64","options":"freethreaded+debug","build":"cross"},{"python":"cpython-3.14","arch":"x86","options":"freethreaded+debug","build":"cross"},{"python":"cpython-3.15","arch":"x64","options":"freethreaded+debug","build":"cross"},{"python":"cpython-3.15","arch":"x86","options":"freethreaded+debug","build":"cross"},{"python":"cpython-3.11","arch":"arm64","options":"debug","build":"cross"},{"python":"cpython-3.11","arch":"arm64","options":"debug","build":"native"},{"python":"cpython-3.12","arch":"arm64","options":"debug","build":"cross"},{"python":"cpython-3.12","arch":"arm64","options":"debug","build":"native"},{"python":"cpython-3.13","arch":"arm64","options":"debug","build":"cross"},{"python":"cpython-3.13","arch":"arm64","options":"debug","build":"native"},{"python":"cpython-3.14","arch":"arm64","options":"debug","build":"cross"},{"python":"cpython-3.14","arch":"arm64","options":"debug","build":"native"},{"python":"cpython-3.15","arch":"arm64","options":"debug","build":"cross"},{"python":"cpython-3.15","arch":"arm64","options":"debug","build":"native"}]') }}
+    name: ${{ matrix.python }} ${{ matrix.arch }} --options ${{ matrix.options }}
     timeout-minutes: 120
     permissions:
       contents: read
@@ -91,6 +90,25 @@ jobs:
           git apply --verbose "$p"
         done
         git --no-pager diff --stat
+
+    # vcvars varies by target, and a cross-compiled arm64 binary cannot run on
+    # the x64 host that produced it, so the embedder steps are skipped there.
+    - name: Resolve toolchain for ${{ matrix.arch }} (${{ matrix.build }})
+      shell: bash
+      run: |
+        case "${{ matrix.arch }}-${{ matrix.build }}" in
+          x64-*)          vcvars=vcvars64.bat ;;
+          x86-*)          vcvars=vcvars32.bat ;;
+          arm64-cross)    vcvars=vcvarsamd64_arm64.bat ;;
+          arm64-native)   vcvars=vcvarsarm64.bat ;;
+        esac
+        echo "VCVARS=$vcvars" >> "$GITHUB_ENV"
+        if [[ "${{ matrix.arch }}-${{ matrix.build }}" == "arm64-cross" ]]; then
+          echo "RUNNABLE=no" >> "$GITHUB_ENV"
+        else
+          echo "RUNNABLE=yes" >> "$GITHUB_ENV"
+        fi
+        echo "vcvars=$vcvars"
 
     - name: Report free disk space
       shell: pwsh
@@ -148,10 +166,10 @@ jobs:
       uses: actions/cache/restore@v4
       with:
         path: pbs/build
-        key: pbs-build-v1-${{ matrix.python }}-${{ env.PBS_OPTIONS }}-${{ hashFiles('pbs/pythonbuild/downloads.py') }}
-        restore-keys: pbs-build-v1-${{ matrix.python }}-${{ env.PBS_OPTIONS }}-
+        key: pbs-build-v1-${{ matrix.python }}-${{ matrix.arch }}-${{ matrix.options }}-${{ hashFiles('pbs/pythonbuild/downloads.py') }}
+        restore-keys: pbs-build-v1-${{ matrix.python }}-${{ matrix.arch }}-${{ matrix.options }}-
 
-    - name: Build ${{ matrix.python }} --options ${{ env.PBS_OPTIONS }}
+    - name: Build ${{ matrix.python }} ${{ matrix.arch }} --options ${{ matrix.options }}
       shell: cmd
       working-directory: pbs
       run: |
@@ -161,12 +179,14 @@ jobs:
         rem and fails with MSB8020.
         set MATRIX_VS=2022
         if "%MATRIX_PYTHON%"=="cpython-3.15" set MATRIX_VS=2026
-        echo building %MATRIX_PYTHON% with Visual Studio %MATRIX_VS%
+        echo building %MATRIX_PYTHON% %MATRIX_ARCH% --options %MATRIX_OPTIONS% with VS %MATRIX_VS% via %VCVARS%
         for /f "usebackq tokens=*" %%i in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath`) do set VSPATH=%%i
-        call "%VSPATH%\VC\Auxiliary\Build\vcvars64.bat" || exit /b 1
-        uv run --no-dev build.py --python %MATRIX_PYTHON% --sh c:\cygwin\bin\sh.exe --options %PBS_OPTIONS% --vs %MATRIX_VS%
+        call "%VSPATH%\VC\Auxiliary\Build\%VCVARS%" || exit /b 1
+        uv run --no-dev build.py --python %MATRIX_PYTHON% --sh c:\cygwin\bin\sh.exe --options %MATRIX_OPTIONS% --vs %MATRIX_VS%
       env:
         MATRIX_PYTHON: ${{ matrix.python }}
+        MATRIX_ARCH: ${{ matrix.arch }}
+        MATRIX_OPTIONS: ${{ matrix.options }}
 
     # Only on success, so a half-built dependency cannot poison later runs.
     - name: Save the PBS dependency cache
@@ -208,10 +228,11 @@ jobs:
     # python314_d.lib through its own #pragma comment(lib, ...). No workaround
     # here, only a LIBPATH. If this links, python_h.h can be deleted.
     - name: Link an embedder against it, with no _DEBUG workaround
+      if: env.RUNNABLE == 'yes'
       shell: cmd
       run: |
         for /f "usebackq tokens=*" %%i in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath`) do set VSPATH=%%i
-        call "%VSPATH%\VC\Auxiliary\Build\vcvars64.bat" || exit /b 1
+        call "%VSPATH%\VC\Auxiliary\Build\%VCVARS%" || exit /b 1
         cl /nologo /std:c++20 /EHsc /MDd /Zi /utf-8 ^
            /I pbs\unpacked\python\install\include ^
            spike\windows_debug_python\embed_probe.cpp ^
@@ -219,6 +240,7 @@ jobs:
            /link /LIBPATH:pbs\unpacked\python\install\libs || exit /b 1
 
     - name: Run the embedder
+      if: env.RUNNABLE == 'yes'
       shell: cmd
       run: |
         set PATH=%CD%\pbs\unpacked\python\install;%PATH%
