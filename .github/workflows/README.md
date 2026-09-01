@@ -7,9 +7,9 @@
 | Tier | Jobs | Trigger |
 |---|---|---|
 | **0** Preflight | `buildifier.check`, `format.check` | PR + push |
-| **1** Build & test | Linux (hermetic Clang and GCC), macOS (hermetic Clang), Windows (MSVC) | PR + push |
+| **1** Build & test | Linux x64 (hermetic Clang and GCC), macOS ARM64 and x64 (hermetic Clang), Windows x64 and ARM64 (MSVC) | PR + push |
 | **1** Lint & coverage | clang-tidy, GCC `-fanalyzer`, PMD/SpotBugs/ruff/ty, the gazelle drift gates, the `MODULE.bazel.lock` freshness gate, coverage — Linux | PR + push |
-| **2** Compilation modes | the same four platforms under `-c dbg` and `-c opt` | push to `main`, `workflow_dispatch`, or a PR labelled `ci-full-matrix` |
+| **2** Compilation modes | the same six platforms under `-c dbg` and `-c opt` | push to `main`, `workflow_dispatch`, or a PR labelled `ci-full-matrix` |
 | **3** Weekly | remote toolchains (`gcc_remote`, `clang_remote`, `java_17_remote_corretto_jdk`), the profiling workloads, the bootstrap integration suite | Sundays 03:00 UTC, `workflow_dispatch` |
 
 Preflight is split from the lint job so a formatting slip reports without waiting

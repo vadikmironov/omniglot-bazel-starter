@@ -116,6 +116,23 @@ jobs:
   # The lint phase: formatting, the linter aspects (clang-tidy / clippy / PMD /
   # SpotBugs / ruff / mypy), GCC -fanalyzer static analysis, and the gazelle /
   # publish / mint drift gates.
+  build-macos-intel:
+    runs-on: macos-26-intel
+    name: Build & test (macOS x64, hermetic Clang)
+    permissions:
+      contents: read
+
+    steps:
+    - uses: actions/checkout@v7
+    - uses: ./.github/actions/setup_macos
+    - uses: ./.github/actions/bazel_test
+      with:
+        buildbuddy_api_key: ${{ secrets.BUILDBUDDY_API_KEY }}
+
+  # The lint phase: formatting, the linter aspects (clang-tidy / clippy / PMD /
+  # SpotBugs / ruff / mypy), GCC -fanalyzer static analysis, and the gazelle /
+  # publish / mint drift gates.
+
   lint:
     runs-on: ubuntu-latest
     permissions:
@@ -205,7 +222,7 @@ jobs:
       fail-fast: false
       matrix:
         mode: [dbg, opt]
-        platform: [linux-clang, linux-gcc, macos, windows]
+        platform: [linux-clang, linux-gcc, macos, macos-intel, windows, windows-arm64]
         include:
           - platform: linux-clang
             name: Linux x64, hermetic Clang
@@ -220,12 +237,20 @@ jobs:
             name: macOS ARM64, hermetic Clang
             os: macos-latest
             setup: macos
+          - platform: macos-intel
+            name: macOS x64, hermetic Clang
+            os: macos-26-intel
+            setup: macos
           # Same scoping as tier 1, and for the same reasons: //tools/... needs
           # the hermetic LLVM, which has no Windows build, and the profiling
           # workloads need gperftools and memray, which are Linux/macOS only.
           - platform: windows
             name: Windows x64
             os: windows-latest
+            setup: windows
+          - platform: windows-arm64
+            name: Windows ARM64
+            os: windows-11-arm
             setup: windows
             targets: //modules/...
             exclude_tags: profiling-cpu,profiling-mem
@@ -382,6 +407,29 @@ jobs:
   build-windows:
     runs-on: windows-latest
     name: Build & test (Windows x64)
+    permissions:
+      contents: read
+
+    env:
+      # Use shorter output_base to avoid Windows MAX_PATH (260 char) limit
+      # See: https://github.com/bazelbuild/rules_rust/issues/1946
+      BAZEL_STARTUP_OPTS: "--output_base=C:/bazel_build"
+
+    steps:
+    - uses: actions/checkout@v7
+    - uses: ./.github/actions/setup_windows
+      with:
+        bazel_startup_opts: ${{ env.BAZEL_STARTUP_OPTS }}
+    - uses: ./.github/actions/bazel_test
+      with:
+        buildbuddy_api_key: ${{ secrets.BUILDBUDDY_API_KEY }}
+        bazel_startup_opts: ${{ env.BAZEL_STARTUP_OPTS }}
+        targets: //modules/...
+        exclude_tags: profiling-cpu,profiling-mem
+
+  build-windows-arm64:
+    runs-on: windows-11-arm
+    name: Build & test (Windows ARM64)
     permissions:
       contents: read
 
