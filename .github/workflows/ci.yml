@@ -116,22 +116,6 @@ jobs:
   # The lint phase: formatting, the linter aspects (clang-tidy / clippy / PMD /
   # SpotBugs / ruff / mypy), GCC -fanalyzer static analysis, and the gazelle /
   # publish / mint drift gates.
-  build-macos-intel:
-    runs-on: macos-26-intel
-    name: Build & test (macOS x64, hermetic Clang)
-    permissions:
-      contents: read
-
-    steps:
-    - uses: actions/checkout@v7
-    - uses: ./.github/actions/setup_macos
-    - uses: ./.github/actions/bazel_test
-      with:
-        buildbuddy_api_key: ${{ secrets.BUILDBUDDY_API_KEY }}
-
-  # The lint phase: formatting, the linter aspects (clang-tidy / clippy / PMD /
-  # SpotBugs / ruff / mypy), GCC -fanalyzer static analysis, and the gazelle /
-  # publish / mint drift gates.
 
   lint:
     runs-on: ubuntu-latest
@@ -222,7 +206,7 @@ jobs:
       fail-fast: false
       matrix:
         mode: [dbg, opt]
-        platform: [linux-clang, linux-gcc, macos, macos-intel, windows, windows-arm64]
+        platform: [linux-clang, linux-gcc, macos, windows, windows-arm64]
         include:
           - platform: linux-clang
             name: Linux x64, hermetic Clang
@@ -237,10 +221,6 @@ jobs:
             name: macOS ARM64, hermetic Clang
             os: macos-latest
             setup: macos
-          - platform: macos-intel
-            name: macOS x64, hermetic Clang
-            os: macos-26-intel
-            setup: macos
           # Same scoping as tier 1, and for the same reasons: //tools/... needs
           # the hermetic LLVM, which has no Windows build, and the profiling
           # workloads need gperftools and memray, which are Linux/macOS only.
@@ -248,6 +228,9 @@ jobs:
             name: Windows x64
             os: windows-latest
             setup: windows
+            targets: //modules/...
+            exclude_tags: profiling-cpu,profiling-mem
+            startup_opts: --output_base=C:/bazel_build
           - platform: windows-arm64
             name: Windows ARM64
             os: windows-11-arm
