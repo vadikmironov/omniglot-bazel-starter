@@ -100,6 +100,11 @@ include("//tools/cpp:cpp_3rd_party_dependencies.MODULE.bazel")
 # --- END lang:cpp ---
 
 # --- BEGIN exclude ---
+# pkgconf, providing the pkg-config toolchain that cmake()/make() require.
+include("//third_party/pkgconf:pkgconf.MODULE.bazel")
+# --- END exclude ---
+
+# --- BEGIN exclude ---
 # fmt source for the rules_foreign_cc example (//modules/cpp_app_with_cmake_dep).
 # Gated out of bootstrap so a generated MODULE.bazel never includes a segment
 # from an example module that ships only in this source repo.

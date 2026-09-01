@@ -1,0 +1,24 @@
+#
+# Module-local MODULE.bazel segment for //third_party/pkgconf.
+#
+# Fetches the pkgconf source release and builds it with the BUILD file next to
+# this segment. pkgconf is a pkg-config implementation with no dependencies of
+# its own, so it compiles straight from source on every platform Bazel's C++
+# toolchain supports.
+#
+# Included from the root MODULE.bazel (included files cannot themselves call
+# include(), so the wiring lives there).
+#
+# pkgconf homepage: https://github.com/pkgconf/pkgconf
+#
+http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+
+http_archive(
+    name = "pkgconf_src",
+    build_file = "//third_party/pkgconf:pkgconf.BUILD",
+    sha256 = "01da06de506241a124faa7ba0a34b5ad549b49df8d280337d42d00e78ac37d5d",
+    strip_prefix = "pkgconf-3.0.6",
+    urls = ["https://github.com/pkgconf/pkgconf/releases/download/pkgconf-3.0.6/pkgconf-3.0.6.tar.gz"],
+)
+
+register_toolchains("//third_party/pkgconf:pkgconf_toolchain")
