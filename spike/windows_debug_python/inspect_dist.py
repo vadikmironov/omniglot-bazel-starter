@@ -47,12 +47,14 @@ def check_artifacts(install: pathlib.Path, stem: str) -> list[str]:
         else:
             errors.append(f"missing artifact: {name}")
 
-    pyds = sorted(p.name for p in (install / "DLLs").glob("*_d.pyd"))
+    # Free-threaded builds carry the full ABI tag, so the marker is not always
+    # the last thing before .pyd: _asyncio_d.pyd but _asyncio_d.cp314t-win32.pyd.
+    pyds = sorted(p.name for p in (install / "DLLs").glob("*.pyd") if "_d" in p.name)
     print(f"  debug extension modules: {len(pyds)}")
     for name in pyds[:5]:
         print(f"    {name}")
     if not pyds:
-        errors.append("no _d.pyd extension modules")
+        errors.append("no debug extension modules")
     return errors
 
 

@@ -51,7 +51,7 @@ jobs:
     # to carry it. windows-latest and windows-2025 both resolve to the VS2026
     # image now, leaving windows-2022 as the only free label with VS2022.
     runs-on: >-
-      ${{ matrix.build == 'native'
+      ${{ matrix.arch == 'arm64'
           && (matrix.python == 'cpython-3.15' && 'windows-11-vs2026-arm' || 'windows-11-arm')
           || (matrix.python == 'cpython-3.15' && 'windows-2025-vs2026' || 'windows-2022') }}
     strategy:
@@ -61,8 +61,8 @@ jobs:
         # ci-targets.yaml lists for each: x64 and x86 for both options, arm64
         # for plain debug from 3.11. arm64 appears twice, cross-compiled as PBS
         # builds it today and native on the free arm64 runner.
-        include: ${{ fromJson('[{"python":"cpython-3.10","arch":"x64","options":"debug","build":"cross"},{"python":"cpython-3.10","arch":"x86","options":"debug","build":"cross"},{"python":"cpython-3.11","arch":"x64","options":"debug","build":"cross"},{"python":"cpython-3.11","arch":"x86","options":"debug","build":"cross"},{"python":"cpython-3.12","arch":"x64","options":"debug","build":"cross"},{"python":"cpython-3.12","arch":"x86","options":"debug","build":"cross"},{"python":"cpython-3.13","arch":"x64","options":"debug","build":"cross"},{"python":"cpython-3.13","arch":"x86","options":"debug","build":"cross"},{"python":"cpython-3.14","arch":"x64","options":"debug","build":"cross"},{"python":"cpython-3.14","arch":"x86","options":"debug","build":"cross"},{"python":"cpython-3.15","arch":"x64","options":"debug","build":"cross"},{"python":"cpython-3.15","arch":"x86","options":"debug","build":"cross"},{"python":"cpython-3.13","arch":"x64","options":"freethreaded+debug","build":"cross"},{"python":"cpython-3.13","arch":"x86","options":"freethreaded+debug","build":"cross"},{"python":"cpython-3.14","arch":"x64","options":"freethreaded+debug","build":"cross"},{"python":"cpython-3.14","arch":"x86","options":"freethreaded+debug","build":"cross"},{"python":"cpython-3.15","arch":"x64","options":"freethreaded+debug","build":"cross"},{"python":"cpython-3.15","arch":"x86","options":"freethreaded+debug","build":"cross"},{"python":"cpython-3.11","arch":"arm64","options":"debug","build":"cross"},{"python":"cpython-3.11","arch":"arm64","options":"debug","build":"native"},{"python":"cpython-3.12","arch":"arm64","options":"debug","build":"cross"},{"python":"cpython-3.12","arch":"arm64","options":"debug","build":"native"},{"python":"cpython-3.13","arch":"arm64","options":"debug","build":"cross"},{"python":"cpython-3.13","arch":"arm64","options":"debug","build":"native"},{"python":"cpython-3.14","arch":"arm64","options":"debug","build":"cross"},{"python":"cpython-3.14","arch":"arm64","options":"debug","build":"native"},{"python":"cpython-3.15","arch":"arm64","options":"debug","build":"cross"},{"python":"cpython-3.15","arch":"arm64","options":"debug","build":"native"},{"python":"cpython-3.13","arch":"arm64","options":"freethreaded+debug","build":"cross"},{"python":"cpython-3.13","arch":"arm64","options":"freethreaded+debug","build":"native"},{"python":"cpython-3.14","arch":"arm64","options":"freethreaded+debug","build":"cross"},{"python":"cpython-3.14","arch":"arm64","options":"freethreaded+debug","build":"native"},{"python":"cpython-3.15","arch":"arm64","options":"freethreaded+debug","build":"cross"},{"python":"cpython-3.15","arch":"arm64","options":"freethreaded+debug","build":"native"}]') }}
-    name: ${{ matrix.python }} ${{ matrix.arch }}/${{ matrix.build }} --options ${{ matrix.options }}
+        include: ${{ fromJson('[{"python":"cpython-3.10","arch":"x64","options":"debug","build":"native"},{"python":"cpython-3.10","arch":"x86","options":"debug","build":"native"},{"python":"cpython-3.11","arch":"x64","options":"debug","build":"native"},{"python":"cpython-3.11","arch":"x86","options":"debug","build":"native"},{"python":"cpython-3.12","arch":"x64","options":"debug","build":"native"},{"python":"cpython-3.12","arch":"x86","options":"debug","build":"native"},{"python":"cpython-3.13","arch":"x64","options":"debug","build":"native"},{"python":"cpython-3.13","arch":"x86","options":"debug","build":"native"},{"python":"cpython-3.14","arch":"x64","options":"debug","build":"native"},{"python":"cpython-3.14","arch":"x86","options":"debug","build":"native"},{"python":"cpython-3.15","arch":"x64","options":"debug","build":"native"},{"python":"cpython-3.15","arch":"x86","options":"debug","build":"native"},{"python":"cpython-3.13","arch":"x64","options":"freethreaded+debug","build":"native"},{"python":"cpython-3.13","arch":"x86","options":"freethreaded+debug","build":"native"},{"python":"cpython-3.14","arch":"x64","options":"freethreaded+debug","build":"native"},{"python":"cpython-3.14","arch":"x86","options":"freethreaded+debug","build":"native"},{"python":"cpython-3.15","arch":"x64","options":"freethreaded+debug","build":"native"},{"python":"cpython-3.15","arch":"x86","options":"freethreaded+debug","build":"native"},{"python":"cpython-3.11","arch":"arm64","options":"debug","build":"native"},{"python":"cpython-3.12","arch":"arm64","options":"debug","build":"native"},{"python":"cpython-3.13","arch":"arm64","options":"debug","build":"native"},{"python":"cpython-3.14","arch":"arm64","options":"debug","build":"native"},{"python":"cpython-3.15","arch":"arm64","options":"debug","build":"native"},{"python":"cpython-3.13","arch":"arm64","options":"freethreaded+debug","build":"native"},{"python":"cpython-3.14","arch":"arm64","options":"freethreaded+debug","build":"native"},{"python":"cpython-3.15","arch":"arm64","options":"freethreaded+debug","build":"native"}]') }}
+    name: ${{ matrix.python }} ${{ matrix.arch }} --options ${{ matrix.options }}
     timeout-minutes: 120
     permissions:
       contents: read
@@ -91,23 +91,17 @@ jobs:
         done
         git --no-pager diff --stat
 
-    # vcvars varies by target, and a cross-compiled arm64 binary cannot run on
-    # the x64 host that produced it, so the embedder steps are skipped there.
-    - name: Resolve toolchain for ${{ matrix.arch }} (${{ matrix.build }})
+    # PC/layout runs the interpreter it just built, so every target builds on
+    # its own architecture and vcvars follows the host.
+    - name: Resolve toolchain for ${{ matrix.arch }}
       shell: bash
       run: |
-        case "${{ matrix.arch }}-${{ matrix.build }}" in
-          x64-*)          vcvars=vcvars64.bat ;;
-          x86-*)          vcvars=vcvars32.bat ;;
-          arm64-cross)    vcvars=vcvarsamd64_arm64.bat ;;
-          arm64-native)   vcvars=vcvarsarm64.bat ;;
+        case "${{ matrix.arch }}" in
+          x64)    vcvars=vcvars64.bat ;;
+          x86)    vcvars=vcvars32.bat ;;
+          arm64)  vcvars=vcvarsarm64.bat ;;
         esac
         echo "VCVARS=$vcvars" >> "$GITHUB_ENV"
-        if [[ "${{ matrix.arch }}-${{ matrix.build }}" == "arm64-cross" ]]; then
-          echo "RUNNABLE=no" >> "$GITHUB_ENV"
-        else
-          echo "RUNNABLE=yes" >> "$GITHUB_ENV"
-        fi
         echo "vcvars=$vcvars"
 
     - name: Report free disk space
@@ -228,7 +222,6 @@ jobs:
     # python314_d.lib through its own #pragma comment(lib, ...). No workaround
     # here, only a LIBPATH. If this links, python_h.h can be deleted.
     - name: Link an embedder against it, with no _DEBUG workaround
-      if: env.RUNNABLE == 'yes'
       shell: cmd
       run: |
         for /f "usebackq tokens=*" %%i in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath`) do set VSPATH=%%i
@@ -240,7 +233,6 @@ jobs:
            /link /LIBPATH:pbs\unpacked\python\install\libs || exit /b 1
 
     - name: Run the embedder
-      if: env.RUNNABLE == 'yes'
       shell: cmd
       run: |
         set PATH=%CD%\pbs\unpacked\python\install;%PATH%
