@@ -97,9 +97,9 @@ jobs:
 
   # macOS build + test (default hermetic Clang). There is no macOS/GCC leg — the
   # hermetic GCC toolchain (f0rmiga/gcc-toolchain) is Linux-only.
-  # Note: macOS x64 (Intel) is not supported because the pinned LLVM has no Intel
-  # macOS distribution. See:
-  # https://github.com/bazel-contrib/toolchains_llvm/blob/master/toolchain/internal/llvm_distributions.bzl
+  # Note: macOS x64 (Intel) has no leg because upstream LLVM stopped publishing
+  # x86_64-apple-darwin after 15.0.7, so toolchain resolution fails outright.
+  # Tracked in #184 along with the toolchain swap that would restore it.
   build-macos:
     runs-on: macos-latest
     name: Build & test (macOS ARM64, hermetic Clang)

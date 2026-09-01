@@ -22,11 +22,12 @@ bazel_dep(name = "rules_cc", version = "0.2.22")
 #
 bazel_dep(name = "rules_foreign_cc", version = "0.15.1")
 
-# Three fixes that landed upstream after 0.15.1, which is 14 months old and
-# still the newest release. All are backported verbatim rather than moving to
-# HEAD: main is ~99 commits ahead and includes a hub/spoke toolchain refactor,
-# which is a lot of unreleased surface for a starter template to carry. Drop all
-# three on the next release bump.
+# Fixes against 0.15.1, which is 14 months old and still the newest release.
+# The first three landed upstream and are backported verbatim rather than
+# moving to HEAD: main is ~99 commits ahead and includes a hub/spoke toolchain
+# refactor, which is a lot of unreleased surface for a starter template to
+# carry. Drop those three on the next release bump; the last two are local and
+# tracked separately.
 #
 #   cc_import_load    Windows pkg-config generates BUILD files calling
 #                     cc_import with no load(); Bazel 9 removed the native
@@ -43,6 +44,16 @@ bazel_dep(name = "rules_foreign_cc", version = "0.15.1")
 #                     no headers. Carries a coupled transitions.bzl hunk.
 #                     https://github.com/bazel-contrib/rules_foreign_cc/issues/1359
 #                     https://github.com/bazel-contrib/rules_foreign_cc/pull/1459
+#   postfixed_outputs cmake() matched declared outputs literally, so a build
+#                     whose library picks up a suffix (CMAKE_DEBUG_POSTFIX
+#                     under -c dbg) could not be named. Resolves the real file
+#                     from the CMake File API codemodel instead.
+#                     https://github.com/bazel-contrib/rules_foreign_cc/issues/1041
+#   pkgconfig_arm64_  the MSVC pkg-config bootstrap infers its target arch by
+#   msvc              preprocessing for _M_IX86/_M_AMD64 only. On Windows ARM64
+#                     neither matches, so PLAT stays empty and LDFLAGS_ARCH
+#                     falls through to /machine:x86, failing the link with
+#                     LNK1112. Passes PLAT and LDFLAGS_ARCH explicitly there.
 single_version_override(
     module_name = "rules_foreign_cc",
     patch_strip = 1,
@@ -51,6 +62,7 @@ single_version_override(
         "//tools/cpp/patches:rules_foreign_cc_0.15.1_pkgconfig_gnu90.patch",
         "//tools/cpp/patches:rules_foreign_cc_0.15.1_msvc_pkgconfig_bzlmod_paths.patch",
         "//tools/cpp/patches:rules_foreign_cc_0.15.1_postfixed_outputs.patch",
+        "//tools/cpp/patches:rules_foreign_cc_0.15.1_pkgconfig_arm64_msvc.patch",
     ],
 )
 
