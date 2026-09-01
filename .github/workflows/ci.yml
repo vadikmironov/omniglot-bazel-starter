@@ -116,7 +116,6 @@ jobs:
   # The lint phase: formatting, the linter aspects (clang-tidy / clippy / PMD /
   # SpotBugs / ruff / mypy), GCC -fanalyzer static analysis, and the gazelle /
   # publish / mint drift gates.
-
   lint:
     runs-on: ubuntu-latest
     permissions:
@@ -410,6 +409,8 @@ jobs:
         targets: //modules/...
         exclude_tags: profiling-cpu,profiling-mem
 
+  # Windows on arm64, same scope and same reasons as the x64 job above. The
+  # runner label is free for public repositories only.
   build-windows-arm64:
     runs-on: windows-11-arm
     name: Build & test (Windows ARM64)
