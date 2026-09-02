@@ -37,7 +37,7 @@ bazel_dep(name = "rules_foreign_cc", version = "0.15.1")
 #                     from the CMake File API codemodel instead.
 #                     https://github.com/bazel-contrib/rules_foreign_cc/issues/1041
 #
-# Three further patches were dropped when //third_party/pkgconf took over the
+# Three further patches were dropped when //tools/cpp/foreign_cc took over the
 # pkg-config toolchain: the bundled pkg-config bootstrap builds glib, and all
 # three existed only to keep that building (glib under GCC 15's C23 default,
 # bzlmod-canonical paths for the MSVC nmake build, and target-arch detection on
