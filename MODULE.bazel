@@ -97,12 +97,11 @@ include("//tools/cpp:llvm_segment.MODULE.bazel")
 #
 include("//tools/cpp:cpp_segment.MODULE.bazel")
 include("//tools/cpp:cpp_3rd_party_dependencies.MODULE.bazel")
-# --- END lang:cpp ---
 
-# --- BEGIN exclude ---
-# pkgconf, providing the pkg-config toolchain that cmake()/make() require.
-include("//third_party/pkgconf:pkgconf.MODULE.bazel")
-# --- END exclude ---
+# pkgconf supplies the pkg-config toolchain that cmake()/make() require, plus
+# the cmake and ninja prebuilts rules_foreign_cc lacks on Windows ARM64.
+include("//tools/cpp/foreign_cc:foreign_cc_tools.MODULE.bazel")
+# --- END lang:cpp ---
 
 # --- BEGIN exclude ---
 # fmt source for the rules_foreign_cc example (//modules/cpp_app_with_cmake_dep).
