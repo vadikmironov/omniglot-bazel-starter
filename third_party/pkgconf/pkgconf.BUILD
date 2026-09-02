@@ -79,6 +79,12 @@ cc_library(
     defines = ["PKGCONFIG_IS_STATIC"],
     # Sources include <libpkgconf/...>, so the archive root is the include root.
     includes = ["."],
+    # path.c reads search paths from the registry on Windows, and Bazel's MSVC
+    # toolchain does not link advapi32 by default.
+    linkopts = select({
+        "@platforms//os:windows": ["advapi32.lib"],
+        "//conditions:default": [],
+    }),
     linkstatic = True,
 )
 
