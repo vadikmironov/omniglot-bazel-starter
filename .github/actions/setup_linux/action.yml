@@ -20,11 +20,6 @@ runs:
         disk-cache: ${{ hashFiles('.bazelversion', 'MODULE.bazel') }}
         # Enable repository cache (avoids re-downloading Maven/LLVM every run)
         repository-cache: true
-    - name: Install libtinfo5 (dependency for clang)
-      shell: bash
-      run: |
-        wget -c https://security.ubuntu.com/ubuntu/pool/universe/n/ncurses/libtinfo5_6.3-2ubuntu0.2_amd64.deb
-        sudo apt install ./libtinfo5_6.3-2ubuntu0.2_amd64.deb
     - name: Print debug info
       shell: bash
       run: |
