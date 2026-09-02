@@ -191,6 +191,19 @@ use_repo(
 #
 bazel_dep(name = "rules_jvm_external", version = "7.1")
 
+# COURSIER_CACHE is set only on the pinned path, so a repin spawns coursier
+# without it. Coursier then derives its cache from the JVM's user.home, which
+# on Linux comes from the passwd database and ignores $HOME. Where the two
+# disagree — $HOME on a network mount — coursier writes somewhere Starlark does
+# not expect and the returned paths cannot be relativized against the cache,
+# failing the repin. Sets the variable on both paths.
+# https://github.com/bazel-contrib/rules_jvm_external/pull/1601
+single_version_override(
+    module_name = "rules_jvm_external",
+    patch_strip = 1,
+    patches = ["//tools/java/patches:rules_jvm_external_7.1_unpinned_coursier_cache.patch"],
+)
+
 #
 # Project-specific Maven repository name. Using a unique name prevents conflicts
 # with other Bazel modules that also use rules_jvm_external (e.g., protobuf).
