@@ -97,9 +97,9 @@ jobs:
 
   # macOS build + test (default hermetic Clang). There is no macOS/GCC leg — the
   # hermetic GCC toolchain (f0rmiga/gcc-toolchain) is Linux-only.
-  # Note: macOS x64 (Intel) is not supported because the pinned LLVM has no Intel
-  # macOS distribution. See:
-  # https://github.com/bazel-contrib/toolchains_llvm/blob/master/toolchain/internal/llvm_distributions.bzl
+  # Note: macOS x64 (Intel) has no leg because upstream LLVM stopped publishing
+  # x86_64-apple-darwin after 15.0.7, so toolchain resolution fails outright.
+  # Tracked in #184 along with the toolchain swap that would restore it.
   build-macos:
     runs-on: macos-latest
     name: Build & test (macOS ARM64, hermetic Clang)
@@ -205,7 +205,7 @@ jobs:
       fail-fast: false
       matrix:
         mode: [dbg, opt]
-        platform: [linux-clang, linux-gcc, macos, windows]
+        platform: [linux-clang, linux-gcc, macos, windows, windows-arm64]
         include:
           - platform: linux-clang
             name: Linux x64, hermetic Clang
@@ -226,6 +226,13 @@ jobs:
           - platform: windows
             name: Windows x64
             os: windows-latest
+            setup: windows
+            targets: //modules/...
+            exclude_tags: profiling-cpu,profiling-mem
+            startup_opts: --output_base=C:/bazel_build
+          - platform: windows-arm64
+            name: Windows ARM64
+            os: windows-11-arm
             setup: windows
             targets: //modules/...
             exclude_tags: profiling-cpu,profiling-mem
@@ -382,6 +389,31 @@ jobs:
   build-windows:
     runs-on: windows-latest
     name: Build & test (Windows x64)
+    permissions:
+      contents: read
+
+    env:
+      # Use shorter output_base to avoid Windows MAX_PATH (260 char) limit
+      # See: https://github.com/bazelbuild/rules_rust/issues/1946
+      BAZEL_STARTUP_OPTS: "--output_base=C:/bazel_build"
+
+    steps:
+    - uses: actions/checkout@v7
+    - uses: ./.github/actions/setup_windows
+      with:
+        bazel_startup_opts: ${{ env.BAZEL_STARTUP_OPTS }}
+    - uses: ./.github/actions/bazel_test
+      with:
+        buildbuddy_api_key: ${{ secrets.BUILDBUDDY_API_KEY }}
+        bazel_startup_opts: ${{ env.BAZEL_STARTUP_OPTS }}
+        targets: //modules/...
+        exclude_tags: profiling-cpu,profiling-mem
+
+  # Windows on arm64, same scope and same reasons as the x64 job above. The
+  # runner label is free for public repositories only.
+  build-windows-arm64:
+    runs-on: windows-11-arm
+    name: Build & test (Windows ARM64)
     permissions:
       contents: read
 

@@ -48,6 +48,17 @@ bazel_dep(name = "rules_oci", version = "2.3.0")
 #
 bazel_dep(name = "aspect_bazel_lib", version = "2.22.5")
 
+# The bundled jq toolchain pins jq 1.7 and offers no Windows arm64 platform, so
+# anything pulling it in fails to resolve there. jq has published the binary
+# since 1.8.0. Drop once this lands upstream; see the patch header.
+single_version_override(
+    module_name = "aspect_bazel_lib",
+    patch_strip = 1,
+    patches = [
+        "//tools/publish/patches:aspect_bazel_lib_2.22.5_jq_windows_arm64.patch",
+    ],
+)
+
 oci = use_extension("@rules_oci//oci:extensions.bzl", "oci")
 
 # Distroless base images, pinned by digest for reproducibility. Renovate's

@@ -22,34 +22,31 @@ bazel_dep(name = "rules_cc", version = "0.2.22")
 #
 bazel_dep(name = "rules_foreign_cc", version = "0.15.1")
 
-# Three fixes that landed upstream after 0.15.1, which is 14 months old and
-# still the newest release. All are backported verbatim rather than moving to
-# HEAD: main is ~99 commits ahead and includes a hub/spoke toolchain refactor,
-# which is a lot of unreleased surface for a starter template to carry. Drop all
-# three on the next release bump.
+# Fixes against 0.15.1, which is 14 months old and still the newest release.
+# Backported verbatim rather than moving to HEAD: main is ~99 commits ahead and
+# includes a hub/spoke toolchain refactor, which is a lot of unreleased surface
+# for a starter template to carry.
 #
 #   cc_import_load    Windows pkg-config generates BUILD files calling
 #                     cc_import with no load(); Bazel 9 removed the native
 #                     rule, so cmake()/make() fail analysis on Windows.
 #                     https://github.com/bazel-contrib/rules_foreign_cc/pull/1570
-#   pkgconfig_gnu90   the bundled glib doesn't compile under GCC 15's C23
-#                     default, breaking cmake()/make() under
-#                     --config=gcc_hermetic.
-#                     https://github.com/bazel-contrib/rules_foreign_cc/issues/1427
-#                     https://github.com/bazel-contrib/rules_foreign_cc/pull/1458
-#   msvc_pkgconfig_   the MSVC pkg-config bootstrap hardcoded WORKSPACE-era
-#   bzlmod_paths      paths (external/glib_dev, external/glib_src). Under
-#                     bzlmod those repos are canonically named, so nmake finds
-#                     no headers. Carries a coupled transitions.bzl hunk.
-#                     https://github.com/bazel-contrib/rules_foreign_cc/issues/1359
-#                     https://github.com/bazel-contrib/rules_foreign_cc/pull/1459
+#   postfixed_outputs cmake() matched declared outputs literally, so a build
+#                     whose library picks up a suffix (CMAKE_DEBUG_POSTFIX
+#                     under -c dbg) could not be named. Resolves the real file
+#                     from the CMake File API codemodel instead.
+#                     https://github.com/bazel-contrib/rules_foreign_cc/issues/1041
+#
+# Three further patches were dropped when //third_party/pkgconf took over the
+# pkg-config toolchain: the bundled pkg-config bootstrap builds glib, and all
+# three existed only to keep that building (glib under GCC 15's C23 default,
+# bzlmod-canonical paths for the MSVC nmake build, and target-arch detection on
+# Windows ARM64). Nothing builds glib now.
 single_version_override(
     module_name = "rules_foreign_cc",
     patch_strip = 1,
     patches = [
         "//tools/cpp/patches:rules_foreign_cc_0.15.1_cc_import_load.patch",
-        "//tools/cpp/patches:rules_foreign_cc_0.15.1_pkgconfig_gnu90.patch",
-        "//tools/cpp/patches:rules_foreign_cc_0.15.1_msvc_pkgconfig_bzlmod_paths.patch",
         "//tools/cpp/patches:rules_foreign_cc_0.15.1_postfixed_outputs.patch",
     ],
 )
