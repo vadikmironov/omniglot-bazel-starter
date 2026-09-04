@@ -49,7 +49,7 @@ bazel_dep(name = "buildifier_prebuilt", version = "8.5.1.4", dev_dependency = Tr
 # Please find documentation here:
 # https://github.com/aspect-build/rules_lint/releases
 #
-bazel_dep(name = "aspect_rules_lint", version = "2.8.0")
+bazel_dep(name = "aspect_rules_lint", version = "2.9.0")
 
 # 2.8.0 shell-quotes clang-tidy's -header-filter, but nothing unquotes it, so
 # clang-tidy treats the flag as an input path and every lint_target_headers
