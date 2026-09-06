@@ -3,7 +3,7 @@ module omniglot-bazel-starter
 go 1.26.0
 
 require (
-	github.com/bazelbuild/bazel-gazelle v0.53.0
+	github.com/bazelbuild/bazel-gazelle v0.54.0
 	github.com/stretchr/testify v1.12.1
 )
 
@@ -29,7 +29,7 @@ require (
 	// Imported directly by //tools/profile/pb2folded, so this is needed by
 	// every profiling scaffold — not just the C++ one, which additionally
 	// runs the pprof CLI as a tool (below).
-	github.com/google/pprof v0.0.0-20260830191439-4932ad3515ea
+	github.com/google/pprof v0.0.0-20260903180319-d6c3cb2f37ec
 // --- END feature:profiling ---
 )
 
