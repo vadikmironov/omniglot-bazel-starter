@@ -174,6 +174,12 @@ build:clang_host --cxxopt=-Wall
 build:gcc_remote --platforms=//tools/cpp/toolchains:x86_64_linux_platform
 build:gcc_remote --extra_toolchains=@remote_xpack_gcc//:all
 build:gcc_remote --cxxopt=-Wall
+# The toolchain links libstdc++ statically (toolchain_config.bzl), so the same
+# left-to-right archive ordering that gcc_hermetic handles above applies here:
+# repeat the libraries as rustc link-args so they land after a crate's link_deps.
+build:gcc_remote --@rules_rust//rust/settings:extra_rustc_flag=-Clink-arg=-l:libstdc++.a
+build:gcc_remote --@rules_rust//rust/settings:extra_rustc_flag=-Clink-arg=-lm
+build:gcc_remote --@rules_rust//rust/settings:extra_rustc_flag=-Clink-arg=-lc
 
 # Clang (remote hermetic-llvm minimal)
 

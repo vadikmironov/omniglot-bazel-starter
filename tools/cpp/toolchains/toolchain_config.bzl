@@ -98,6 +98,12 @@ def _impl(ctx):
         fail("Unable to create tool_paths/builtin include lists for unknown compiler flavour.")
 
     features = [
+        # Bazel only sets the `pic` build variable -- and so only expands the
+        # legacy `pic` feature's -fPIC -- when the toolchain says it supports
+        # PIC. Without this, shared libraries compile at the compiler's default
+        # -fPIE, which GCC resolves with a direct R_X86_64_PC32 against
+        # undefined externs and the linker then rejects for a .so.
+        feature(name = "supports_pic", enabled = True),
         feature(
             name = "default_linker_flags",
             enabled = True,

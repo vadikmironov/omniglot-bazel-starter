@@ -58,13 +58,12 @@ jobs:
       matrix:
         include:
           # The C++ remote compilers link against the host glibc, so they cover
-          # the C++ modules -- the usage CLAUDE.md documents -- not //...:
-          # cpp_py_ext_module's shared library fails to link under them, which
-          # is a property of the toolchain, not a regression to report.
+          # //modules/... rather than //...: the tools/ tree builds host
+          # binaries the pinned compilers have no reason to be driving.
           - config: gcc_remote
-            targets: //modules/cpp_app //modules/cpp_app_with_ext_dep //modules/cpp_library
+            targets: //modules/...
           - config: clang_remote
-            targets: //modules/cpp_app //modules/cpp_app_with_ext_dep //modules/cpp_library
+            targets: //modules/...
           # The remote JDK swaps the Java runtime repo-wide and //... passes
           # under it, so there is no reason to narrow this one.
           - config: java_17_remote_corretto_jdk
@@ -117,6 +116,9 @@ jobs:
     - name: Open or update the tracking issue
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # The job checks out nothing, so gh has no git remote to infer the
+        # repository from and every subcommand below would fail without this.
+        GH_REPO: ${{ github.repository }}
         RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
       run: |
         title="Weekly run failing"
