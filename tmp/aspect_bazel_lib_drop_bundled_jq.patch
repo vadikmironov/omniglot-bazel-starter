@@ -1,0 +1,427 @@
+Drop the bundled jq toolchain in favour of jq.bzl
+
+lib/jq.bzl already re-exports the rule from jq.bzl, and that rule resolves
+jq.bzl's own toolchain type, so the toolchain bundled here is no longer
+what any jq() target uses. It is still registered for every platform in
+its own JQ_PLATFORMS table, which is a second, older copy of the same
+data: it pins jq 1.7 and has no Windows arm64 entry, so it fails to
+resolve on that host and takes unrelated targets with it.
+
+Removing it leaves one source of truth. jq.bzl moves to 0.6.1, which
+carries every platform this table used to provide.
+
+This drops @aspect_bazel_lib//lib:jq_toolchain_type, which is public API.
+Anything depending on it directly should use @jq.bzl//jq/toolchain
+instead. v3 has already removed jq from this repository, so this brings
+2.x in line rather than inventing a direction.
+
+diff --git a/MODULE.bazel b/MODULE.bazel
+index 0d38d9b..9df6ddc 100644
+--- a/MODULE.bazel
++++ b/MODULE.bazel
+@@ -19,26 +19,24 @@ bazel_dep(name = "rules_shell", version = "0.4.1")
+ bazel_dep(name = "bazel_lib", version = "3.0.0")
+ 
+ # TODO(3.0): remove this back-compat
+-bazel_dep(name = "jq.bzl", version = "0.1.0")
++bazel_dep(name = "jq.bzl", version = "0.6.1")
+ bazel_dep(name = "yq.bzl", version = "0.1.1")
+ bazel_dep(name = "tar.bzl", version = "0.5.1")
+ 
+ bazel_lib_toolchains = use_extension("@aspect_bazel_lib//lib:extensions.bzl", "toolchains")
+ bazel_lib_toolchains.copy_directory()
+ bazel_lib_toolchains.copy_to_directory()
+-bazel_lib_toolchains.jq()
+ bazel_lib_toolchains.yq()
+ bazel_lib_toolchains.coreutils()
+ bazel_lib_toolchains.tar()
+ bazel_lib_toolchains.zstd()
+ bazel_lib_toolchains.expand_template()
+ bazel_lib_toolchains.bats()
+-use_repo(bazel_lib_toolchains, "bats_toolchains", "bsd_tar_toolchains", "copy_directory_toolchains", "copy_to_directory_toolchains", "coreutils_toolchains", "expand_template_toolchains", "jq", "jq_toolchains", "yq", "yq_toolchains", "zstd_toolchains")
++use_repo(bazel_lib_toolchains, "bats_toolchains", "bsd_tar_toolchains", "copy_directory_toolchains", "copy_to_directory_toolchains", "coreutils_toolchains", "expand_template_toolchains", "yq", "yq_toolchains", "zstd_toolchains")
+ 
+ register_toolchains(
+     "@copy_directory_toolchains//:all",
+     "@copy_to_directory_toolchains//:all",
+-    "@jq_toolchains//:all",
+     "@yq_toolchains//:all",
+     "@coreutils_toolchains//:all",
+     "@expand_template_toolchains//:all",
+diff --git a/e2e/api_entries/BUILD.bazel b/e2e/api_entries/BUILD.bazel
+index 22e5a24..2961ca9 100644
+--- a/e2e/api_entries/BUILD.bazel
++++ b/e2e/api_entries/BUILD.bazel
+@@ -29,7 +29,6 @@ build_test(
+         "@aspect_bazel_lib//lib:glob_match",
+         "@aspect_bazel_lib//lib:host_repo",
+         "@aspect_bazel_lib//lib:jq",
+-        "@aspect_bazel_lib//lib:jq_toolchain_type",
+         "@aspect_bazel_lib//lib:lists",
+         "@aspect_bazel_lib//lib:output_files",
+         "@aspect_bazel_lib//lib:params_file",
+diff --git a/lib/BUILD.bazel b/lib/BUILD.bazel
+index 80f2a45..53d2e05 100644
+--- a/lib/BUILD.bazel
++++ b/lib/BUILD.bazel
+@@ -39,9 +39,6 @@ config_setting(
+     values = {"enable_runfiles": "true"},
+ )
+ 
+-toolchain_type(
+-    name = "jq_toolchain_type",
+-)
+ 
+ toolchain_type(
+     name = "yq_toolchain_type",
+@@ -270,7 +267,6 @@ bzl_library(
+         "//lib/private:copy_to_directory_toolchain",
+         "//lib/private:coreutils_toolchain",
+         "//lib/private:expand_template_toolchain",
+-        "//lib/private:jq_toolchain",
+         "//lib/private:source_toolchains_repo",
+         "//lib/private:tar_toolchain",
+         "//lib/private:yq_toolchain",
+diff --git a/lib/extensions.bzl b/lib/extensions.bzl
+index f32c882..e218390 100644
+--- a/lib/extensions.bzl
++++ b/lib/extensions.bzl
+@@ -9,8 +9,6 @@ load(
+     "DEFAULT_COREUTILS_REPOSITORY",
+     "DEFAULT_COREUTILS_VERSION",
+     "DEFAULT_EXPAND_TEMPLATE_REPOSITORY",
+-    "DEFAULT_JQ_REPOSITORY",
+-    "DEFAULT_JQ_VERSION",
+     "DEFAULT_TAR_REPOSITORY",
+     "DEFAULT_YQ_REPOSITORY",
+     "DEFAULT_YQ_VERSION",
+@@ -20,7 +18,6 @@ load(
+     "register_copy_to_directory_toolchains",
+     "register_coreutils_toolchains",
+     "register_expand_template_toolchains",
+-    "register_jq_toolchains",
+     "register_tar_toolchains",
+     "register_yq_toolchains",
+     "register_zstd_toolchains",
+@@ -62,13 +59,6 @@ def _toolchains_extension_impl(mctx):
+         get_version_fn = lambda attr: None,
+     )
+ 
+-    extension_utils.toolchain_repos_bfs(
+-        mctx = mctx,
+-        get_tag_fn = lambda tags: tags.jq,
+-        toolchain_name = "jq",
+-        toolchain_repos_fn = lambda name, version: register_jq_toolchains(name = name, version = version, register = False),
+-    )
+-
+     extension_utils.toolchain_repos_bfs(
+         mctx = mctx,
+         get_tag_fn = lambda tags: tags.yq,
+@@ -128,7 +118,6 @@ toolchains = module_extension(
+     tag_classes = {
+         "copy_directory": tag_class(attrs = {"name": attr.string(default = DEFAULT_COPY_DIRECTORY_REPOSITORY)}),
+         "copy_to_directory": tag_class(attrs = {"name": attr.string(default = DEFAULT_COPY_TO_DIRECTORY_REPOSITORY)}),
+-        "jq": tag_class(attrs = {"name": attr.string(default = DEFAULT_JQ_REPOSITORY), "version": attr.string(default = DEFAULT_JQ_VERSION)}),
+         "yq": tag_class(attrs = {"name": attr.string(default = DEFAULT_YQ_REPOSITORY), "version": attr.string(default = DEFAULT_YQ_VERSION)}),
+         "coreutils": tag_class(attrs = {"name": attr.string(default = DEFAULT_COREUTILS_REPOSITORY), "version": attr.string(default = DEFAULT_COREUTILS_VERSION)}),
+         "tar": tag_class(attrs = {"name": attr.string(default = DEFAULT_TAR_REPOSITORY)}),
+diff --git a/lib/private/BUILD.bazel b/lib/private/BUILD.bazel
+index d994aff..1ff229a 100644
+--- a/lib/private/BUILD.bazel
++++ b/lib/private/BUILD.bazel
+@@ -140,12 +140,6 @@ bzl_library(
+     ],
+ )
+ 
+-bzl_library(
+-    name = "jq_toolchain",
+-    srcs = ["jq_toolchain.bzl"],
+-    visibility = ["//lib:__subpackages__"],
+-    deps = [":repo_utils"],
+-)
+ 
+ bzl_library(
+     name = "output_files",
+diff --git a/lib/private/jq_toolchain.bzl b/lib/private/jq_toolchain.bzl
+deleted file mode 100644
+index f8cd0c7..0000000
+--- a/lib/private/jq_toolchain.bzl
++++ /dev/null
+@@ -1,223 +0,0 @@
+-"Setup jq toolchain repositories and rules"
+-
+-load(":repo_utils.bzl", "repo_utils")
+-
+-# Platform names follow the platform naming convention in @aspect_bazel_lib//:lib/private/repo_utils.bzl
+-JQ_PLATFORMS = {
+-    "darwin_amd64": struct(
+-        release_platform = "macos-amd64",
+-        compatible_with = [
+-            "@platforms//os:macos",
+-            "@platforms//cpu:x86_64",
+-        ],
+-    ),
+-    "darwin_arm64": struct(
+-        release_platform = "macos-arm64",
+-        compatible_with = [
+-            "@platforms//os:macos",
+-            "@platforms//cpu:aarch64",
+-        ],
+-    ),
+-    "linux_amd64": struct(
+-        release_platform = "linux-amd64",
+-        compatible_with = [
+-            "@platforms//os:linux",
+-            "@platforms//cpu:x86_64",
+-        ],
+-    ),
+-    "linux_arm64": struct(
+-        release_platform = "linux-arm64",
+-        compatible_with = [
+-            "@platforms//os:linux",
+-            "@platforms//cpu:aarch64",
+-        ],
+-    ),
+-    "windows_amd64": struct(
+-        release_platform = "win64",
+-        compatible_with = [
+-            "@platforms//os:windows",
+-            "@platforms//cpu:x86_64",
+-        ],
+-    ),
+-}
+-
+-DEFAULT_JQ_VERSION = "1.7"
+-
+-# https://github.com/stedolan/jq/releases
+-#
+-# The integrity hashes can be computed with
+-# shasum -b -a 384 [downloaded file] | awk '{ print $1 }' | xxd -r -p | base64
+-JQ_VERSIONS = {
+-    "1.7": {
+-        "linux-amd64": "sha384-4wJ15NoxFf7r1Zf5YVGUeMPx/pfWlSfMJWLFcu4fUcBFe5L4BOpF/njEK8AH58od",
+-        "linux-arm64": "sha384-y9BwX+RyXf2a16xwtvcjHFfIBp3K3Ukyg4GjtmxBtynD/BKNf+0tuLtZx64TTI+/",
+-        "macos-amd64": "sha384-N0WdpiD8zl1k9888yGxWW/dHzztOTU+RTlZrzOYJMXXUUMqjnqXq8GwnHDsC9Lk3",
+-        "macos-arm64": "sha384-0nnKlrEAU7NCzTM63XYkhAGGapA/IT2O2jkU+H+ZbQFu3E+XEbgw5E/+o0oHjLGf",
+-        "win64": "sha384-2QfBgUpi1I5KPVrKtZnPcur+Wn/iE+tZVPFKXiIPoBKTpqZKhzc/CdqjcBn+IPiy",
+-    },
+-}
+-
+-JqInfo = provider(
+-    doc = "Provide info for executing jq",
+-    fields = {
+-        "bin": "Executable jq binary",
+-    },
+-)
+-
+-def _jq_toolchain_impl(ctx):
+-    binary = ctx.file.bin
+-
+-    # Make the $(JQ_BIN) variable available in places like genrules.
+-    # See https://docs.bazel.build/versions/main/be/make-variables.html#custom_variables
+-    template_variables = platform_common.TemplateVariableInfo({
+-        "JQ_BIN": binary.path,
+-    })
+-    default_info = DefaultInfo(
+-        files = depset([binary]),
+-        runfiles = ctx.runfiles(files = [binary]),
+-    )
+-    jq_info = JqInfo(
+-        bin = binary,
+-    )
+-
+-    # Export all the providers inside our ToolchainInfo
+-    # so the resolved_toolchain rule can grab and re-export them.
+-    toolchain_info = platform_common.ToolchainInfo(
+-        jqinfo = jq_info,
+-        template_variables = template_variables,
+-        default = default_info,
+-    )
+-
+-    return [default_info, toolchain_info, template_variables]
+-
+-jq_toolchain = rule(
+-    implementation = _jq_toolchain_impl,
+-    attrs = {
+-        "bin": attr.label(
+-            mandatory = True,
+-            allow_single_file = True,
+-        ),
+-    },
+-)
+-
+-def _jq_toolchains_repo_impl(rctx):
+-    # Expose a concrete toolchain which is the result of Bazel resolving the toolchain
+-    # for the execution or target platform.
+-    # Workaround for https://github.com/bazelbuild/bazel/issues/14009
+-    starlark_content = """# @generated by @aspect_bazel_lib//lib/private:jq_toolchain.bzl
+-
+-# Forward all the providers
+-def _resolved_toolchain_impl(ctx):
+-    toolchain_info = ctx.toolchains["@aspect_bazel_lib//lib:jq_toolchain_type"]
+-    return [
+-        toolchain_info,
+-        toolchain_info.default,
+-        toolchain_info.jqinfo,
+-        toolchain_info.template_variables,
+-    ]
+-
+-# Copied from java_toolchain_alias
+-# https://cs.opensource.google/bazel/bazel/+/master:tools/jdk/java_toolchain_alias.bzl
+-resolved_toolchain = rule(
+-    implementation = _resolved_toolchain_impl,
+-    toolchains = ["@aspect_bazel_lib//lib:jq_toolchain_type"],
+-)
+-"""
+-    rctx.file("defs.bzl", starlark_content)
+-
+-    build_content = """# @generated by @aspect_bazel_lib//lib/private:jq_toolchain.bzl
+-#
+-# These can be registered in the workspace file or passed to --extra_toolchains flag.
+-# By default all these toolchains are registered by the jq_register_toolchains macro
+-# so you don't normally need to interact with these targets.
+-
+-load(":defs.bzl", "resolved_toolchain")
+-
+-resolved_toolchain(name = "resolved_toolchain", visibility = ["//visibility:public"])
+-
+-"""
+-
+-    for [platform, meta] in JQ_PLATFORMS.items():
+-        build_content += """
+-toolchain(
+-    name = "{platform}_toolchain",
+-    exec_compatible_with = {compatible_with},
+-    toolchain = "@{user_repository_name}_{platform}//:jq_toolchain",
+-    toolchain_type = "@aspect_bazel_lib//lib:jq_toolchain_type",
+-)
+-""".format(
+-            platform = platform,
+-            user_repository_name = rctx.attr.user_repository_name,
+-            compatible_with = meta.compatible_with,
+-        )
+-
+-    # Base BUILD file for this repository
+-    rctx.file("BUILD.bazel", build_content)
+-
+-jq_toolchains_repo = repository_rule(
+-    _jq_toolchains_repo_impl,
+-    doc = """Creates a repository with toolchain definitions for all known platforms
+-     which can be registered or selected.""",
+-    attrs = {
+-        "user_repository_name": attr.string(doc = "Base name for toolchains repository"),
+-    },
+-)
+-
+-def _jq_platform_repo_impl(rctx):
+-    is_windows = rctx.attr.platform.startswith("windows_")
+-    meta = JQ_PLATFORMS[rctx.attr.platform]
+-    release_platform = meta.release_platform if hasattr(meta, "release_platform") else rctx.attr.platform
+-
+-    url = "https://github.com/stedolan/jq/releases/download/jq-{0}/jq-{1}{2}".format(
+-        rctx.attr.version,
+-        release_platform,
+-        ".exe" if is_windows else "",
+-    )
+-
+-    rctx.download(
+-        url = url,
+-        output = "jq.exe" if is_windows else "jq",
+-        executable = True,
+-        integrity = JQ_VERSIONS[rctx.attr.version][release_platform],
+-    )
+-    build_content = """# @generated by @aspect_bazel_lib//lib/private:jq_toolchain.bzl
+-load("@aspect_bazel_lib//lib/private:jq_toolchain.bzl", "jq_toolchain")
+-exports_files(["{0}"])
+-jq_toolchain(name = "jq_toolchain", bin = "{0}", visibility = ["//visibility:public"])
+-""".format("jq.exe" if is_windows else "jq")
+-
+-    # Base BUILD file for this repository
+-    rctx.file("BUILD.bazel", build_content)
+-
+-jq_platform_repo = repository_rule(
+-    implementation = _jq_platform_repo_impl,
+-    doc = "Fetch external tools needed for jq toolchain",
+-    attrs = {
+-        "version": attr.string(mandatory = True, values = JQ_VERSIONS.keys()),
+-        "platform": attr.string(mandatory = True, values = JQ_PLATFORMS.keys()),
+-    },
+-)
+-
+-def _jq_host_alias_repo(rctx):
+-    ext = ".exe" if repo_utils.is_windows(rctx) else ""
+-
+-    # Base BUILD file for this repository
+-    rctx.file("BUILD.bazel", """# @generated by @aspect_bazel_lib//lib/private:jq_toolchain.bzl
+-package(default_visibility = ["//visibility:public"])
+-exports_files(["jq{ext}"])
+-""".format(
+-        ext = ext,
+-    ))
+-
+-    rctx.symlink("../{name}_{platform}/jq{ext}".format(
+-        name = rctx.attr.name,
+-        platform = repo_utils.platform(rctx),
+-        ext = ext,
+-    ), "jq{ext}".format(ext = ext))
+-
+-jq_host_alias_repo = repository_rule(
+-    _jq_host_alias_repo,
+-    doc = """Creates a repository with a shorter name meant for the host platform, which contains
+-    a BUILD.bazel file that exports symlinks to the host platform's binaries
+-    """,
+-)
+diff --git a/lib/repositories.bzl b/lib/repositories.bzl
+index ad1e3ed..3360d1b 100644
+--- a/lib/repositories.bzl
++++ b/lib/repositories.bzl
+@@ -6,7 +6,6 @@ load("//lib/private:copy_directory_toolchain.bzl", "COPY_DIRECTORY_PLATFORMS", "
+ load("//lib/private:copy_to_directory_toolchain.bzl", "COPY_TO_DIRECTORY_PLATFORMS", "copy_to_directory_platform_repo", "copy_to_directory_toolchains_repo")
+ load("//lib/private:coreutils_toolchain.bzl", "COREUTILS_PLATFORMS", "coreutils_platform_repo", "coreutils_toolchains_repo", _DEFAULT_COREUTILS_VERSION = "DEFAULT_COREUTILS_VERSION")
+ load("//lib/private:expand_template_toolchain.bzl", "EXPAND_TEMPLATE_PLATFORMS", "expand_template_platform_repo", "expand_template_toolchains_repo")
+-load("//lib/private:jq_toolchain.bzl", "JQ_PLATFORMS", "jq_host_alias_repo", "jq_platform_repo", "jq_toolchains_repo", _DEFAULT_JQ_VERSION = "DEFAULT_JQ_VERSION")
+ load("//lib/private:source_toolchains_repo.bzl", "source_toolchains_repo")
+ load("//lib/private:tar_toolchain.bzl", "BSDTAR_PLATFORMS", "bsdtar_binary_repo", "tar_toolchains_repo")
+ load("//lib/private:yq_toolchain.bzl", "YQ_PLATFORMS", "yq_host_alias_repo", "yq_platform_repo", "yq_toolchains_repo", _DEFAULT_YQ_VERSION = "DEFAULT_YQ_VERSION")
+@@ -64,33 +63,6 @@ def aspect_bazel_lib_dependencies():
+         url = "https://github.com/bazelbuild/rules_shell/releases/download/v0.4.1/rules_shell-v0.4.1.tar.gz",
+     )
+ 
+-DEFAULT_JQ_REPOSITORY = "jq"
+-DEFAULT_JQ_VERSION = _DEFAULT_JQ_VERSION
+-
+-def register_jq_toolchains(name = DEFAULT_JQ_REPOSITORY, version = DEFAULT_JQ_VERSION, register = True):
+-    """Registers jq toolchain and repositories
+-
+-    Args:
+-        name: override the prefix for the generated toolchain repositories
+-        version: the version of jq to execute (see https://github.com/stedolan/jq/releases)
+-        register: whether to call through to native.register_toolchains.
+-            Should be True for WORKSPACE users, but false when used under bzlmod extension
+-    """
+-    for [platform, _] in JQ_PLATFORMS.items():
+-        jq_platform_repo(
+-            name = "%s_%s" % (name, platform),
+-            platform = platform,
+-            version = version,
+-        )
+-        if register:
+-            native.register_toolchains("@%s_toolchains//:%s_toolchain" % (name, platform))
+-
+-    jq_host_alias_repo(name = name)
+-
+-    jq_toolchains_repo(
+-        name = "%s_toolchains" % name,
+-        user_repository_name = name,
+-    )
+ 
+ DEFAULT_YQ_REPOSITORY = "yq"
+ DEFAULT_YQ_VERSION = _DEFAULT_YQ_VERSION
+@@ -383,7 +355,6 @@ def aspect_bazel_lib_register_toolchains():
+     register_copy_to_directory_toolchains()
+     register_expand_template_toolchains()
+     register_coreutils_toolchains()
+-    register_jq_toolchains()
+     register_yq_toolchains()
+     register_tar_toolchains()
+     register_zstd_toolchains()
