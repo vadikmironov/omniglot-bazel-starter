@@ -33,12 +33,18 @@ def unpack() -> pathlib.Path:
     return OUT
 
 
-def check_artifacts(install: pathlib.Path, stem: str) -> list[str]:
-    """The _d files an embedder links against have to exist."""
+def check_artifacts(install: pathlib.Path, stem: str, exe_stem: str) -> list[str]:
+    """The _d files an embedder links against, and runs, have to exist."""
     errors = []
     for name in (
         f"{stem}.dll",
         f"libs/{stem}.lib",
+        f"{exe_stem}.exe",
+        f"{exe_stem.replace('python', 'pythonw', 1)}.exe",
+        # build.py copies the debug executables to the canonical names, as it
+        # does for free-threaded builds; PYTHON.json's python_exe names the copy.
+        "python.exe",
+        "pythonw.exe",
         "include/Python.h",
         "include/pyconfig.h",
     ):
@@ -56,6 +62,12 @@ def check_artifacts(install: pathlib.Path, stem: str) -> list[str]:
         print(f"    {name}")
     if not pyds:
         errors.append("no debug extension modules")
+
+    # The layout ships whatever vcruntime*.dll CPython's build staged, which is
+    # the release redistributable. The debug binaries import vcruntime140d.dll
+    # and ucrtbased.dll instead, which are not redistributable and never shipped.
+    crt = sorted(p.name for p in install.glob("vcruntime*.dll"))
+    print(f"  vcruntime DLLs shipped: {', '.join(crt) or 'none'}")
     return errors
 
 
@@ -63,7 +75,14 @@ def check_metadata(root: pathlib.Path) -> list[str]:
     """PYTHON.json has to declare the build it actually is."""
     errors = []
     meta = json.loads((root / "PYTHON.json").read_text())
-    for key in ("version", "target_triple", "build_options", "python_version"):
+    for key in (
+        "version",
+        "target_triple",
+        "build_options",
+        "python_version",
+        "python_exe",
+        "crt_features",
+    ):
         print(f"  {key:<16}: {meta.get(key)}")
 
     config_vars = meta["python_config_vars"]
@@ -132,9 +151,10 @@ def main() -> int:
     major, minor, _ = meta["python_version"].split(".")
     freethreaded = "freethreaded" in meta.get("build_options", "")
     stem = f"python{major}{minor}{'t' if freethreaded else ''}_d"
+    exe_stem = f"python{major}.{minor}t_d" if freethreaded else "python_d"
 
     print(f"=== artifacts ({stem}) ===")
-    errors = check_artifacts(root / "install", stem)
+    errors = check_artifacts(root / "install", stem, exe_stem)
     print("=== metadata ===")
     errors += check_metadata(root)
     export_gil_define(meta["python_config_vars"])

@@ -19,34 +19,42 @@ $(PyDebugExt), so PC/layout is passed --debug, and the executables,
 extension libraries and dependency libraries pick up the _d suffix.
 
 The tail-calling interpreter is disabled for Debug. PBS turns it on for
-3.15 on x64, but a guaranteed tail call needs optimisations that /Od
-removes, so MSVC reports C4737 for each one until the error count trips
-C1003 and the build stops.
+3.15 on x64, but [[msvc::musttail]] requires /O2 and under /Od MSVC
+reports C4737 for each dispatch site. CPython's early check for this was
+reverted and the build still fails as of September 2026.
 
+  https://learn.microsoft.com/en-us/cpp/cpp/attributes#msvcmusttail
+  https://github.com/python/cpython/issues/148047
+
+building.rst documents the option and the debug CRT requirement: the
+binaries import ucrtbased.dll and vcruntime*d.dll, which ship with
+Visual Studio and are not redistributable.
 
 diff --git a/cpython-windows/build.py b/cpython-windows/build.py
 --- a/cpython-windows/build.py
 +++ b/cpython-windows/build.py
-@@ -777,8 +777,13 @@
+@@ -777,8 +777,15 @@
      if freethreaded:
          args.append("/property:DisableGil=true")
- 
+
 -    # Build tail-calling Python for 3.15+
 -    if python_version.startswith("3.15") and platform == "x64":
-+    # Build tail-calling Python for 3.15+. Not in Debug: /Od leaves MSVC unable
-+    # to guarantee the tail calls, and it reports C4737 for every one of them.
++    # Build tail-calling Python for 3.15+, but not in Debug. [[msvc::musttail]]
++    # requires /O2 and under /Od MSVC reports C4737 at every dispatch site.
++    # See https://learn.microsoft.com/en-us/cpp/cpp/attributes#msvcmusttail
++    # and https://github.com/python/cpython/issues/148047
 +    if (
 +        python_version.startswith("3.15")
 +        and platform == "x64"
 +        and configuration != "Debug"
 +    ):
          args.append("/property:UseTailCallInterp=true")
- 
+
      exec_and_log(args, str(pcbuild_path), os.environ)
-@@ -1211,12 +1216,13 @@
+@@ -1211,12 +1218,13 @@
      else:
          raise Exception("unhandled architecture: %s" % arch)
- 
+
 +    debug_suffix = "_d" if config == "Debug" else ""
      if freethreaded:
 -        abi_tag = ".cp%st-%s" % (python_majmin, abi_platform)
@@ -58,21 +66,21 @@ diff --git a/cpython-windows/build.py b/cpython-windows/build.py
 -        lib_suffix = ""
 +        abi_tag = debug_suffix
 +        lib_suffix = debug_suffix
- 
+
      # Copy object files for core sources into their own directory.
      core_dir = out_dir / "build" / "core"
-@@ -1345,15 +1351,15 @@
- 
+@@ -1345,15 +1353,15 @@
+
      # Copy libraries for dependencies into the lib directory.
      for depend in sorted(depends_projects):
 -        static_source = outputs_path / ("%s.lib" % depend)
 -        static_dest = lib_dir / ("%s.lib" % depend)
 +        static_source = outputs_path / ("%s%s.lib" % (depend, debug_suffix))
 +        static_dest = lib_dir / ("%s%s.lib" % (depend, debug_suffix))
- 
+
          log("copying link library %s" % static_source)
          shutil.copyfile(static_source, static_dest)
- 
+
 -        shared_source = outputs_path / ("%s.dll" % depend)
 +        shared_source = outputs_path / ("%s%s.dll" % (depend, debug_suffix))
          if shared_source.exists():
@@ -80,19 +88,19 @@ diff --git a/cpython-windows/build.py b/cpython-windows/build.py
 +            shared_dest = lib_dir / ("%s%s.dll" % (depend, debug_suffix))
              log("copying shared library %s" % shared_source)
              shutil.copyfile(shared_source, shared_dest)
- 
-@@ -1372,6 +1378,7 @@
+
+@@ -1372,6 +1380,7 @@
      openssl_entry: str,
  ) -> pathlib.Path:
      parsed_build_options = set(build_options.split("+"))
 +    debug = "debug" in parsed_build_options
      pgo = "pgo" in parsed_build_options
      freethreaded = "freethreaded" in parsed_build_options
- 
-@@ -1426,13 +1433,14 @@
+
+@@ -1426,13 +1435,14 @@
          # as we do for Unix builds.
          mpdecimal_archive = None
- 
+
 +    debug_suffix = "_d" if debug else ""
      if freethreaded:
          (major, minor, _) = python_version.split(".")
@@ -105,10 +113,10 @@ diff --git a/cpython-windows/build.py b/cpython-windows/build.py
 -        pythonw_exe = "pythonw.exe"
 +        python_exe = f"python{debug_suffix}.exe"
 +        pythonw_exe = f"pythonw{debug_suffix}.exe"
- 
+
      # Python 3.15 uses the default name for the executable in a suffixed directory
      instrumented_python_exe = python_exe
-@@ -1635,13 +1643,13 @@
+@@ -1635,13 +1645,13 @@
              run_msbuild(
                  msbuild,
                  pcbuild_path,
@@ -121,20 +129,20 @@ diff --git a/cpython-windows/build.py b/cpython-windows/build.py
              )
 -            artifact_config = "Release"
 +            artifact_config = "Debug" if debug else "Release"
- 
+
          install_dir = out_dir / "python" / "install"
- 
-@@ -1675,6 +1683,9 @@
+
+@@ -1675,6 +1685,9 @@
          if freethreaded:
              args.append("--include-freethreaded")
- 
+
 +        if debug:
 +            args.append("--debug")
 +
          # CPython 3.12 removed distutils.
          if not meets_python_minimum_version(python_version, "3.12"):
              args.append("--include-distutils")
-@@ -1946,10 +1957,10 @@
+@@ -1946,10 +1959,10 @@
          default="cpython-3.11",
          help="Python distribution to build",
      )
@@ -147,3 +155,24 @@ diff --git a/cpython-windows/build.py b/cpython-windows/build.py
          default="noopt",
          help="Build options to apply when compiling Python",
      )
+diff --git a/docs/building.rst b/docs/building.rst
+--- a/docs/building.rst
++++ b/docs/building.rst
+@@ -147,6 +147,17 @@
+ with Visual Studio 2026::
+
+    $ uv run --no-dev build.py --sh c:\cygwin\bin\sh.exe --vs 2026 --python cpython-3.15
+
++To produce a debug build, pass ``--options debug`` or ``freethreaded+debug``::
++
++   $ uv run --no-dev build.py --sh c:\cygwin\bin\sh.exe --options debug
++
++The artifacts carry the ``_d`` suffix of CPython's Debug configuration
++(``python_d.exe``, ``python314_d.dll``, ``_asyncio_d.pyd``) and link against
++the debug C runtime (``ucrtbased.dll`` and ``vcruntime*d.dll``). That
++runtime ships with Visual Studio and `is not redistributable
++<https://learn.microsoft.com/en-us/cpp/windows/determining-which-dlls-to-redistribute>`_,
++so a debug distribution only runs on a machine with Visual Studio installed.
++
+ To build a 32-bit x86 binary, simply use an
+ ``x86 Native Tools Command Prompt`` instead of ``x64``.

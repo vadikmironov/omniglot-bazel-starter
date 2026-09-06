@@ -87,7 +87,7 @@ diff --git a/src/validation.rs b/src/validation.rs
      "tcl86t.dll",
      "tk86t.dll",
  ];
-@@ -1931,14 +1947,26 @@
+@@ -1931,14 +1947,23 @@
          ));
      }
  
@@ -100,12 +100,9 @@ diff --git a/src/validation.rs b/src/validation.rs
 -    {
 -        errors.push("abiflags does not contain 'd'".to_string());
 +    if is_debug {
-+        // Windows keeps the lowercase `abiflags` empty on purpose, because it
-+        // feeds path construction there. The uppercase `ABIFLAGS` carries the
-+        // marker, but only from 3.14, so consult EXT_SUFFIX instead: every
-+        // supported version derives it from the importer, and a debug build
-+        // suffixes it with `_d`.
-+        // https://github.com/python/cpython/blob/v3.14.7/Lib/sysconfig/__init__.py#L407
++        // Windows keeps `abiflags` empty on purpose and only emulates `ABIFLAGS`
++        // from 3.14, so consult EXT_SUFFIX, which every version suffixes with `_d`.
++        // See https://github.com/python/cpython/blob/v3.14.7/Lib/sysconfig/__init__.py#L407
 +        let (key, marker) = if triple.contains("-windows-") {
 +            ("EXT_SUFFIX", "_d")
 +        } else {

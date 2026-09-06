@@ -46,22 +46,21 @@ env:
 
 jobs:
   pbs-baseline:
-    # 3.15 needs VS2026 and everything older needs VS2022, and build.py
-    # resolves --vs by asking vswhere for a matching range, so the runner has
-    # to carry it. windows-latest and windows-2025 both resolve to the VS2026
-    # image now, leaving windows-2022 as the only free label with VS2022.
+    # Follow ci-targets.yaml: only x86_64 moves to VS 2026, and only from 3.15;
+    # i686 and aarch64 stay on VS 2022 for every version. build.py resolves
+    # --vs through vswhere, so the runner has to carry that version.
+    # windows-latest and windows-2025 both resolve to the VS 2026 image now,
+    # leaving windows-2022 as the only free x64 label with VS 2022.
     runs-on: >-
-      ${{ matrix.arch == 'arm64'
-          && (matrix.python == 'cpython-3.15' && 'windows-11-vs2026-arm' || 'windows-11-arm')
-          || (matrix.python == 'cpython-3.15' && 'windows-2025-vs2026' || 'windows-2022') }}
+      ${{ matrix.arch == 'arm64' && 'windows-11-arm'
+          || (matrix.arch == 'x64' && matrix.python == 'cpython-3.15' && 'windows-2025-vs2026' || 'windows-2022') }}
     strategy:
       fail-fast: false
       matrix:
         # Every configuration patch 0005 turns on, across the versions
         # ci-targets.yaml lists for each: x64 and x86 for both options, arm64
-        # for plain debug from 3.11. arm64 appears twice, cross-compiled as PBS
-        # builds it today and native on the free arm64 runner.
-        include: ${{ fromJson('[{"python":"cpython-3.10","arch":"x64","options":"debug","build":"native"},{"python":"cpython-3.10","arch":"x86","options":"debug","build":"native"},{"python":"cpython-3.11","arch":"x64","options":"debug","build":"native"},{"python":"cpython-3.11","arch":"x86","options":"debug","build":"native"},{"python":"cpython-3.12","arch":"x64","options":"debug","build":"native"},{"python":"cpython-3.12","arch":"x86","options":"debug","build":"native"},{"python":"cpython-3.13","arch":"x64","options":"debug","build":"native"},{"python":"cpython-3.13","arch":"x86","options":"debug","build":"native"},{"python":"cpython-3.14","arch":"x64","options":"debug","build":"native"},{"python":"cpython-3.14","arch":"x86","options":"debug","build":"native"},{"python":"cpython-3.15","arch":"x64","options":"debug","build":"native"},{"python":"cpython-3.15","arch":"x86","options":"debug","build":"native"},{"python":"cpython-3.13","arch":"x64","options":"freethreaded+debug","build":"native"},{"python":"cpython-3.13","arch":"x86","options":"freethreaded+debug","build":"native"},{"python":"cpython-3.14","arch":"x64","options":"freethreaded+debug","build":"native"},{"python":"cpython-3.14","arch":"x86","options":"freethreaded+debug","build":"native"},{"python":"cpython-3.15","arch":"x64","options":"freethreaded+debug","build":"native"},{"python":"cpython-3.15","arch":"x86","options":"freethreaded+debug","build":"native"},{"python":"cpython-3.11","arch":"arm64","options":"debug","build":"native"},{"python":"cpython-3.12","arch":"arm64","options":"debug","build":"native"},{"python":"cpython-3.13","arch":"arm64","options":"debug","build":"native"},{"python":"cpython-3.14","arch":"arm64","options":"debug","build":"native"},{"python":"cpython-3.15","arch":"arm64","options":"debug","build":"native"},{"python":"cpython-3.13","arch":"arm64","options":"freethreaded+debug","build":"native"},{"python":"cpython-3.14","arch":"arm64","options":"freethreaded+debug","build":"native"},{"python":"cpython-3.15","arch":"arm64","options":"freethreaded+debug","build":"native"}]') }}
+        # for debug from 3.11 and freethreaded+debug from 3.13.
+        include: ${{ fromJson('[{"python":"cpython-3.10","arch":"x64","options":"debug"},{"python":"cpython-3.10","arch":"x86","options":"debug"},{"python":"cpython-3.11","arch":"x64","options":"debug"},{"python":"cpython-3.11","arch":"x86","options":"debug"},{"python":"cpython-3.12","arch":"x64","options":"debug"},{"python":"cpython-3.12","arch":"x86","options":"debug"},{"python":"cpython-3.13","arch":"x64","options":"debug"},{"python":"cpython-3.13","arch":"x86","options":"debug"},{"python":"cpython-3.14","arch":"x64","options":"debug"},{"python":"cpython-3.14","arch":"x86","options":"debug"},{"python":"cpython-3.15","arch":"x64","options":"debug"},{"python":"cpython-3.15","arch":"x86","options":"debug"},{"python":"cpython-3.13","arch":"x64","options":"freethreaded+debug"},{"python":"cpython-3.13","arch":"x86","options":"freethreaded+debug"},{"python":"cpython-3.14","arch":"x64","options":"freethreaded+debug"},{"python":"cpython-3.14","arch":"x86","options":"freethreaded+debug"},{"python":"cpython-3.15","arch":"x64","options":"freethreaded+debug"},{"python":"cpython-3.15","arch":"x86","options":"freethreaded+debug"},{"python":"cpython-3.11","arch":"arm64","options":"debug"},{"python":"cpython-3.12","arch":"arm64","options":"debug"},{"python":"cpython-3.13","arch":"arm64","options":"debug"},{"python":"cpython-3.14","arch":"arm64","options":"debug"},{"python":"cpython-3.15","arch":"arm64","options":"debug"},{"python":"cpython-3.13","arch":"arm64","options":"freethreaded+debug"},{"python":"cpython-3.14","arch":"arm64","options":"freethreaded+debug"},{"python":"cpython-3.15","arch":"arm64","options":"freethreaded+debug"}]') }}
     name: ${{ matrix.python }} ${{ matrix.arch }} --options ${{ matrix.options }}
     timeout-minutes: 120
     permissions:
@@ -91,15 +90,16 @@ jobs:
         done
         git --no-pager diff --stat
 
-    # PC/layout runs the interpreter it just built, so every target builds on
-    # its own architecture and vcvars follows the host.
+    # vcvars follows ci-targets.yaml. arm64 uses the x64-hosted cross compiler
+    # on an arm64 host, as upstream does: PC/layout runs the interpreter it
+    # just built, so the host still has to be able to execute the output.
     - name: Resolve toolchain for ${{ matrix.arch }}
       shell: bash
       run: |
         case "${{ matrix.arch }}" in
           x64)    vcvars=vcvars64.bat ;;
           x86)    vcvars=vcvars32.bat ;;
-          arm64)  vcvars=vcvarsarm64.bat ;;
+          arm64)  vcvars=vcvarsamd64_arm64.bat ;;
         esac
         echo "VCVARS=$vcvars" >> "$GITHUB_ENV"
         echo "vcvars=$vcvars"
@@ -167,12 +167,12 @@ jobs:
       shell: cmd
       working-directory: pbs
       run: |
-        rem ci-targets.yaml pins vs_version 2022 for this triple and overrides
-        rem to 2026 only from 3.15. Older CPython has no BasePlatformToolset
-        rem mapping for VisualStudioVersion 18.0, so it falls through to v140
-        rem and fails with MSB8020.
+        rem ci-targets.yaml pins vs_version 2022 and overrides to 2026 only for
+        rem x86_64 from 3.15. Older CPython has no BasePlatformToolset mapping
+        rem for VisualStudioVersion 18.0, so it falls through to v140 and fails
+        rem with MSB8020.
         set MATRIX_VS=2022
-        if "%MATRIX_PYTHON%"=="cpython-3.15" set MATRIX_VS=2026
+        if "%MATRIX_PYTHON%-%MATRIX_ARCH%"=="cpython-3.15-x64" set MATRIX_VS=2026
         echo building %MATRIX_PYTHON% %MATRIX_ARCH% --options %MATRIX_OPTIONS% with VS %MATRIX_VS% via %VCVARS%
         for /f "usebackq tokens=*" %%i in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath`) do set VSPATH=%%i
         call "%VSPATH%\VC\Auxiliary\Build\%VCVARS%" || exit /b 1
@@ -209,6 +209,16 @@ jobs:
       run: |
         $dists = Resolve-Path -Path "dist/*.tar.zst" -Relative
         ./pythonbuild.exe validate-distribution $dists
+
+    # windows.yml runs this after validation. Without --stdlib it runs only
+    # pythonbuild.disttests, through the python_exe PYTHON.json names.
+    - name: Run the distribution tests
+      if: success()
+      shell: pwsh
+      working-directory: pbs
+      run: |
+        $dists = Resolve-Path -Path "dist/*.tar.zst" -Relative
+        uv run --no-dev test-distribution.py $dists
 
     # Everything below answers what the build alone cannot: does the
     # distribution work, and does it give us something release cannot?
