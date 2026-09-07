@@ -1,4 +1,4 @@
-Accept a Windows debug distribution in the validator
+Accept a Windows debug distribution in the validator and disttests
 
 validate-distribution rejects a Windows `debug` build on two counts.
 
@@ -36,6 +36,14 @@ because it is widely used to calculate paths there. The uppercase
 So consult EXT_SUFFIX instead, which every supported version derives from
 the importer and which a debug build suffixes with _d. That also drops an
 unwrap() that would panic on a distribution missing the key.
+
+The disttests trip on one more count. CPython 3.12+ ships its Windows
+OpenSSL without uplink support and makes set_keylog_filename raise
+NotImplementedError on a debug build, so test_ssl_with_keylogfile is
+skipped for Windows debug distributions from 3.12.
+
+  https://github.com/python/cpython/pull/131839
+  https://github.com/python/cpython/blob/v3.12.14/Modules/_ssl/debughelpers.c#L168
 
 diff --git a/src/validation.rs b/src/validation.rs
 --- a/src/validation.rs
@@ -119,3 +127,22 @@ diff --git a/src/validation.rs b/src/validation.rs
      }
  
      for extension in json.build_info.extensions.keys() {
+diff --git a/pythonbuild/disttests/__init__.py b/pythonbuild/disttests/__init__.py
+--- a/pythonbuild/disttests/__init__.py
++++ b/pythonbuild/disttests/__init__.py
+@@ -218,6 +218,15 @@
+         ssl.create_default_context()
+ 
+     @unittest.skipIf(os.name != "nt", "Windows-specific OpenSSL uplink regression")
++    # CPython 3.12+ ships Windows OpenSSL without uplink support, so a debug
++    # build cannot hand it a keylog FILE* and raises NotImplementedError instead.
++    # https://github.com/python/cpython/blob/v3.12.14/Modules/_ssl/debughelpers.c#L168
++    @unittest.skipIf(
++        os.name == "nt"
++        and sys.version_info >= (3, 12)
++        and "debug" in os.environ["BUILD_OPTIONS"].split("+"),
++        "set_keylog_filename is unavailable on Windows debug builds",
++    )
+     def test_ssl_with_keylogfile(self):
+         # Validate that a SSLContext can be created when SSLKEYLOGFILE is set
+         # https://github.com/astral-sh/python-build-standalone/issues/640
