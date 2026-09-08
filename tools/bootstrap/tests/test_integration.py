@@ -611,15 +611,16 @@ class TestIntegration(unittest.TestCase):
                 f"lint_gen failed:\nSTDOUT:\n{gen.stdout}\nSTDERR:\n{gen.stderr}",
             )
 
-            # --fail_on_violation makes lint_test compare against an empty report
-            # (assert_output_empty) instead of just the linter exit code, so
-            # clang-tidy/clippy findings — which exit 0 — are caught too. We only
-            # lint bad modules here, so the rules_lint#899 false-positive on clean
-            # clang-tidy targets is irrelevant.
+            # The shipped gate, as CI and the README run it: each lint_test reads
+            # its linter's recorded exit code. clang-tidy exits 0 on warnings, so
+            # .clang-tidy's WarningsAsErrors is what makes its findings count;
+            # clippy's gate asserts on captured output instead. Deliberately not
+            # --@aspect_rules_lint//lint:fail_on_violation: that is rules_lint's
+            # `bazel build` mode, where a non-zero linter exit fails the action
+            # itself, so ruff/PMD findings surface as exit 1 rather than 3.
             result = _bazel(
                 workspace,
                 "test",
-                "--@aspect_rules_lint//lint:fail_on_violation",
                 "--test_tag_filters=lint",
                 "//modules/...",
             )
