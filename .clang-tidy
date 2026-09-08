@@ -21,6 +21,11 @@
 #     Triggered by libcurl's internal header structure (external code, read-only).
 #   -clang-analyzer-optin.cplusplus.UninitializedObject
 #     False positive in external fmt library headers (read-only).
+#   -cppcoreguidelines-pro-bounds-avoid-unchecked-container-access
+#     Flags every operator[] on a standard container. The workload kernels
+#     index inside loop bounds and cannot pay for .at() without measuring the
+#     check; its sibling pro-bounds-constant-array-index is off for the same
+#     reason.
 Checks: >-
   *,
   -abseil-*,
@@ -38,5 +43,9 @@ Checks: >-
   -clang-analyzer-optin.cplusplus.UninitializedObject,
   -readability-identifier-length,
   -cppcoreguidelines-pro-bounds-constant-array-index,
+  -cppcoreguidelines-pro-bounds-avoid-unchecked-container-access,
   -cppcoreguidelines-avoid-do-while,
   -bugprone-easily-swappable-parameters
+# Every enabled check fails the run. clang-tidy exits 0 on warnings, and the
+# lint_test gate reads that exit code, so warnings would otherwise pass it.
+WarningsAsErrors: '*'

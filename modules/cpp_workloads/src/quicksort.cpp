@@ -36,6 +36,7 @@ auto random_slice(std::size_t n, std::uint64_t seed) -> std::vector<std::uint64_
     return v;
 }
 
+// NOLINTNEXTLINE(misc-no-recursion): the recursive call tree is the workload
 void quicksort(std::span<std::uint64_t> v) {
     if (v.size() <= 1) {
         return;

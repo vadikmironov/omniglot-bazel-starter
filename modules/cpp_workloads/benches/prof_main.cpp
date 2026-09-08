@@ -8,17 +8,17 @@
 #include <benchmark/benchmark.h>
 #include <gperftools/profiler.h>
 
-#include <cstdio>
 #include <cstdlib>
+#include <iostream>
 
 auto main(int argc, char** argv) -> int {
     benchmark::Initialize(&argc, argv);
     if (benchmark::ReportUnrecognizedArguments(argc, argv)) {
         return 1;
     }
-    const char* profile_out = std::getenv("CPUPROF_OUT");
+    const char* profile_out = std::getenv("CPUPROF_OUT");  // NOLINT(concurrency-mt-unsafe): read before any thread starts
     if (profile_out != nullptr && ProfilerStart(profile_out) == 0) {
-        std::fprintf(stderr, "warning: ProfilerStart(%s) failed; benches run unprofiled\n", profile_out);
+        std::cerr << "warning: ProfilerStart(" << profile_out << ") failed; benches run unprofiled\n";
         profile_out = nullptr;
     }
     benchmark::RunSpecifiedBenchmarks();

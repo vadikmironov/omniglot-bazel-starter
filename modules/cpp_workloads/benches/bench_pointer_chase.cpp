@@ -14,7 +14,7 @@ constexpr std::size_t CHASE_DEFAULT_N = std::size_t{1} << 22U;
 
 void bm_chase(benchmark::State& state) {
     const auto perm = cpp_workloads::build_cycle(cpp_workloads::workload_n(CHASE_DEFAULT_N), 42);
-    for (auto unused : state) {
+    for ([[maybe_unused]] auto unused : state) {
         benchmark::DoNotOptimize(cpp_workloads::chase_sum(perm));
     }
 }
@@ -22,7 +22,7 @@ BENCHMARK(bm_chase);
 
 void bm_array_sum(benchmark::State& state) {
     const auto perm = cpp_workloads::build_cycle(cpp_workloads::workload_n(CHASE_DEFAULT_N), 42);
-    for (auto unused : state) {
+    for ([[maybe_unused]] auto unused : state) {
         benchmark::DoNotOptimize(cpp_workloads::array_sum(perm));
     }
 }

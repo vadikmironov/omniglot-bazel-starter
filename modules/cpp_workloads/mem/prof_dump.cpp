@@ -3,7 +3,6 @@
 #include <gperftools/heap-profiler.h>
 
 #include <cstdint>
-#include <cstdio>
 #include <cstdlib>
 #include <fstream>
 #include <string>
@@ -11,6 +10,8 @@
 namespace cpp_workloads {
 
 namespace {
+
+constexpr std::int64_t BYTES_PER_KIB = 1024;
 
 // Resident set size in bytes, current and peak, or zero where /proc is
 // unavailable (macOS).
@@ -21,7 +22,7 @@ struct Footprint {
 
 auto read_rss() -> Footprint {
     std::ifstream status("/proc/self/status");
-    Footprint footprint{0, 0};
+    Footprint footprint{.current = 0, .peak = 0};
     std::string field;
     while (status >> field) {
         const bool is_rss = field == "VmRSS:";
@@ -32,7 +33,7 @@ auto read_rss() -> Footprint {
         if (!(status >> kib)) {
             break;
         }
-        (is_rss ? footprint.current : footprint.peak) = kib * 1024;
+        (is_rss ? footprint.current : footprint.peak) = kib * BYTES_PER_KIB;
     }
     return footprint;
 }
@@ -54,14 +55,14 @@ void write_meta(const std::string& prefix) {
 }  // namespace
 
 void heap_profile_start() {
-    const char* out = std::getenv("MEMPROF_OUT");
+    const char* out = std::getenv("MEMPROF_OUT");  // NOLINT(concurrency-mt-unsafe): read before any thread starts
     if (out != nullptr) {
         HeapProfilerStart(out);
     }
 }
 
 auto heap_profile_dump() -> std::string {
-    const char* out = std::getenv("MEMPROF_OUT");
+    const char* out = std::getenv("MEMPROF_OUT");  // NOLINT(concurrency-mt-unsafe): read before any thread starts
     if (out == nullptr) {
         return "";
     }

@@ -62,6 +62,7 @@ auto extract_body_text(const std::string& html, std::string& text) -> int {
 }  // namespace
 
 // Based on https://curl.se/libcurl/c/http-post.html
+// NOLINTNEXTLINE(bugprone-exception-escape): an uncaught exception ends the process by design
 auto main() -> int {
     CURL* curl = nullptr;
     CURLcode res = CURLE_FAILED_INIT;

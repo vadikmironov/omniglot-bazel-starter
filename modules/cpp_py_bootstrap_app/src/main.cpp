@@ -12,6 +12,7 @@
 #include "spdlog/sinks/stdout_color_sinks.h"
 #include "spdlog/spdlog.h"
 
+// NOLINTNEXTLINE(bugprone-exception-escape): an uncaught exception ends the process by design
 auto main(int /*argc*/, char** argv) -> int {
     std::shared_ptr<spdlog::logger> logger_ptr;
     try {
