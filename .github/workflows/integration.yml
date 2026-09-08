@@ -31,15 +31,16 @@ jobs:
           echo "Remote cache enabled for integration tests"
         fi
     - name: Run integration tests
+      # The suite is tagged manual, which a `...` wildcard drops before any tag
+      # filter is applied, so it must be named explicitly.
       # Each subset spins up cold nested Bazel servers; the suite runs ~3300s
       # locally and CI runners are slower, so allow headroom over the 3600s
       # ("eternal") default. The remote cache above cuts this substantially when
       # BUILDBUDDY_API_KEY is set.
       run: >
         bazel test
-        --test_tag_filters=manual
         --test_timeout=5400
-        //tools/bootstrap/tests/...
+        //tools/bootstrap/tests:test_integration
 
   # The remote toolchains: pinned downloads that no PR ever exercises, so they
   # rot from upstream change rather than from our commits — which is exactly

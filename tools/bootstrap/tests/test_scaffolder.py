@@ -12,6 +12,7 @@ scaffolds a repository into a temporary directory and verifies:
 """
 
 import itertools
+import re
 import shutil
 import tempfile
 import unittest
@@ -20,6 +21,7 @@ from pathlib import Path
 from bootstrap.manifest import (
     BootstrapManifest,
     effective_excluded_files,
+    effective_languages,
     load_manifest,
     resolve_files,
 )
@@ -61,6 +63,28 @@ PALANTIR_MARKERS = [
     "PalantirJavaFormatWrapper",
     "palantir-java-format",
 ]
+
+# Labels in a MODULE file that name a *file* in this repo — Bazel opens each
+# at module resolution, so a scaffold that lacks one fails before the first
+# build. Override `patches` lists, include()d segments, use_repo_rule() .bzl
+# files and http_archive `build_file`s. Each match yields (package, name).
+_MODULE_PATCHES_RE = re.compile(r"patches\s*=\s*\[(.*?)\]", re.DOTALL)
+_MODULE_LABEL_RE = re.compile(r'"//([^":]*):([^"]+)"')
+_MODULE_FILE_LABEL_RES = (
+    re.compile(r'include\(\s*"//([^":]*):([^"]+)"'),
+    re.compile(r'use_repo_rule\(\s*"//([^":]*):([^"]+)"'),
+    re.compile(r'build_file\s*=\s*"//([^":]*):([^"]+)"'),
+)
+
+
+def _module_file_labels(content: str) -> set[tuple[str, str]]:
+    """(package, name) for every repo-file label *content* references."""
+    labels: set[tuple[str, str]] = set()
+    for block in _MODULE_PATCHES_RE.finditer(content):
+        labels.update(_MODULE_LABEL_RE.findall(block.group(1)))
+    for pattern in _MODULE_FILE_LABEL_RES:
+        labels.update(pattern.findall(content))
+    return labels
 
 
 def _find_source_root() -> Path:
@@ -228,6 +252,28 @@ class TestScaffolder(unittest.TestCase):
                     content,
                     rf"(?:#|//)\s*---\s*{kind}\s+(?:lang:|feature:|exclude)",
                     f"{kind} section marker in {rel}",
+                )
+
+    def _assert_module_labels_resolve(self, target: Path) -> None:
+        """Every repo-file label in a rendered MODULE file exists in the scaffold.
+
+        A section that survives filtering can still name a file the manifest
+        never ships — an override patch under a tool dir that is enumerated
+        file-by-file, say. The source repo is whole, so only a scaffold shows
+        the gap, and Bazel reports it as a missing package on the very first
+        command. Both the file and its package's BUILD must be present.
+        """
+        module_files = [target / "MODULE.bazel", *sorted(target.rglob("*.MODULE.bazel"))]
+        for module_file in module_files:
+            rel = module_file.relative_to(target)
+            for package, name in sorted(_module_file_labels(module_file.read_text())):
+                self.assertTrue(
+                    (target / package / name).is_file(),
+                    f"{rel} references //{package}:{name} but {package}/{name} is not shipped",
+                )
+                self.assertTrue(
+                    any((target / package / b).is_file() for b in ("BUILD", "BUILD.bazel")),
+                    f"{rel} references //{package}:{name} but {package} has no BUILD file",
                 )
 
     def _assert_name_substitution(self, target: Path) -> None:
@@ -406,6 +452,7 @@ class TestScaffolder(unittest.TestCase):
 
         # Content correctness
         self._assert_no_markers(target)
+        self._assert_module_labels_resolve(target)
         self._assert_name_substitution(target)
         self._assert_module_bazel_content(target, selected)
         self._assert_format_build_content(target, selected)
@@ -785,6 +832,32 @@ class TestScaffolder(unittest.TestCase):
         target = self._scaffold({"rust"}, features={"custom_toolchains"})
         self.assertFalse((target / "tools" / "cpp" / "toolchains").exists())
         self.assertNotIn("## Custom Toolchains", (target / "README.md").read_text())
+
+    def test_module_labels_resolve_with_features(self) -> None:
+        """MODULE-file labels resolve under feature selections too.
+
+        The 31 language subsets run featureless, so a file referenced only from
+        a ``feature:`` section (the aspect_rules_lint patch, the publish and
+        coverage segments) is exercised here: every feature at once, each
+        feature that gates a MODULE reference alone, and the empty selection.
+        """
+        selections: list[tuple[set[str], set[str]]] = [
+            (set(LANGUAGES), set(self.manifest.features)),
+            ({"cpp"}, {"lint"}),
+            ({"java"}, {"lint"}),
+            (set(), {"publish"}),
+            (set(), {"coverage"}),
+            (set(), set()),
+        ]
+        for selected, features in selections:
+            with self.subTest(languages=sorted(selected), features=sorted(features)):
+                languages = effective_languages(self.manifest, selected, features)
+                target = self._scaffold(languages, features=features)
+                self._assert_no_markers(target)
+                self._assert_module_labels_resolve(target)
+                # The lint patch is cpp-only: present with cpp AND lint, absent otherwise.
+                patch = target / "tools" / "lint" / "patches" / "aspect_rules_lint_2.8.0_clang_tidy_header_filter.patch"
+                self.assertEqual(patch.is_file(), "cpp" in languages and "lint" in features)
 
 
 # ── Dynamic test generation for all 31 non-empty subsets ─────────────
