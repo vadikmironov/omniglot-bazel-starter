@@ -1,7 +1,7 @@
 #include <fmt/base.h>
 #include <fmt/fmt-c.h>
 
-#include <cstdio>
+#include <cstdio>  // NOLINT(misc-include-cleaner): stdout for fmt_vprint
 
 // fmt::println comes from <fmt/base.h>, the lightweight core of {fmt}. The
 // library was compiled from its upstream CMakeLists.txt by the cmake() rule in

@@ -17,7 +17,7 @@ void bm_matmul_ijk(benchmark::State& state) {
     const std::size_t n = cpp_workloads::workload_n(MATMUL_DEFAULT_N);
     const auto a = cpp_workloads::random_matrix(n, 42);
     const auto b = cpp_workloads::random_matrix(n, 43);
-    for (auto unused : state) {
+    for ([[maybe_unused]] auto unused : state) {
         benchmark::DoNotOptimize(cpp_workloads::multiply_ijk(a, b, n));
     }
 }
@@ -27,7 +27,7 @@ void bm_matmul_ikj(benchmark::State& state) {
     const std::size_t n = cpp_workloads::workload_n(MATMUL_DEFAULT_N);
     const auto a = cpp_workloads::random_matrix(n, 42);
     const auto b = cpp_workloads::random_matrix(n, 43);
-    for (auto unused : state) {
+    for ([[maybe_unused]] auto unused : state) {
         benchmark::DoNotOptimize(cpp_workloads::multiply_ikj(a, b, n));
     }
 }

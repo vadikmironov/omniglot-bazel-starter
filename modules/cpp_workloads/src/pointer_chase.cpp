@@ -12,6 +12,7 @@ namespace cpp_workloads {
 auto build_cycle(std::size_t n, std::uint64_t seed) -> std::vector<std::size_t> {
     std::mt19937_64 rng(seed);
     std::vector<std::size_t> perm(n);
+    // NOLINTNEXTLINE(modernize-use-ranges): std::ranges::iota needs libstdc++ 14; clang_remote links the host's
     std::iota(perm.begin(), perm.end(), std::size_t{0});
     if (n < 2) {
         // No cycle to build — and n - 1 below would wrap at n == 0.

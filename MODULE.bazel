@@ -50,6 +50,15 @@ bazel_dep(name = "buildifier_prebuilt", version = "8.5.1.4", dev_dependency = Tr
 # https://github.com/aspect-build/rules_lint/releases
 #
 bazel_dep(name = "aspect_rules_lint", version = "2.8.0")
+
+# Temporary floor, not a dependency: buf is unused here. aspect_rules_lint 2.8.0
+# pins rules_buf 0.5.2, whose rules_go 0.42.0 still uses the native CcInfo
+# symbol Bazel 9 removed, so any selection without Go fails at toolchain
+# resolution. rules_buf 0.5.4 moves to rules_go 0.59.0, which loads CcInfo from
+# rules_cc. Drop this once aspect_rules_lint depends on rules_buf >= 0.5.4.
+# https://github.com/aspect-build/rules_lint/blob/v2.8.0/MODULE.bazel#L45
+# https://github.com/bufbuild/rules_buf/blob/v0.5.4/MODULE.bazel#L26
+bazel_dep(name = "rules_buf", version = "0.5.4")
 # --- END lang:core ---
 
 # --- BEGIN feature:lint lang:cpp ---

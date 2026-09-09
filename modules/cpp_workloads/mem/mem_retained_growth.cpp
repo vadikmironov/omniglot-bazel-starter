@@ -2,7 +2,7 @@
 // whole live heap to the growth site.
 
 #include <cstddef>
-#include <cstdio>
+#include <iostream>
 
 #include "prof_dump.h"
 #include "retained_growth.h"
@@ -18,7 +18,7 @@ auto main() -> int {
     cpp_workloads::heap_profile_start();
     const auto retained = cpp_workloads::grow(chunks, CHUNK_BYTES);
     const auto out = cpp_workloads::heap_profile_dump();
-    std::printf("retained %zu bytes in %zu chunks; heap profile prefix: %s\n",
-                cpp_workloads::retained_bytes(retained), retained.size(), out.c_str());
+    std::cout << "retained " << cpp_workloads::retained_bytes(retained) << " bytes in " << retained.size()
+              << " chunks; heap profile prefix: " << out << '\n';
     return 0;
 }

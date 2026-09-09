@@ -13,12 +13,12 @@ namespace cpp_workloads {
 // negative or oversized value keeps the default instead of wrapping to
 // SIZE_MAX the way strtoull would.
 inline auto workload_n(std::size_t fallback) -> std::size_t {
-    const char* raw = std::getenv("WORKLOAD_N");
+    const char* raw = std::getenv("WORKLOAD_N");  // NOLINT(concurrency-mt-unsafe): read before any thread starts
     if (raw == nullptr) {
         return fallback;
     }
     std::size_t parsed = 0;
-    const char* last = raw + std::strlen(raw);
+    const char* last = raw + std::strlen(raw);  // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic): from_chars takes [first, last)
     const auto [ptr, ec] = std::from_chars(raw, last, parsed);
     if (ec != std::errc{} || ptr != last) {
         return fallback;

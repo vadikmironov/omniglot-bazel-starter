@@ -48,6 +48,10 @@ clang_tidy = lint_clang_tidy_aspect(
     lint_target_headers = True,
     angle_includes_are_system = False,
     verbose = False,
+    # Generated headers are not ours to lint: a rules_foreign_cc install lands
+    # under bazel-out as a plain -I include, and the lint_target_headers filter
+    # matches it by the target's directory prefix.
+    args = ["--exclude-header-filter=(^|/)bazel-out/"],
 )
 
 clang_tidy_test = lint_test(aspect = clang_tidy)

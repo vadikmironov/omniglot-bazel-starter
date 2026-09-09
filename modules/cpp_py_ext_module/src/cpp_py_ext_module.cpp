@@ -79,20 +79,24 @@ static void cpp_py_ext_module_free(void* self) {
 
 // NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables,cppcoreguidelines-avoid-c-arrays,hicpp-avoid-c-arrays,modernize-avoid-c-arrays)
 PyMethodDef cpp_py_ext_module_methods[] = {
-    {"get_hello_world_string_py_wrapper", get_hello_world_string_py_wrapper, METH_VARARGS,
-     "Function wrapper over cpp_library static get_hello_world_string function."},
-    {"get_invocation_count", get_invocation_count, METH_NOARGS,
-     "Returns the number of successful get_hello_world_string invocations."},
-    {nullptr, nullptr, 0, nullptr} /* Sentinel */
+    {.ml_name = "get_hello_world_string_py_wrapper",
+     .ml_meth = get_hello_world_string_py_wrapper,
+     .ml_flags = METH_VARARGS,
+     .ml_doc = "Function wrapper over cpp_library static get_hello_world_string function."},
+    {.ml_name = "get_invocation_count",
+     .ml_meth = get_invocation_count,
+     .ml_flags = METH_NOARGS,
+     .ml_doc = "Returns the number of successful get_hello_world_string invocations."},
+    {} /* Sentinel */
 };
 
 // NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables,cppcoreguidelines-avoid-c-arrays,hicpp-avoid-c-arrays,modernize-avoid-c-arrays)
 PyModuleDef_Slot cpp_py_ext_module_slots[] = {
-    {Py_mod_exec, reinterpret_cast<void*>(cpp_py_ext_module_exec)},  // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+    {.slot = Py_mod_exec, .value = reinterpret_cast<void*>(cpp_py_ext_module_exec)},  // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
 #ifdef Py_GIL_DISABLED
-    {Py_mod_gil, Py_MOD_GIL_NOT_USED},
+    {.slot = Py_mod_gil, .value = Py_MOD_GIL_NOT_USED},
 #endif
-    {0, nullptr} /* Sentinel */
+    {} /* Sentinel */
 };
 
 // NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)

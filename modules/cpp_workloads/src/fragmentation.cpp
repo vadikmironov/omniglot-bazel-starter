@@ -8,15 +8,26 @@
 
 namespace cpp_workloads {
 
+namespace {
+
+// Block sizes straddle tcmalloc's small/large boundary so freed blocks
+// leave holes the survivors' growth cannot reuse.
+constexpr std::size_t MIN_BLOCK_BYTES = 512;
+constexpr std::size_t MAX_BLOCK_BYTES = 8191;
+constexpr std::byte INITIAL_FILL{0xA5};
+constexpr std::byte GROWTH_FILL{0x5A};
+
+}  // namespace
+
 auto fragment(std::size_t blocks, std::uint64_t seed)
     -> std::pair<std::vector<std::vector<std::byte>>, FragStats> {
     std::mt19937_64 rng(seed);
-    std::uniform_int_distribution<std::size_t> size_dist(512, 8191);
+    std::uniform_int_distribution<std::size_t> size_dist(MIN_BLOCK_BYTES, MAX_BLOCK_BYTES);
 
     std::vector<std::vector<std::byte>> all;
     all.reserve(blocks);
     for (std::size_t i = 0; i < blocks; i++) {
-        all.emplace_back(size_dist(rng), std::byte{0xA5});
+        all.emplace_back(size_dist(rng), INITIAL_FILL);
     }
 
     std::vector<std::vector<std::byte>> survivors;
@@ -29,7 +40,7 @@ auto fragment(std::size_t blocks, std::uint64_t seed)
     all.clear();
     all.shrink_to_fit();
     for (auto& block : survivors) {
-        block.resize(block.size() * 2, std::byte{0x5A});
+        block.resize(block.size() * 2, GROWTH_FILL);
     }
 
     FragStats stats{.survivors = survivors.size(), .live_bytes = 0};

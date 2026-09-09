@@ -2,7 +2,7 @@
 // mapped memory stays high.
 
 #include <cstddef>
-#include <cstdio>
+#include <iostream>
 
 #include "fragmentation.h"
 #include "prof_dump.h"
@@ -17,7 +17,7 @@ auto main() -> int {
     cpp_workloads::heap_profile_start();
     const auto [survivors, stats] = cpp_workloads::fragment(blocks, 42);
     const auto out = cpp_workloads::heap_profile_dump();
-    std::printf("%zu surviving blocks, %zu live bytes; heap profile prefix: %s\n",
-                stats.survivors, stats.live_bytes, out.c_str());
+    std::cout << stats.survivors << " surviving blocks, " << stats.live_bytes
+              << " live bytes; heap profile prefix: " << out << '\n';
     return 0;
 }

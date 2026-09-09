@@ -45,7 +45,7 @@ auto get_python_toolchain_path_via_runfiles(char** argv, const std::string& rel_
     // Bazel runfiles paths always use forward slashes regardless of platform
     std::string const prefix = std::string("../");
     auto interpreter_path_view = std::string_view(rel_interpreter_path);
-    if (interpreter_path_view.find(prefix) != std::string_view::npos) {
+    if (interpreter_path_view.contains(prefix)) {
         interpreter_path_view = interpreter_path_view.substr(prefix.size(), interpreter_path_view.size());
     }
 

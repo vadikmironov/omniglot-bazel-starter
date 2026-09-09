@@ -38,6 +38,17 @@ source allowlists; `rust_test` is included — native `rust_clippy` lints test
 crates like any other (its `clippy_test` is `testonly` so it can depend on the
 `rust_test` source).
 
+### C++ clang-tidy
+
+Each `lint_test` reads the exit code of its linter. clang-tidy exits 0 when it
+finds only warnings, so [`.clang-tidy`](../../.clang-tidy) sets
+`WarningsAsErrors: '*'`. With this setting, each enabled check fails the test.
+Generated headers under `bazel-out/` are not linted: [`linters.bzl`](linters.bzl)
+passes `--exclude-header-filter` for them. Examples are the headers that a
+`rules_foreign_cc` install writes and the interpreter-path header from
+`rules_python`. The first-party headers of a target stay linted through
+`lint_target_headers`.
+
 ### Rust clippy
 
 Rust does not use `aspect_rules_lint`. After 2.5.2 aspect_rules_lint moved clippy

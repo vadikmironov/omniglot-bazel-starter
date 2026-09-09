@@ -19,7 +19,7 @@ void bm_quicksort(benchmark::State& state) {
     const std::size_t n = cpp_workloads::workload_n(QUICKSORT_DEFAULT_N);
     const auto input = cpp_workloads::random_slice(n, 42);
     std::vector<std::uint64_t> buf(n);
-    for (auto unused : state) {
+    for ([[maybe_unused]] auto unused : state) {
         std::ranges::copy(input, buf.begin());
         cpp_workloads::quicksort(buf);
         benchmark::DoNotOptimize(buf.data());
