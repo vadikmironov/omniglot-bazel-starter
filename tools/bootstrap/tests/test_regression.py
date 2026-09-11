@@ -112,6 +112,22 @@ class TestManifestFilesExist(unittest.TestCase):
                     f"language_files entry missing: {f} (tag={tag})",
                 )
 
+    def test_all_feature_entries_exist(self) -> None:
+        """Every path a feature ships must exist: a renamed patch that the
+        manifest still lists otherwise fails only when a scaffold copies it."""
+        for name, feat in self.manifest.features.items():
+            for f in feat.files + feat.composite_files:
+                self.assertTrue((self.source_root / f).exists(), f"feature file missing: {f} ({name})")
+            for d in feat.directories:
+                self.assertTrue((self.source_root / d).is_dir(), f"feature directory missing: {d} ({name})")
+            for group in (feat.language_files, feat.composite_language_files):
+                for tag, files in group.items():
+                    for f in files:
+                        self.assertTrue(
+                            (self.source_root / f).exists(),
+                            f"feature language file missing: {f} ({name}, tag={tag})",
+                        )
+
     def test_all_composite_files_exist(self) -> None:
         for f in self.manifest.composite_files:
             self.assertTrue(
