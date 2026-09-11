@@ -14,12 +14,12 @@ require (
 	github.com/ianlancetaylor/demangle v0.0.0-20250417193237-f615e6bd150b // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	golang.org/x/mod v0.23.0 // indirect
-	golang.org/x/sys v0.47.0 // indirect
+	golang.org/x/sys v0.48.0 // indirect
 	golang.org/x/tools/go/vcs v0.1.0-deprecated // indirect
 )
 
 // --- BEGIN exclude ---
-require golang.org/x/net v0.58.0
+require golang.org/x/net v0.59.0
 
 // --- END exclude ---
 
@@ -29,7 +29,7 @@ require (
 	// Imported directly by //tools/profile/pb2folded, so this is needed by
 	// every profiling scaffold — not just the C++ one, which additionally
 	// runs the pprof CLI as a tool (below).
-	github.com/google/pprof v0.0.0-20260903180319-d6c3cb2f37ec
+	github.com/google/pprof v0.0.0-20260906184651-6331bc6350fe
 // --- END feature:profiling ---
 )
 
