@@ -134,7 +134,7 @@ composite_files = [
 rust = ["tools/lint/clippy_assert_empty.sh"]
 cpp = [
     "tools/lint/patches/BUILD",
-    "tools/lint/patches/aspect_rules_lint_2.8.0_clang_tidy_header_filter.patch",
+    "tools/lint/patches/aspect_rules_lint_2.9.0_clang_tidy_header_filter.patch",
 ]
 
 # Single-language gazelle generators: shipped only when the lint feature AND the

@@ -855,9 +855,10 @@ class TestScaffolder(unittest.TestCase):
                 target = self._scaffold(languages, features=features)
                 self._assert_no_markers(target)
                 self._assert_module_labels_resolve(target)
-                # The lint patch is cpp-only: present with cpp AND lint, absent otherwise.
-                patch = target / "tools" / "lint" / "patches" / "aspect_rules_lint_2.8.0_clang_tidy_header_filter.patch"
-                self.assertEqual(patch.is_file(), "cpp" in languages and "lint" in features)
+                # The lint feature's cpp-only files (the clang-tidy patch and its
+                # BUILD): present with cpp AND lint, absent otherwise.
+                for rel in self.manifest.features["lint"].language_files["cpp"]:
+                    self.assertEqual((target / rel).is_file(), "cpp" in languages and "lint" in features, rel)
 
 
 # ── Dynamic test generation for all 31 non-empty subsets ─────────────
