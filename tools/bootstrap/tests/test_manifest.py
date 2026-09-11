@@ -249,7 +249,7 @@ class TestLoadManifest(unittest.TestCase):
     def test_composite_language_files(self) -> None:
         """Language-specific composite files are present."""
         clf = self.manifest.composite_language_files
-        self.assertIn("tools/python/requirements.in", clf.get("python", []))
+        self.assertIn("tools/python/pyproject.toml", clf.get("python", []))
         self.assertIn("tools/cpp/cpp_3rd_party_dependencies.MODULE.bazel", clf.get("cpp", []))
         self.assertIn("tools/rust/Cargo.toml", clf.get("rust", []))
         self.assertIn("tools/java/package_defs.bzl", clf.get("java", []))

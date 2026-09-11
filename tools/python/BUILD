@@ -1,24 +1,19 @@
-load("@rules_python//python:pip.bzl", "compile_pip_requirements")
-load("@rules_uv//uv:venv.bzl", "create_venv")
+load("@rules_python//python/uv:lock.bzl", "lock")
+load(":venv.bzl", "create_venv")
 
-# This target generates requirements_lock.txt file based on requirements.in.
-compile_pip_requirements(
-    name = "generate_requirements_lock",
-    extra_args = [
-        "--allow-unsafe",
-        "--no-emit-index-url",
-        "--upgrade",
-    ],
-    requirements_in = "requirements.in",
-    requirements_txt = "requirements_lock.txt",
-    tags = ["manual"],
+# Resolves pyproject.toml (every dependency group, every platform) into uv.lock.
+# `bazel run //tools/python:lock.update` refreshes the source-tree copy;
+# `bazel run //tools/python:lock.run -- --upgrade` also upgrades existing pins.
+lock(
+    name = "lock",
+    srcs = ["pyproject.toml"],
+    out = "uv.lock",
 )
 
-# rules_uv virtual environment support to enable seamless development experience
-# and easy virtual environment management via Bazel.
-
+# Creates ./.venv from uv.lock with the hermetic interpreter so pre-commit and
+# editor tooling (ruff, ty) run without a Bazel round trip.
 create_venv(
     name = "generate_virtual_env",
-    destination_folder = ".venv",
-    requirements_txt = "requirements_lock.txt",
+    lock = "uv.lock",
+    pyproject = "pyproject.toml",
 )

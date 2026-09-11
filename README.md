@@ -55,7 +55,7 @@ Full guide — every prompt, re-bootstrap, and `--review` — in [`tools/bootstr
 
 [rules_python](https://github.com/bazelbuild/rules_python/blob/main/README.md) documentation is available [here](https://rules-python.readthedocs.io/en/latest/index.html). Full integration with pip is supported and this repo provides an example of a binary with external dependencies [here](modules/python_app_with_ext_dep/README.md). Monorepo wide pip based repository available in any module, but it is also possible to register several different set of requirements (requirements_dev for example).
 
-[rules_python](https://github.com/bazelbuild/rules_python/blob/main/README.md) do not offer yet an ability to manage virtual environments which might be useful for development setup. This has been added via separate [rules_uv](https://github.com/theoremlp/rules_uv). [rules_python](https://github.com/bazelbuild/rules_python/blob/main/README.md) also have a [ticket](https://github.com/bazelbuild/rules_python/issues/1975) to integrate uv and uv based toolchains, but it is yet marked as experimental.
+Dependencies are declared in [`tools/python/pyproject.toml`](tools/python/pyproject.toml) and resolved into a universal `uv.lock` by [uv](https://docs.astral.sh/uv/), which [rules_python](https://github.com/bazelbuild/rules_python/blob/main/README.md) bundles as a toolchain: the [`lock` rule](https://rules-python.readthedocs.io/en/latest/pypi/lock.html) runs `uv lock` inside Bazel and `pip.parse(uv_lock = ...)` reads the result directly, so one lockfile covers every platform. The uv integration is still tracked as experimental upstream in [rules_python#1975](https://github.com/bazel-contrib/rules_python/issues/1975). [rules_python](https://github.com/bazelbuild/rules_python/blob/main/README.md) does not export a development virtual environment, so [`tools/python/venv.bzl`](tools/python/venv.bzl) adds a small rule that runs `uv sync` with the same uv binary and the hermetic interpreter.
 
 [rules_python](https://github.com/bazelbuild/rules_python/blob/main/README.md) in general allow flexible [toolchain configuration](https://rules-python.readthedocs.io/en/latest/toolchains.html#). It is also possible to use a locally installed python toolchain and this is documented [here](https://rules-python.readthedocs.io/en/latest/toolchains.html#local-toolchain). The [local toolchain definition](tools/python/python_segment.MODULE.bazel) can be selected via `.bazelrc` build flags and [Bazel --config command line option](https://bazel.build/run/bazelrc#config) similar to [C++](#cc). **Note:** [rules_python](https://github.com/bazelbuild/rules_python/blob/main/README.md) are using pre-built Python toolchains [hosted here](https://github.com/astral-sh/python-build-standalone/releases) and automatically map a toolchain version argument to a [specific Python toolchain version](https://github.com/bazelbuild/rules_python/blob/main/python/versions.bzl).
 
@@ -169,7 +169,7 @@ bazel run //:lint_gen                # preview without writing: -- -mode diff
 bazel test --test_tag_filters=lint //...
 
 # Regenerate dependency locks after editing a manifest
-bazel run //tools/python:generate_requirements_lock.update            # Python — tools/python/requirements.in
+bazel run //tools/python:lock.update                                  # Python — tools/python/pyproject.toml
 REPIN=1 bazel run @omniglot-bazel-starter_maven_dependencies//:pin    # Java   — Maven artifacts
 CARGO_BAZEL_REPIN=1 bazel fetch @crates//...                          # Rust   — tools/rust/Cargo.toml
 bazel run @rules_go//go -- mod tidy                                   # Go     — go.mod / go.sum
@@ -178,7 +178,7 @@ bazel mod tidy                                                        # Bazel  �
 
 ### Dependency Updates
 
-[Renovate](https://docs.renovatebot.com/) watches every manifest — `bazel_dep` versions in the MODULE segments, `tools/rust/Cargo.toml`, `go.mod`, the Maven artifact list, `tools/python/requirements.in`, and the `oci.pull` image digests — and opens a PR per update. CI validates each one like any other change; merge when green. To try one locally first:
+[Renovate](https://docs.renovatebot.com/) watches every manifest — `bazel_dep` versions in the MODULE segments, `tools/rust/Cargo.toml`, `go.mod`, the Maven artifact list, `tools/python/pyproject.toml` (refreshed as a whole `uv.lock` via lock-file maintenance, since the names there are unpinned), and the `oci.pull` image digests — and opens a PR per update. CI validates each one like any other change; merge when green. To try one locally first:
 
 ```bash
 gh pr checkout <number>       # e.g. gh pr checkout 49
@@ -192,7 +192,7 @@ git switch -c build/<dep>-<version> main
 
 # 1. Edit the version where it lives:
 #    Bazel modules — bazel_dep(...) in the tools/<lang>/*.MODULE.bazel segments
-#    Rust          — tools/rust/Cargo.toml           Python — tools/python/requirements.in
+#    Rust          — tools/rust/Cargo.toml           Python — tools/python/pyproject.toml
 #    Go            — bazel run @rules_go//go -- get <module>@<version>
 #    Java          — artifacts in tools/java/java_segment.MODULE.bazel
 #    OCI images    — oci.pull digests in tools/publish/publish_segment.MODULE.bazel

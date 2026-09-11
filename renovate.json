@@ -17,11 +17,14 @@
    },
    "packageRules": [
       {
-         "description": "Grouped by which lockfile a bump forces you to regenerate. A per-package PR carries a partial lock, so the remaining members and their transitive fallout have to be re-derived by hand before it can merge — which is how these were being batched manually anyway. Over the first 71 days this repo saw 127 Renovate PRs; grouping this way would have made it 53.",
+         "description": "tools/python/pyproject.toml declares unpinned names, so every Python update is a uv.lock refresh: lockFileMaintenance runs `uv lock` for the whole set in one PR.",
          "matchManagers": [
-            "pip_requirements"
+            "pep621"
          ],
-         "groupName": "python requirements"
+         "groupName": "python requirements",
+         "lockFileMaintenance": {
+            "enabled": true
+         }
       },
       {
          "description": "maven_install.json is repinned as a whole by @<project>_maven_dependencies//:pin. PMD is the clearest case: pmd-core, pmd-java and pmd-cli ship from one release and resolve together, so three separate PRs each carried a change that could not be merged on its own.",

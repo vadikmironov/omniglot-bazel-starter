@@ -15,7 +15,7 @@ py_library(
 )
 ```
 
-The `requirement("requests")` function resolves the package from the pip lockfile. This is generated from `tools/python/requirements.in` which lists all pip dependencies for the repo.
+The `requirement("requests")` function resolves the package from `tools/python/uv.lock`, which uv generates from `tools/python/pyproject.toml` — the single list of PyPI dependencies for the repo.
 
 The binary is split from the library so the library can be tested and reused independently:
 
@@ -30,11 +30,11 @@ py_binary(
 
 ## Adding New Dependencies
 
-1. Add the package to `tools/python/requirements.in`
+1. Add the package to `tools/python/pyproject.toml`
 2. Regenerate the lockfile:
 
 ```bash
-   bazel run //tools/python:generate_requirements_lock.update
+   bazel run //tools/python:lock.update
 ```
 
 3. Use `requirement("package-name")` in your BUILD file. The `ty` type checker bundles typeshed stubs for common packages (e.g. `requests`), so a separate stub package is usually not needed.

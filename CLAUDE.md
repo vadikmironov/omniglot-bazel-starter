@@ -152,7 +152,7 @@ Version configuration: `.publish.toml`. Publish infrastructure: `tools/publish/`
 ## Development Workflow
 
 ### Multi-Language Dependencies
-- **Python**: Uses pip dependencies managed via `tools/python/requirements.in`
+- **Python**: PyPI dependencies declared in `tools/python/pyproject.toml` and resolved into `tools/python/uv.lock` (uv via rules_python)
 - **Rust**: External crates managed via `Cargo.toml` in `tools/rust/`
 - **C++**: Dependencies via Bazel Central Registry (BCR) managed in `tools/cpp/cpp_3rd_party_dependencies.MODULE.bazel`
 - **Java**: Maven dependencies configured in `tools/java/java_segment.MODULE.bazel` as `maven.install` `artifacts` parameter
@@ -160,7 +160,8 @@ Version configuration: `.publish.toml`. Publish infrastructure: `tools/publish/`
 ### Regenerate Dependecies On Change
 ```bash
 # Run following command after any Python dependency changes or Python version change
-bazel run //tools/python:generate_requirements_lock.update
+# (keeps existing pins; add `.run -- --upgrade` instead of `.update` to upgrade them all)
+bazel run //tools/python:lock.update
 
 # Run following command after any Java Maven dependency changes or Java version change
 bazel run @omniglot-bazel-starter_maven_dependencies//:pin

@@ -1,0 +1,53 @@
+# Python dependencies for the whole repo, resolved into uv.lock. After editing
+# this file, regenerate the lockfile:
+#   bazel run //tools/python:lock.update
+#
+# The requires-python floor follows PYTHON_VERSION in python_segment.MODULE.bazel.
+
+[project]
+name = "omniglot-bazel-starter"
+version = "0.0.0"
+requires-python = ">=3.14"
+dependencies = [
+    # --- BEGIN user-managed ---
+    # Your project's pip dependencies. Preserved across re-bootstrap.
+    # --- END user-managed ---
+    # --- BEGIN exclude ---
+    # bootstrap tool dependency
+    "questionary",
+    # example dependency for python_app_with_ext_dep
+    "requests",
+    # --- END exclude ---
+]
+
+[dependency-groups]
+# Development tools; //tools/python:generate_virtual_env installs every group into .venv.
+dev = [
+    # --- BEGIN feature:lint ---
+    # linter & formatter CLI for local runs / editor integration. Bazel formatting
+    # uses the rules_lint ruff binary, so this is only needed for the lint feature.
+    "ruff",
+    # security linter
+    "bandit",
+    # type checker
+    "ty",
+    # --- END feature:lint ---
+    # git pre-commit hooks framework
+    "pre-commit",
+]
+# --- BEGIN feature:profiling ---
+# Workloads driven by bazel run //tools/profile.
+profiling = [
+    # CPU bench framework
+    "pytest",
+    "pytest-benchmark",
+    # in-process CPU sampler; the bench conftest renders its session as folded stacks
+    "pyinstrument",
+    # heap capture for the one-shot memory workloads (Linux/macOS only)
+    "memray",
+]
+# --- END feature:profiling ---
+
+[tool.uv]
+# The repo is not a distributable package: lock and install only the dependencies.
+package = false

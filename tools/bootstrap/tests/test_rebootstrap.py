@@ -33,7 +33,7 @@ TEST_REPO_NAME = "rebootstrap_test"
 MANAGED_SOURCE_FILES = [
     ".gitignore",
     ".bazelignore",
-    "tools/python/requirements.in",
+    "tools/python/pyproject.toml",
     "tools/rust/Cargo.toml",
     "tools/cpp/cpp_3rd_party_dependencies.MODULE.bazel",
     "tools/java/java_segment.MODULE.bazel",
@@ -93,12 +93,12 @@ class TestRebootstrap(_ScaffoldHarness):
     def test_requirements_user_edit_survives(self) -> None:
         target = self._fresh_target()
         self._scaffold_into(target, {"python"})
-        req = target / "tools" / "python" / "requirements.in"
+        req = target / "tools" / "python" / "pyproject.toml"
 
         # User appends a dependency inside the user-managed region.
         edited = req.read_text().replace(
-            "# --- END user-managed ---",
-            "flask==3.0.0\n# --- END user-managed ---",
+            "    # --- END user-managed ---",
+            '    "flask==3.0.0",\n    # --- END user-managed ---',
             1,
         )
         req.write_text(edited)
@@ -113,7 +113,7 @@ class TestRebootstrap(_ScaffoldHarness):
     def test_unedited_rebootstrap_is_idempotent(self) -> None:
         target = self._fresh_target()
         self._scaffold_into(target, {"python", "rust"})
-        req = target / "tools" / "python" / "requirements.in"
+        req = target / "tools" / "python" / "pyproject.toml"
         cargo = target / "tools" / "rust" / "Cargo.toml"
         before = (req.read_text(), cargo.read_text())
 
@@ -332,8 +332,8 @@ class TestFeatureOverride(_ScaffoldHarness):
         self._scaffold_into(target, {"python", "go"}, features={"lint"})
         self.assertTrue((target / "go.mod").exists())
         self.assertTrue((target / "tools" / "lint" / "linters.bzl").exists())
-        # Lint deps are now present in requirements.in (re-rendered with lint on).
-        self.assertIn("ty", (target / "tools" / "python" / "requirements.in").read_text())
+        # Lint deps are now present in pyproject.toml (re-rendered with lint on).
+        self.assertIn("ty", (target / "tools" / "python" / "pyproject.toml").read_text())
 
     def test_remove_features_prunes_orphans_and_self_heals_composites(self) -> None:
         target = self._fresh_target()
@@ -352,9 +352,9 @@ class TestFeatureOverride(_ScaffoldHarness):
             self.assertFalse((target / rel).exists(), f"{rel} should be pruned")
         # Language tooling survives (python is still selected).
         self.assertTrue((target / "tools" / "python").is_dir())
-        self.assertTrue((target / "tools" / "python" / "requirements.in").exists())
+        self.assertTrue((target / "tools" / "python" / "pyproject.toml").exists())
         # Composite files self-heal: lint deps stripped, unconditional dep kept.
-        req = (target / "tools" / "python" / "requirements.in").read_text()
+        req = (target / "tools" / "python" / "pyproject.toml").read_text()
         self.assertIn("pre-commit", req)
         self.assertNotIn("ty", req)
 
