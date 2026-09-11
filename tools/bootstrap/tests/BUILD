@@ -1,5 +1,10 @@
 load("@rules_python//python:defs.bzl", "py_test")
 
+# The suites tagged `external` read the live source tree (manifest, composite
+# files, whole tool directories) through their resolved __file__ path, not
+# through declared inputs, so a cached result can outlive the tree it judged.
+# The tag makes Bazel run them every time, locally and in CI.
+
 py_test(
     name = "test_processor",
     size = "small",
@@ -11,6 +16,7 @@ py_test(
     name = "test_manifest",
     size = "small",
     srcs = ["test_manifest.py"],
+    tags = ["external"],
     deps = ["//tools/bootstrap:bootstrap_lib"],
 )
 
@@ -19,6 +25,7 @@ py_test(
     size = "small",
     srcs = ["test_scaffolder.py"],
     local = True,
+    tags = ["external"],
     deps = ["//tools/bootstrap:bootstrap_lib"],
 )
 
@@ -27,6 +34,7 @@ py_test(
     size = "small",
     srcs = ["test_regression.py"],
     local = True,
+    tags = ["external"],
     deps = ["//tools/bootstrap:bootstrap_lib"],
 )
 
@@ -35,6 +43,7 @@ py_test(
     size = "small",
     srcs = ["test_rebootstrap.py"],
     local = True,
+    tags = ["external"],
     deps = ["//tools/bootstrap:bootstrap_lib"],
 )
 
@@ -44,6 +53,9 @@ py_test(
     timeout = "eternal",
     srcs = ["test_integration.py"],
     local = True,
-    tags = ["manual"],
+    tags = [
+        "external",
+        "manual",
+    ],
     deps = ["//tools/bootstrap:bootstrap_lib"],
 )
