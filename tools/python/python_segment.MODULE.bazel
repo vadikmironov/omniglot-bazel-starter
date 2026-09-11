@@ -2,7 +2,8 @@
 ## Toolchain versions configuration
 ##
 # When changing this, also update `python-version` in //:ty.toml so the ty
-# type checker targets the same Python version as the build toolchain.
+# type checker targets the same Python version as the build toolchain, and
+# raise the `requires-python` floor in //tools/python:pyproject.toml.
 PYTHON_VERSION = "3.14"
 
 PYTHON_VERSION_SNAKE = PYTHON_VERSION.replace(".", "_")
@@ -43,7 +44,7 @@ pip.parse(
     extra_pip_args = [],
     hub_name = "omniglot-bazel-starter_pip_dependencies",
     python_version = PYTHON_VERSION,
-    requirements_lock = "//tools/python:requirements_lock.txt",
+    uv_lock = "//tools/python:uv.lock",
 )
 use_repo(pip, "omniglot-bazel-starter_pip_dependencies")
 
@@ -63,11 +64,12 @@ use_repo(host_python, "host_python_repo", "host_python_toolchain")
 # --- END feature:custom_toolchains ---
 
 #
-# rules_uv block
+# uv toolchain (bundled with rules_python)
 #
-# Bazel rules to enable use of uv to compile pip requirements and generate
-# virtual envs.
+# rules_python registers its uv toolchains, but the hub stays empty until a
+# module calls uv.configure(); the version defaults to rules_python's pin.
+# Backs //tools/python:lock (uv lock) and :generate_virtual_env (uv sync).
+# https://rules-python.readthedocs.io/en/latest/api/rules_python/python/uv/index.html
 #
-# Please find documentation here:
-# https://github.com/theoremlp/rules_uv/releases
-bazel_dep(name = "rules_uv", version = "0.89.2")
+uv = use_extension("@rules_python//python/uv:uv.bzl", "uv", dev_dependency = True)
+uv.configure()

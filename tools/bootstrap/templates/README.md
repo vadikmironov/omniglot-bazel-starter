@@ -75,7 +75,7 @@ After editing a language's dependency manifest, refresh its lockfile too.
 ```bash
 bazel mod tidy                                                        # Bazel  — use_repo() calls in the MODULE segments
 # --- BEGIN lang:python ---
-bazel run //tools/python:generate_requirements_lock.update            # Python — tools/python/requirements.in
+bazel run //tools/python:lock.update                                  # Python — tools/python/pyproject.toml
 # --- END lang:python ---
 # --- BEGIN lang:java ---
 REPIN=1 bazel run @omniglot-bazel-starter_maven_dependencies//:pin    # Java   — Maven artifacts

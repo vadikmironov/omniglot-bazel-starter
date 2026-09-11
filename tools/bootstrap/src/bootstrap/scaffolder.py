@@ -324,8 +324,8 @@ def _is_text_file(path: Path) -> bool:
 _LOCK_REFRESH_COMMANDS: list[tuple[str, str, list[str], dict[str, str]]] = [
     (
         "python",
-        "Python pip requirements lock",
-        ["bazel", "run", "//tools/python:generate_requirements_lock.update"],
+        "Python uv lock",
+        ["bazel", "run", "//tools/python:lock.update"],
         {},
     ),
     (

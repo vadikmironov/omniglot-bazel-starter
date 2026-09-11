@@ -415,9 +415,9 @@ class TestScaffolder(unittest.TestCase):
         # No nogo rule in root BUILD.
         self.assertNotIn("nogo", (target / "BUILD").read_text(), "nogo rule leaked into root BUILD")
         if "python" in selected:
-            req = (target / "tools" / "python" / "requirements.in").read_text()
+            req = (target / "tools" / "python" / "pyproject.toml").read_text()
             for tool in ("ruff", "bandit", "ty"):
-                self.assertNotIn(tool, req, f"{tool} leaked into requirements.in without lint")
+                self.assertNotIn(tool, req, f"{tool} leaked into pyproject.toml without lint")
             self.assertIn("pre-commit", req, "pre-commit should remain (not lint-only)")
             ruff = (target / ".ruff.toml").read_text()
             self.assertIn("line-length", ruff, ".ruff.toml should keep its formatter config")
@@ -470,8 +470,8 @@ class TestScaffolder(unittest.TestCase):
             # questionary is the bootstrap CLI's own dep; scaffolded repos shouldn't pull it.
             self.assertNotIn(
                 "questionary",
-                (target / "tools" / "python" / "requirements.in").read_text(),
-                "requirements.in leaked bootstrap-tool dep questionary",
+                (target / "tools" / "python" / "pyproject.toml").read_text(),
+                "pyproject.toml leaked bootstrap-tool dep questionary",
             )
         # Publish + lint features are opt-in; default subsets must NOT ship them.
         self._assert_publish_absent(target)
@@ -543,7 +543,7 @@ class TestScaffolder(unittest.TestCase):
         self.assertTrue((target / "tools" / "lint" / "linters.bzl").exists())
         self.assertTrue((target / "tools" / "lint" / "BUILD").exists())
         # Python analyzers: deps, aspect wiring, configs.
-        req = (target / "tools" / "python" / "requirements.in").read_text()
+        req = (target / "tools" / "python" / "pyproject.toml").read_text()
         for tool in ("ruff", "bandit", "ty"):
             self.assertIn(tool, req)
         self.assertTrue((target / "ty.toml").exists())
@@ -738,7 +738,7 @@ class TestScaffolder(unittest.TestCase):
         self.assertIn("## Publishing", content)  # publish feature on
         self.assertNotIn("test_tag_filters=lint", content)  # lint feature off
         # Per-language lock-refresh lines are gated by language.
-        self.assertIn("generate_requirements_lock.update", content)  # python
+        self.assertIn("//tools/python:lock.update", content)  # python
         self.assertIn("@rules_go//go -- mod tidy", content)  # go
         self.assertNotIn("CARGO_BAZEL_REPIN", content)  # rust not selected
 

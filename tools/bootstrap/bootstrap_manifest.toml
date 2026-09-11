@@ -256,7 +256,7 @@ files = [
     ".gitignore",
     # No lang/feature sections — listed as composite (not core) purely so its
     # user-managed region is preserved across re-bootstrap via splicing, the
-    # same mechanism requirements.in / .gitignore use. A plain core copy would
+    # same mechanism pyproject.toml / .gitignore use. A plain core copy would
     # clobber a repo's project-specific ignore paths on every re-bootstrap.
     ".bazelignore",
     "tools/format/BUILD",
@@ -271,7 +271,7 @@ files = [
 [composite_language_files]
 python = [
     ".ruff.toml",
-    "tools/python/requirements.in",
+    "tools/python/pyproject.toml",
     # Section-filtered so its feature:coverage and feature:custom_toolchains
     # blocks can be gated by feature selection.
     "tools/python/python_segment.MODULE.bazel",
