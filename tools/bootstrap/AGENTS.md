@@ -151,7 +151,9 @@ The root `BUILD` carries one such region (just after `package(...)`) wrapping a
 `_BUILDIFIER_EXCLUDES` constant that the buildifier targets consume. Scaffolded
 repos drop their repo-specific Gazelle directives (`# gazelle:exclude <dir>`) and
 buildifier exclude tweaks there so they survive re-bootstrap while the rule
-definitions stay template-managed.
+definitions stay template-managed. `.clang-tidy` carries one at the tail of its
+`Checks` list for project-specific check globs — the list is a YAML sequence rather
+than the usual folded string precisely so the marker lines are comments, not content.
 
 ## Language vs. feature gating (mental model)
 

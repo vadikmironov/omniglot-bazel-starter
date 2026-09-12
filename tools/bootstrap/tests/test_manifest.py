@@ -66,11 +66,19 @@ class TestLoadManifest(unittest.TestCase):
             self.assertEqual(self.manifest.languages[key].label, expected_label)
 
     def test_language_files_and_directories(self) -> None:
-        """Each language has non-empty files and directories lists."""
+        """Each language ships at least one config file — as a plain copy or
+        composite-routed (.clang-tidy, for its user-managed region) — and a
+        tool directory."""
         for lang_key, config in self.manifest.languages.items():
             with self.subTest(lang=lang_key):
+                composite = [
+                    f
+                    for tag, files in self.manifest.composite_language_files.items()
+                    if lang_key in tag.split(",")
+                    for f in files
+                ]
                 self.assertTrue(
-                    len(config.files) > 0,
+                    len(config.files) + len(composite) > 0,
                     f"{lang_key} should have at least one config file",
                 )
                 self.assertTrue(
@@ -409,6 +417,14 @@ class TestResolveFiles(unittest.TestCase):
         self.assertIn(".clang-format", resolve_files(self.manifest, {"cpp", "java"}).composite)
         for sel in ({"python"}, {"rust"}, {"go"}, {"python", "rust", "go"}):
             self.assertNotIn(".clang-format", resolve_files(self.manifest, sel).composite, f"clang-format with {sel}")
+
+    def test_resolve_clang_tidy_is_composite_for_cpp(self) -> None:
+        """.clang-tidy is composite-routed (user-managed region splicing), C++ only."""
+        resolved = resolve_files(self.manifest, {"cpp"})
+        self.assertIn(".clang-tidy", resolved.composite)
+        self.assertNotIn(".clang-tidy", resolved.copy)
+        for sel in ({"python"}, {"java"}, {"rust"}, {"go"}):
+            self.assertNotIn(".clang-tidy", resolve_files(self.manifest, sel).composite, f"clang-tidy with {sel}")
 
     def test_resolve_precommit_gated_on_python(self) -> None:
         """.pre-commit-config.yaml ships only when Python is selected."""

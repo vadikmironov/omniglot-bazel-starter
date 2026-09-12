@@ -49,6 +49,11 @@ passes `--exclude-header-filter` for them. Examples are the headers that a
 `rules_python`. The first-party headers of a target stay linted through
 `lint_target_headers`.
 
+Put project-specific check globs in the `user-managed` region at the end of
+the `Checks` list. Globs apply in order and the last match wins, so an entry
+there can disable a check or enable one again. The bootstrap tool keeps that
+region when it re-bootstraps the repo.
+
 ### Rust clippy
 
 Rust does not use `aspect_rules_lint`. After 2.5.2 aspect_rules_lint moved clippy

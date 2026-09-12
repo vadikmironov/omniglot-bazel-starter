@@ -45,7 +45,7 @@ directories = ["tools/python"]
 
 [languages.cpp]
 label = "C++"
-files = [".clang-tidy"]
+files = []
 directories = ["tools/cpp"]
 
 [languages.rust]
@@ -281,6 +281,10 @@ python = [
     ".pre-commit-config.yaml",
 ]
 cpp = [
+    # No lang/feature sections — composite purely so its user-managed region
+    # (project-specific check globs) is spliced across re-bootstrap, like
+    # .ruff.toml. A plain copy would clobber a repo's disabled checks.
+    ".clang-tidy",
     "tools/cpp/cpp_3rd_party_dependencies.MODULE.bazel",
     # Section-filtered so its host gcc/clang register_toolchains block can be
     # gated behind feature:custom_toolchains (the rules_cc dep stays).
