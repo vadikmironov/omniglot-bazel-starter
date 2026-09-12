@@ -36,6 +36,12 @@ common --downloader_config=bazel_downloader.cfg
 # https://bazel.build/reference/command-line-reference#common_options-flag--enable_platform_specific_config
 common --enable_platform_specific_config
 
+# Opt out of aspect_tools_telemetry uploads on every machine and command. Its
+# extension writes the notice version into MODULE.bazel.lock unconditionally,
+# so that fact stays committed and this flag is what keeps uploads off.
+# https://github.com/aspect-build/tools_telemetry/blob/v0.5.0/extension.bzl#L108
+common --repo_env=DO_NOT_TRACK=1
+
 ##
 ## Windows specific flags
 ##

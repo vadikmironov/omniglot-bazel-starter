@@ -1,0 +1,16 @@
+// Global (self-hosted) Renovate settings for .github/workflows/renovate.yml.
+// Repository behaviour (managers, grouping, postUpgradeTasks) lives in /renovate.json.
+{
+  "platform": "github",
+  // The repository comes from RENOVATE_REPOSITORIES, set by the workflow.
+  "onboarding": false,
+  "requireConfig": "required",
+  // Every postUpgradeTasks command in /renovate.json must match one of these.
+  // bazelisk, go, uv and the rest are installed on demand by containerbase
+  // (binarySource "install", the default inside the Renovate image).
+  "allowedCommands": [
+    "^go mod tidy$",
+    "^bazel run --repo_env=REPIN=1 @omniglot-bazel-starter_maven_dependencies//:pin$",
+    "^bazel mod deps --lockfile_mode=update$"
+  ]
+}

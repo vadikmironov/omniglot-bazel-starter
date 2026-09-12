@@ -1,6 +1,7 @@
 # CI workflows
 
-`ci.yml` runs on every PR and push to `main`; `integration.yml` runs weekly.
+`ci.yml` runs on every PR and push to `main`; `integration.yml` runs weekly;
+`renovate.yml` runs the dependency bot every six hours.
 
 ## What runs when
 
@@ -46,3 +47,56 @@ remote JDK covers `//...`.
   comments coverage on PRs
 - A failing weekly run opens or updates a single issue labelled `ci-weekly`; none
   of its jobs gate a merge
+
+## Renovate
+
+`renovate.yml` runs Renovate self-hosted, every six hours and on
+`workflow_dispatch`. The hosted Mend app cannot run Bazel, so its PRs leave
+`MODULE.bazel.lock`, `go.sum` and `maven_install.json` stale and fail the lock
+freshness gate. The self-hosted run executes the repo's own refresh commands as
+`postUpgradeTasks` before each commit:
+
+| Manager | Commands |
+|---|---|
+| `bazel-module`, `cargo` | `bazel mod deps --lockfile_mode=update` |
+| `bazel-module`, `maven_install` artifacts (their own "maven artifacts" group) | `bazel run --repo_env=REPIN=1 @omniglot-bazel-starter_maven_dependencies//:pin`, then the lock refresh |
+| `gomod` | `go mod tidy` with containerbase's Go; Bazel's `@rules_go//go` runner would pull the 2 GB LLVM toolchain, and go_deps is not in the module lock |
+| `pep621` | none: Renovate runs `uv lock` itself |
+
+The command allowlist lives in `renovate-global.json5`; the tasks live in
+`/renovate.json`. A command that is not on the allowlist does not run.
+
+### Setup
+
+Do steps 1 to 4 before the workflow lands on `main`: the schedule starts with
+the merge, and a run without the secrets fails at the token step.
+
+1. Create a GitHub App (Settings, Developer settings, GitHub Apps) with these
+   repository permissions: Commit statuses, Contents, Issues, Pull requests
+   and Workflows as read and write; Administration, Checks and Dependabot
+   alerts as read. Uncheck "Webhook active".
+2. Install the App on this repository.
+3. Create an environment named `renovate` (Settings, Environments) and limit
+   its deployment branches to `main`. Add two secrets to it: `RENOVATE_APP_ID`
+   (the App ID) and `RENOVATE_APP_PRIVATE_KEY` (a private key generated on
+   the App page). The job binds to this environment, so only a run from
+   `main` can mint the token; `workflow_dispatch` works from `main` only.
+4. Remove this repository from the Mend Renovate app installation, and close
+   its open `renovate/*` PRs and its Dependency Dashboard issue. Renovate
+   matches branches and issues by author, so it treats the old ones as
+   user-modified and opens a second dashboard.
+5. Run once in dry-run mode and read the log before the schedule takes over:
+
+```bash
+gh workflow run renovate.yml -f dry-run=full -f log-level=debug
+```
+
+A full dry run still executes the `postUpgradeTasks`, so it validates the
+Bazel commands and the tool install; it only skips creating branches and PRs.
+
+The App's commits trigger CI like any other push, which the workflow's own
+`GITHUB_TOKEN` would not. The token reaches every task command through
+Renovate's git environment, so a compromised dependency that runs code during
+`bazel mod deps` could use it: the environment above limits the blast radius
+to what a run from `main` can do, and one required approving review on `main`
+stops the App from merging its own PRs.

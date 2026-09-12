@@ -178,7 +178,7 @@ bazel mod tidy                                                        # Bazel  �
 
 ### Dependency Updates
 
-[Renovate](https://docs.renovatebot.com/) watches every manifest — `bazel_dep` versions in the MODULE segments, `tools/rust/Cargo.toml`, `go.mod`, the Maven artifact list, `tools/python/pyproject.toml` (refreshed as a whole `uv.lock` via lock-file maintenance, since the names there are unpinned), and the `oci.pull` image digests — and opens a PR per update. CI validates each one like any other change; merge when green. To try one locally first:
+[Renovate](https://docs.renovatebot.com/) watches every manifest — `bazel_dep` versions in the MODULE segments, `tools/rust/Cargo.toml`, `go.mod`, the Maven artifact list, `tools/python/pyproject.toml` (refreshed as a whole `uv.lock` via lock-file maintenance, since the names there are unpinned), and the `oci.pull` image digests — and opens a PR per update. It runs self-hosted from [`.github/workflows/renovate.yml`](.github/workflows/renovate.yml), which regenerates `MODULE.bazel.lock`, `go.sum` and `maven_install.json` before each commit (setup in [`.github/workflows/README.md`](.github/workflows/README.md)). CI validates each one like any other change; merge when green. To try one locally first:
 
 ```bash
 gh pr checkout <number>       # e.g. gh pr checkout 49
