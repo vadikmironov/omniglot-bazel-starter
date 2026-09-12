@@ -1,0 +1,73 @@
+Pin the v145 toolset when building 3.10-3.14 with VS 2026
+
+VS 2026's msbuild takes the toolset from PCbuild/python.props by
+VisualStudioVersion: 3.15 maps 18.0 to v145, 3.13 and 3.14 map it to
+v143, and 3.10 to 3.12 have no entry, fall through to v140 and fail with
+MSB8020. v143 does not build everywhere either: the GitHub VS 2026 images
+carry it only for some targets (the arm64 image has no x86 v143, and
+pcbuild.proj builds _freeze_module as Win32 when the target is ARM64), so
+3.13 and 3.14 fail with MSB8020 there too. v145 is the toolset every VS
+2026 image ships for every host and target, and python.props documents
+/p:PlatformToolset as the override, so pass it for the branches that do
+not map 18.0 to it when --vs 2026 is selected.
+
+This is what the windows-11-arm runner needs from September 2026, when
+the label moves to the VS 2026 image and --vs 2022 can no longer resolve
+a VS 17 installation through vswhere.
+https://github.com/actions/runner-images/issues/14602
+
+diff --git a/cpython-windows/build.py b/cpython-windows/build.py
+index 0a43383..3e5b537 100644
+--- a/cpython-windows/build.py
++++ b/cpython-windows/build.py
+@@ -752,6 +752,7 @@ def run_msbuild(
+     python_version: str,
+     windows_sdk_version: str,
+     freethreaded: bool,
++    msvc_version: str,
+ ):
+     args = [
+         str(msbuild),
+@@ -788,6 +789,18 @@ def run_msbuild(
+     ):
+         args.append("/property:UseTailCallInterp=true")
+ 
++    # PCbuild/python.props maps VisualStudioVersion 18.0 (VS 2026) to v145
++    # only from 3.15; 3.13 and 3.14 map it to v143 and older branches fall
++    # through to v140, MSB8020 either way on the VS 2026 images, which ship
++    # v143 for some targets only (no x86 v143 on arm64, where _freeze_module
++    # builds as Win32). Pin v145, present for every host and target there;
++    # python.props documents the override.
++    # See https://github.com/python/cpython/blob/v3.12.14/PCbuild/python.props#L9
++    if msvc_version == "2026" and python_version.startswith(
++        ("3.10", "3.11", "3.12", "3.13", "3.14")
++    ):
++        args.append("/property:PlatformToolset=v145")
++
+     exec_and_log(args, str(pcbuild_path), os.environ)
+ 
+ 
+@@ -1568,6 +1581,7 @@ def build_cpython(
+                 python_version=python_version,
+                 windows_sdk_version=windows_sdk_version,
+                 freethreaded=freethreaded,
++                msvc_version=msvc_version,
+             )
+ 
+             # build-windows.py sets some environment variables which cause the
+@@ -1638,6 +1652,7 @@ def build_cpython(
+                 python_version=python_version,
+                 windows_sdk_version=windows_sdk_version,
+                 freethreaded=freethreaded,
++                msvc_version=msvc_version,
+             )
+             artifact_config = "PGUpdate"
+ 
+@@ -1650,6 +1665,7 @@ def build_cpython(
+                 python_version=python_version,
+                 windows_sdk_version=windows_sdk_version,
+                 freethreaded=freethreaded,
++                msvc_version=msvc_version,
+             )
+             artifact_config = "Debug" if debug else "Release"
+ 
