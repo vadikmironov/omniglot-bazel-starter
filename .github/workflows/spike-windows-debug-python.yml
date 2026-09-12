@@ -7,11 +7,16 @@ name: Spike - Q2 PBS Windows build
 # spike/windows_debug_python/embed_probe.cpp as the acceptance test for whatever
 # distribution Q2 eventually produces.
 #
-# Q2 (this workflow): can we drive python-build-standalone's Windows pipeline at
-# all? It has no debug build option -- `--options` accepts only noopt/pgo and
-# their freethreaded pairs, and `configuration="Release"` is hardcoded in
-# cpython-windows/build.py. Before patching any of that, reproduce their build
-# unmodified so we know the harness runs and what an iteration costs.
+# Q2 (answered, run 34095975591): python-build-standalone's Windows pipeline
+# builds, validates and tests every debug configuration patches 0003-0005 add,
+# 26 jobs green. Upstream: astral-sh/python-build-standalone#1262.
+#
+# Q3 (this matrix): arm64 on the VS 2026 image. GitHub moves the windows-11-arm
+# label to that image in September 2026 (actions/runner-images#14602), and
+# build.py resolves --vs 2022 by asking vswhere for a VS 17 install, which the
+# image does not have. So every arm64 configuration upstream ships (pgo,
+# freethreaded+pgo) plus ours (debug, freethreaded+debug) is built here with
+# --vs 2026. Upstream's own probe is astral-sh/python-build-standalone#1261.
 #
 # Delete this workflow, and spike/, once #183 has its answer.
 
@@ -34,33 +39,34 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  # Same reason as patch 0002: the checkout is on D: and uv's default cache is
-  # on C:, so uv cannot hardlink. We drive build.py directly rather than running
-  # PBS's own workflow, so the patch alone would not cover this run.
+  # Upstream #1243 moved uv's cache onto the workspace volume in windows.yml;
+  # we drive build.py directly rather than running that workflow, so set it
+  # here too: the checkout is on D: and uv's default cache is on C:, so uv
+  # cannot hardlink.
   UV_CACHE_DIR: ${{ github.workspace }}/.uv-cache
   PBS_REF: ${{ inputs.pbs_ref || 'main' }}
-  # Q2 is testing the debug option patch 0003 adds. workflow_dispatch only
-  # lists workflows present on the default branch, so until this merges the
-  # push trigger and this default are how it runs.
+  # workflow_dispatch only lists workflows present on the default branch, so
+  # until this merges the push trigger and this default are how it runs.
   # PBS_PYTHON comes from the matrix; see the strategy block below.
 
 jobs:
   pbs-baseline:
-    # Follow ci-targets.yaml: only x86_64 moves to VS 2026, and only from 3.15;
-    # i686 and aarch64 stay on VS 2022 for every version. build.py resolves
-    # --vs through vswhere, so the runner has to carry that version.
-    # windows-latest and windows-2025 both resolve to the VS 2026 image now,
-    # leaving windows-2022 as the only free x64 label with VS 2022.
+    # arm64 goes to the VS 2026 image (Q3). For x64 and x86, follow
+    # ci-targets.yaml: only x86_64 moves to VS 2026, and only from 3.15.
+    # build.py resolves --vs through vswhere, so the runner has to carry that
+    # version. windows-latest and windows-2025 both resolve to the VS 2026
+    # image now, leaving windows-2022 as the only free x64 label with VS 2022.
     runs-on: >-
-      ${{ matrix.arch == 'arm64' && 'windows-11-arm'
+      ${{ matrix.arch == 'arm64' && 'windows-11-vs2026-arm'
           || (matrix.arch == 'x64' && matrix.python == 'cpython-3.15' && 'windows-2025-vs2026' || 'windows-2022') }}
     strategy:
       fail-fast: false
       matrix:
-        # Every configuration patch 0005 turns on, across the versions
-        # ci-targets.yaml lists for each: x64 and x86 for both options, arm64
-        # for debug from 3.11 and freethreaded+debug from 3.13.
-        include: ${{ fromJson('[{"python":"cpython-3.10","arch":"x64","options":"debug"},{"python":"cpython-3.10","arch":"x86","options":"debug"},{"python":"cpython-3.11","arch":"x64","options":"debug"},{"python":"cpython-3.11","arch":"x86","options":"debug"},{"python":"cpython-3.12","arch":"x64","options":"debug"},{"python":"cpython-3.12","arch":"x86","options":"debug"},{"python":"cpython-3.13","arch":"x64","options":"debug"},{"python":"cpython-3.13","arch":"x86","options":"debug"},{"python":"cpython-3.14","arch":"x64","options":"debug"},{"python":"cpython-3.14","arch":"x86","options":"debug"},{"python":"cpython-3.15","arch":"x64","options":"debug"},{"python":"cpython-3.15","arch":"x86","options":"debug"},{"python":"cpython-3.13","arch":"x64","options":"freethreaded+debug"},{"python":"cpython-3.13","arch":"x86","options":"freethreaded+debug"},{"python":"cpython-3.14","arch":"x64","options":"freethreaded+debug"},{"python":"cpython-3.14","arch":"x86","options":"freethreaded+debug"},{"python":"cpython-3.15","arch":"x64","options":"freethreaded+debug"},{"python":"cpython-3.15","arch":"x86","options":"freethreaded+debug"},{"python":"cpython-3.11","arch":"arm64","options":"debug"},{"python":"cpython-3.12","arch":"arm64","options":"debug"},{"python":"cpython-3.13","arch":"arm64","options":"debug"},{"python":"cpython-3.14","arch":"arm64","options":"debug"},{"python":"cpython-3.15","arch":"arm64","options":"debug"},{"python":"cpython-3.13","arch":"arm64","options":"freethreaded+debug"},{"python":"cpython-3.14","arch":"arm64","options":"freethreaded+debug"},{"python":"cpython-3.15","arch":"arm64","options":"freethreaded+debug"}]') }}
+        # Q3: every arm64 configuration in ci-targets.yaml, upstream's pgo pairs
+        # and the debug pairs patch 0005 adds: 3.11+ for the plain options,
+        # 3.13+ for free-threaded. The x64/x86 entries of Q2 are parked; see
+        # run 34095975591 for them.
+        include: ${{ fromJson('[{"python":"cpython-3.11","arch":"arm64","options":"debug"},{"python":"cpython-3.12","arch":"arm64","options":"debug"},{"python":"cpython-3.13","arch":"arm64","options":"debug"},{"python":"cpython-3.14","arch":"arm64","options":"debug"},{"python":"cpython-3.15","arch":"arm64","options":"debug"},{"python":"cpython-3.13","arch":"arm64","options":"freethreaded+debug"},{"python":"cpython-3.14","arch":"arm64","options":"freethreaded+debug"},{"python":"cpython-3.15","arch":"arm64","options":"freethreaded+debug"},{"python":"cpython-3.11","arch":"arm64","options":"pgo"},{"python":"cpython-3.12","arch":"arm64","options":"pgo"},{"python":"cpython-3.13","arch":"arm64","options":"pgo"},{"python":"cpython-3.14","arch":"arm64","options":"pgo"},{"python":"cpython-3.15","arch":"arm64","options":"pgo"},{"python":"cpython-3.13","arch":"arm64","options":"freethreaded+pgo"},{"python":"cpython-3.14","arch":"arm64","options":"freethreaded+pgo"},{"python":"cpython-3.15","arch":"arm64","options":"freethreaded+pgo"}]') }}
     name: ${{ matrix.python }} ${{ matrix.arch }} --options ${{ matrix.options }}
     timeout-minutes: 120
     permissions:
@@ -168,10 +174,13 @@ jobs:
       working-directory: pbs
       run: |
         rem ci-targets.yaml pins vs_version 2022 and overrides to 2026 only for
-        rem x86_64 from 3.15. Older CPython has no BasePlatformToolset mapping
-        rem for VisualStudioVersion 18.0, so it falls through to v140 and fails
-        rem with MSB8020.
+        rem x86_64 from 3.15. Q3 adds arm64: the VS 2026 image has no VS 2022,
+        rem so --vs 2026 for every version there. 3.13+ map VisualStudioVersion
+        rem 18.0 to a toolset in PCbuild/python.props; 3.10-3.12 do not, fall
+        rem through to v140 and fail with MSB8020 unless PlatformToolset is
+        rem pinned (patch 0006, when present).
         set MATRIX_VS=2022
+        if "%MATRIX_ARCH%"=="arm64" set MATRIX_VS=2026
         if "%MATRIX_PYTHON%-%MATRIX_ARCH%"=="cpython-3.15-x64" set MATRIX_VS=2026
         echo building %MATRIX_PYTHON% %MATRIX_ARCH% --options %MATRIX_OPTIONS% with VS %MATRIX_VS% via %VCVARS%
         for /f "usebackq tokens=*" %%i in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath`) do set VSPATH=%%i
@@ -221,9 +230,12 @@ jobs:
         uv run --no-dev test-distribution.py $dists
 
     # Everything below answers what the build alone cannot: does the
-    # distribution work, and does it give us something release cannot?
+    # distribution work, and does it give us something release cannot? Debug
+    # entries only: the inspect script asserts the _d names and the embedder
+    # links /MDd, so a pgo entry ends at the distribution tests.
 
     - name: Unpack and inspect the distribution
+      if: contains(matrix.options, 'debug')
       shell: pwsh
       working-directory: pbs
       run: uv run --no-project --script ../spike/windows_debug_python/inspect_dist.py
@@ -237,6 +249,7 @@ jobs:
     # the documented contract from 3.14 on: the installed pyconfig.h no longer
     # declares which build it belongs to, so the consumer supplies it.
     - name: Link an embedder against it, with no _DEBUG workaround
+      if: contains(matrix.options, 'debug')
       shell: cmd
       run: |
         for /f "usebackq tokens=*" %%i in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath`) do set VSPATH=%%i
@@ -248,6 +261,7 @@ jobs:
            /link /LIBPATH:pbs\unpacked\python\install\libs || exit /b 1
 
     - name: Run the embedder
+      if: contains(matrix.options, 'debug')
       shell: cmd
       run: |
         set PATH=%CD%\pbs\unpacked\python\install;%PATH%
