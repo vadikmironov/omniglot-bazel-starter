@@ -26,26 +26,33 @@
 #     index inside loop bounds and cannot pay for .at() without measuring the
 #     check; its sibling pro-bounds-constant-array-index is off for the same
 #     reason.
-Checks: >-
-  *,
-  -abseil-*,
-  -fuchsia-*,
-  -llvm-*,
-  -llvmlibc-*,
-  -altera-*,
-  -boost-*,
-  -portability-avoid-pragma-once,
-  -readability-convert-member-functions-to-static,
-  -modernize-use-integer-sign-comparison,
-  -clang-diagnostic-builtin-macro-redefined,
-  -google-runtime-int,
-  -misc-header-include-cycle,
-  -clang-analyzer-optin.cplusplus.UninitializedObject,
-  -readability-identifier-length,
-  -cppcoreguidelines-pro-bounds-constant-array-index,
-  -cppcoreguidelines-pro-bounds-avoid-unchecked-container-access,
-  -cppcoreguidelines-avoid-do-while,
-  -bugprone-easily-swappable-parameters
+#
+# Globs apply in order, last match wins. A YAML list (not the usual folded
+# string) so the user-managed region below can sit inside it as comments.
+Checks:
+  - '*'
+  - '-abseil-*'
+  - '-fuchsia-*'
+  - '-llvm-*'
+  - '-llvmlibc-*'
+  - '-altera-*'
+  - '-boost-*'
+  - '-portability-avoid-pragma-once'
+  - '-readability-convert-member-functions-to-static'
+  - '-modernize-use-integer-sign-comparison'
+  - '-clang-diagnostic-builtin-macro-redefined'
+  - '-google-runtime-int'
+  - '-misc-header-include-cycle'
+  - '-clang-analyzer-optin.cplusplus.UninitializedObject'
+  - '-readability-identifier-length'
+  - '-cppcoreguidelines-pro-bounds-constant-array-index'
+  - '-cppcoreguidelines-pro-bounds-avoid-unchecked-container-access'
+  - '-cppcoreguidelines-avoid-do-while'
+  - '-bugprone-easily-swappable-parameters'
+  # --- BEGIN user-managed ---
+  # Project-specific check globs, one `- '<glob>'` per line (a leading `-`
+  # inside the quotes disables). Preserved across re-bootstrap.
+  # --- END user-managed ---
 # Every enabled check fails the run. clang-tidy exits 0 on warnings, and the
 # lint_test gate reads that exit code, so warnings would otherwise pass it.
 WarningsAsErrors: '*'

@@ -33,6 +33,7 @@ TEST_REPO_NAME = "rebootstrap_test"
 MANAGED_SOURCE_FILES = [
     ".gitignore",
     ".bazelignore",
+    ".clang-tidy",
     "tools/python/pyproject.toml",
     "tools/rust/Cargo.toml",
     "tools/cpp/cpp_3rd_party_dependencies.MODULE.bazel",
@@ -180,6 +181,37 @@ class TestRebootstrap(_ScaffoldHarness):
         self.assertIn("services/postgres/data", result, "user bazelignore entry lost on re-bootstrap")
         # The bazel-* symlink ignores prove the baseline was refreshed alongside.
         self.assertIn("bazel-out", result, "starter baseline lost on re-bootstrap")
+
+    def test_clang_tidy_user_edit_stays_inside_checks(self) -> None:
+        target = self._fresh_target()
+        self._scaffold_into(target, {"cpp"})
+        tidy = target / ".clang-tidy"
+
+        # User disables a check inside the user-managed region (a list item).
+        edited = tidy.read_text().replace(
+            "  # --- END user-managed ---",
+            "  - '-readability-magic-numbers'\n  # --- END user-managed ---",
+            1,
+        )
+        tidy.write_text(edited)
+
+        self._scaffold_into(target, {"cpp"})  # re-bootstrap
+        result = tidy.read_text()
+        self.assertIn("- '-readability-magic-numbers'", result, "user check glob lost on re-bootstrap")
+        # Starter globs prove the baseline was refreshed alongside the user region.
+        self.assertIn("- '-bugprone-easily-swappable-parameters'", result, "starter baseline lost on re-bootstrap")
+        # The user glob must stay a member of the Checks list — after the
+        # starter globs (last match wins) and before the next top-level key.
+        self.assertGreater(
+            result.index("- '-readability-magic-numbers'"),
+            result.index("- '-bugprone-easily-swappable-parameters'"),
+            "user glob precedes the starter globs",
+        )
+        self.assertLess(
+            result.index("- '-readability-magic-numbers'"),
+            result.index("WarningsAsErrors:"),
+            "user glob escaped the Checks list",
+        )
 
     def test_gomod_is_not_managed(self) -> None:
         """go.mod carries no user-managed region — it is import-driven (tidy)."""
