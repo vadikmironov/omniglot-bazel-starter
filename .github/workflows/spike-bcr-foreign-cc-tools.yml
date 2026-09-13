@@ -41,16 +41,45 @@ jobs:
     - uses: ./.github/actions/setup_linux
       if: matrix.setup == 'linux'
 
-    - name: Build pkg-config, ninja and make from BCR
+    # One step per tool, each allowed to fail, so the job reports a verdict
+    # for all three rather than stopping at the first broken one.
+    - name: Bazel release
       shell: bash
       working-directory: spike/bcr_foreign_cc_tools
       run: |
         [[ "$RUNNER_OS" == Windows ]] && startup="--output_base=C:/bazel_build" || startup=""
         bazel $startup info release
-        bazel $startup build @pkg-config//:pkg-config @ninja//:ninja @make//:make
+
+    - name: Build pkg-config (and glib) from BCR
+      id: pkgconfig
+      continue-on-error: true
+      shell: bash
+      working-directory: spike/bcr_foreign_cc_tools
+      run: |
+        [[ "$RUNNER_OS" == Windows ]] && startup="--output_base=C:/bazel_build" || startup=""
+        bazel $startup build --keep_going --verbose_failures @pkg-config//:pkg-config
+
+    - name: Build ninja from BCR
+      id: ninja
+      continue-on-error: true
+      shell: bash
+      working-directory: spike/bcr_foreign_cc_tools
+      run: |
+        [[ "$RUNNER_OS" == Windows ]] && startup="--output_base=C:/bazel_build" || startup=""
+        bazel $startup build --keep_going --verbose_failures @ninja//:ninja
+
+    - name: Build make from BCR
+      id: make
+      continue-on-error: true
+      shell: bash
+      working-directory: spike/bcr_foreign_cc_tools
+      run: |
+        [[ "$RUNNER_OS" == Windows ]] && startup="--output_base=C:/bazel_build" || startup=""
+        bazel $startup build --keep_going --verbose_failures @make//:make
 
     # Building is half the answer; each binary has to run on the host too.
-    - name: Run them
+    - name: Run pkg-config
+      if: steps.pkgconfig.outcome == 'success'
       shell: bash
       working-directory: spike/bcr_foreign_cc_tools
       run: |
@@ -64,5 +93,28 @@ jobs:
           echo "pkg-config --exists returned success for a missing package" >&2
           exit 1
         fi
+
+    - name: Run ninja
+      if: steps.ninja.outcome == 'success'
+      shell: bash
+      working-directory: spike/bcr_foreign_cc_tools
+      run: |
+        [[ "$RUNNER_OS" == Windows ]] && startup="--output_base=C:/bazel_build" || startup=""
         bazel $startup run @ninja//:ninja -- --version
+
+    - name: Run make
+      if: steps.make.outcome == 'success'
+      shell: bash
+      working-directory: spike/bcr_foreign_cc_tools
+      run: |
+        [[ "$RUNNER_OS" == Windows ]] && startup="--output_base=C:/bazel_build" || startup=""
         bazel $startup run @make//:make -- --version
+
+    # The job itself goes red if any tool did not build, after all verdicts are in.
+    - name: Verdict
+      shell: bash
+      run: |
+        echo "pkg-config: ${{ steps.pkgconfig.outcome }}"
+        echo "ninja:      ${{ steps.ninja.outcome }}"
+        echo "make:       ${{ steps.make.outcome }}"
+        [[ "${{ steps.pkgconfig.outcome }}" == success && "${{ steps.ninja.outcome }}" == success && "${{ steps.make.outcome }}" == success ]]
