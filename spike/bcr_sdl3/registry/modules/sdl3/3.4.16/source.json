@@ -3,13 +3,12 @@
     "integrity": "sha256-cyIjbNEgkMPrQLlyi+TUnHb2atF9BDaVhNTsrVz3fGg=",
     "strip_prefix": "SDL3-3.4.16",
     "overlay": {
-        "BUILD.bazel": "sha256-zWCNIz6fk35S4Ja4YjFtZ1qhS7xRXPrWnJXMUaRiRng=",
+        "BUILD.bazel": "sha256-R/YNvauVC2o0PGjfs9b0n5j6PcumOj+aypyXixNJ/dY=",
         "MODULE.bazel": "sha256-FgEKZkW0eLR3gZTo647RYhABFYiCvyMzLan0XGr/MKg=",
-        "bazel/linux/SDL_build_config.h": "sha256-llPbgYxkqdROEz1Z1ls/d2NEZhV6ZcaAe7IQOZD29A4=",
-        "test/BUILD.bazel": "sha256-v+Z/xyCMReccxOwDsrbBgX+Qe0JYHTNVI/yv3Ws/TWo=",
+        "bazel/linux/SDL_build_config.h": "sha256-jPyTtQHiyjK8JZ2kn31+3Ng3KRSV3b+0MrEDbaedWGg=",
+        "test/BUILD.bazel": "sha256-Cx2JtV0PkpXusROYO9NhXq/LOGq1q/Zq8MBOO4ozV7o=",
         "test/MODULE.bazel": "sha256-HKsCaVv/zUewi5wJZDEO09s14yTJB2dSEsLA65JtYeE=",
-        "test/MODULE.bazel.lock": "sha256-1D4mzST3ufjHmqXKpAqHiPZkxaEnRuzqyiCtHQOU1/I=",
-        "wayland_protocols.bzl": "sha256-i/iTb+0/wIIRk1Jyd4vyKRDGbDTBOUOHlS+nx+xs65o="
+        "wayland_protocols.bzl": "sha256-rC6u+PwqOzkLa455+Pex+PZYmSsR+3G9xFFqDSawBH8="
     },
     "patch_strip": 0
 }

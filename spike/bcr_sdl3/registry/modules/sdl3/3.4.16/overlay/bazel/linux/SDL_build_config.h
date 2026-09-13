@@ -3,8 +3,8 @@
   tools/gen_linux_build_config.sh from SDL 3.4.16's own CMake configure:
 
     ubuntu:20.04, cmake version 3.16.3, gcc (Ubuntu 9.4.0-1ubuntu1~20.04.2) 9.4.0
-    packages: ca-certificates cmake curl gcc libc6-dev make pkg-config libx11-dev libxext-dev libxcursor-dev libxi-dev libxfixes-dev libxrandr-dev libwayland-dev libxkbcommon-dev libasound2-dev libgl-dev
-    cmake -DCMAKE_BUILD_TYPE=Release -DSDL_SHARED=OFF -DSDL_STATIC=ON -DSDL_TESTS=OFF -DSDL_EXAMPLES=OFF -DSDL_TEST_LIBRARY=OFF -DSDL_INSTALL=OFF -DSDL_ALSA=ON -DSDL_PULSEAUDIO=OFF -DSDL_PIPEWIRE=OFF -DSDL_JACK=OFF -DSDL_SNDIO=OFF -DSDL_OSS=OFF -DSDL_X11=ON -DSDL_X11_XSCRNSAVER=OFF -DSDL_X11_XTEST=OFF -DSDL_FRIBIDI=OFF -DSDL_LIBTHAI=OFF -DSDL_WAYLAND=ON -DSDL_WAYLAND_LIBDECOR=OFF -DSDL_KMSDRM=OFF -DSDL_OPENVR=OFF -DSDL_RPI=OFF -DSDL_ROCKCHIP=OFF -DSDL_VIVANTE=OFF -DSDL_OPENGL=ON -DSDL_OPENGLES=ON -DSDL_VULKAN=ON -DSDL_DBUS=OFF -DSDL_IBUS=OFF -DSDL_LIBUDEV=OFF -DSDL_LIBURING=OFF -DSDL_HIDAPI=OFF
+    packages: ca-certificates cmake curl gcc libc6-dev make pkg-config libx11-dev libxext-dev libxcursor-dev libxi-dev libxfixes-dev libxrandr-dev libwayland-dev libxkbcommon-dev libasound2-dev libgl-dev libegl-dev
+    cmake -DCMAKE_BUILD_TYPE=Release -DSDL_SHARED=OFF -DSDL_STATIC=ON -DSDL_TESTS=OFF -DSDL_EXAMPLES=OFF -DSDL_TEST_LIBRARY=OFF -DSDL_INSTALL=OFF -DSDL_ALSA=ON -DSDL_PULSEAUDIO=OFF -DSDL_PIPEWIRE=OFF -DSDL_JACK=OFF -DSDL_SNDIO=OFF -DSDL_OSS=OFF -DSDL_X11=ON -DSDL_X11_XSCRNSAVER=OFF -DSDL_X11_XTEST=OFF -DSDL_FRIBIDI=OFF -DSDL_LIBTHAI=OFF -DSDL_WAYLAND=ON -DSDL_WAYLAND_LIBDECOR=OFF -DSDL_KMSDRM=OFF -DSDL_OPENVR=OFF -DSDL_RPI=OFF -DSDL_ROCKCHIP=OFF -DSDL_VIVANTE=OFF -DSDL_OPENGL=ON -DSDL_OPENGLES=ON -DSDL_VULKAN=ON -DSDL_DBUS=OFF -DSDL_IBUS=OFF -DSDL_LIBUDEV=OFF -DSDL_LIBURING=OFF -DSDL_HIDAPI_LIBUSB=OFF
 
   Do not edit; rerun the script.
 */
@@ -267,7 +267,7 @@
 /* #undef SDL_CAMERA_DISABLED */
 /* #undef SDL_JOYSTICK_DISABLED */
 /* #undef SDL_HAPTIC_DISABLED */
-#define SDL_HIDAPI_DISABLED 1
+/* #undef SDL_HIDAPI_DISABLED */
 /* #undef SDL_POWER_DISABLED */
 /* #undef SDL_SENSOR_DISABLED */
 /* #undef SDL_DIALOG_DISABLED */
@@ -316,7 +316,7 @@
 /* #undef SDL_JOYSTICK_EMSCRIPTEN */
 /* #undef SDL_JOYSTICK_GAMEINPUT */
 /* #undef SDL_JOYSTICK_HAIKU */
-/* #undef SDL_JOYSTICK_HIDAPI */
+#define SDL_JOYSTICK_HIDAPI 1
 /* #undef SDL_JOYSTICK_IOKIT */
 #define SDL_JOYSTICK_LINUX 1
 /* #undef SDL_JOYSTICK_MFI */
@@ -325,7 +325,7 @@
 /* #undef SDL_JOYSTICK_PSP */
 /* #undef SDL_JOYSTICK_RAWINPUT */
 /* #undef SDL_JOYSTICK_USBHID */
-/* #undef SDL_JOYSTICK_VIRTUAL */
+#define SDL_JOYSTICK_VIRTUAL 1
 /* #undef SDL_JOYSTICK_VITA */
 /* #undef SDL_JOYSTICK_WGI */
 /* #undef SDL_JOYSTICK_XINPUT */
@@ -426,12 +426,12 @@
 /* #undef SDL_VIDEO_DRIVER_VIVANTE */
 /* #undef SDL_VIDEO_DRIVER_VIVANTE_VDK */
 /* #undef SDL_VIDEO_DRIVER_OPENVR */
-/* #undef SDL_VIDEO_DRIVER_WAYLAND */
-/* #undef SDL_VIDEO_DRIVER_WAYLAND_DYNAMIC */
-/* #undef SDL_VIDEO_DRIVER_WAYLAND_DYNAMIC_CURSOR */
-/* #undef SDL_VIDEO_DRIVER_WAYLAND_DYNAMIC_EGL */
+#define SDL_VIDEO_DRIVER_WAYLAND 1
+#define SDL_VIDEO_DRIVER_WAYLAND_DYNAMIC "libwayland-client.so.0"
+#define SDL_VIDEO_DRIVER_WAYLAND_DYNAMIC_CURSOR "libwayland-cursor.so.0"
+#define SDL_VIDEO_DRIVER_WAYLAND_DYNAMIC_EGL "libwayland-egl.so.1"
 /* #undef SDL_VIDEO_DRIVER_WAYLAND_DYNAMIC_LIBDECOR */
-/* #undef SDL_VIDEO_DRIVER_WAYLAND_DYNAMIC_XKBCOMMON */
+#define SDL_VIDEO_DRIVER_WAYLAND_DYNAMIC_XKBCOMMON "libxkbcommon.so.0"
 /* #undef SDL_VIDEO_DRIVER_WINDOWS */
 #define SDL_VIDEO_DRIVER_X11 1
 #define SDL_VIDEO_DRIVER_X11_DYNAMIC "libX11.so.6"
@@ -480,7 +480,7 @@
 /* #undef SDL_VIDEO_OPENGL_ES */
 #define SDL_VIDEO_OPENGL_ES2 1
 /* #undef SDL_VIDEO_OPENGL_CGL */
-/* #undef SDL_VIDEO_OPENGL_GLX */ /* Bazel: no Mesa headers, OpenGL over EGL */
+/* #undef SDL_VIDEO_OPENGL_GLX */ /* Bazel: no Mesa headers; OpenGL over EGL */
 /* #undef SDL_VIDEO_OPENGL_WGL */
 #define SDL_VIDEO_OPENGL_EGL 1
 
@@ -585,9 +585,9 @@
 /* #undef SDL_EMSCRIPTEN_PERSISTENT_PATH_STRING */
 
 /* xkbcommon version info */
-#define SDL_XKBCOMMON_VERSION_MAJOR 
-#define SDL_XKBCOMMON_VERSION_MINOR 
-#define SDL_XKBCOMMON_VERSION_PATCH 
+#define SDL_XKBCOMMON_VERSION_MAJOR 0
+#define SDL_XKBCOMMON_VERSION_MINOR 10
+#define SDL_XKBCOMMON_VERSION_PATCH 0
 
 /* Libdecor version info */
 #define SDL_LIBDECOR_VERSION_MAJOR 
@@ -625,9 +625,9 @@ typedef unsigned int uintptr_t;
 /* #undef SDL_DISABLE_AVX2 */
 /* #undef SDL_DISABLE_AVX512F */
 /* #undef SDL_DISABLE_MMX */
-#define SDL_DISABLE_LSX 1
-#define SDL_DISABLE_LASX 1
-#define SDL_DISABLE_NEON 1
+/* #undef SDL_DISABLE_LSX */ /* Bazel: per-CPU; SDL_intrin.h decides */
+/* #undef SDL_DISABLE_LASX */ /* Bazel: per-CPU; SDL_intrin.h decides */
+/* #undef SDL_DISABLE_NEON */ /* Bazel: per-CPU; SDL_intrin.h decides */
 
 #ifdef SDL_PLATFORM_PRIVATE
 #include "SDL_end_config_private.h"

@@ -52,7 +52,9 @@ CMAKE_FLAGS=(
     -DSDL_KMSDRM=OFF -DSDL_OPENVR=OFF -DSDL_RPI=OFF -DSDL_ROCKCHIP=OFF -DSDL_VIVANTE=OFF
     -DSDL_OPENGL=ON -DSDL_OPENGLES=ON -DSDL_VULKAN=ON
     -DSDL_DBUS=OFF -DSDL_IBUS=OFF -DSDL_LIBUDEV=OFF -DSDL_LIBURING=OFF
-    -DSDL_HIDAPI=OFF
+    # HIDAPI stays on (the virtual joystick depends on it in CMake) but has no
+    # backend here: the hidraw one needs libudev, and libusb is off.
+    -DSDL_HIDAPI_LIBUSB=OFF
 )
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -88,8 +90,9 @@ EOF
     #   could not target (NEON, LoongArch). The header serves every CPU the
     #   module builds for, and SDL_intrin.h already selects intrinsics by
     #   the compiler's own feature macros, so the opt-outs are dropped.
-    sed -e 's|^#define SDL_VIDEO_OPENGL_GLX 1$|/* #undef SDL_VIDEO_OPENGL_GLX */ /* Bazel: no Mesa headers, OpenGL over EGL */|' \
-        -e 's|^#define \(SDL_DISABLE_\(SSE\|SSE2\|SSE3\|SSE4_1\|SSE4_2\|AVX\|AVX2\|AVX512F\|MMX\|LSX\|LASX\|NEON\)\) 1$|/* #undef \1 */ /* Bazel: per-CPU, left to SDL_intrin.h */|' \
+    sed -E \
+        -e 's,^#define SDL_VIDEO_OPENGL_GLX 1$,/* #undef SDL_VIDEO_OPENGL_GLX */ /* Bazel: no Mesa headers; OpenGL over EGL */,' \
+        -e 's,^#define (SDL_DISABLE_(SSE|SSE2|SSE3|SSE4_1|SSE4_2|AVX|AVX2|AVX512F|MMX|LSX|LASX|NEON)) 1$,/* #undef \1 */ /* Bazel: per-CPU; SDL_intrin.h decides */,' \
         "$generated"
     exit 0
 fi

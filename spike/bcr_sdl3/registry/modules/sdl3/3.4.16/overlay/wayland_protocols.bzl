@@ -4,22 +4,25 @@ SDL loads libwayland-client at runtime, so the protocol tables (wayland.xml
 included) are compiled into SDL itself, as SDL's CMake build does. The list
 of protocols is whatever the SDL source tree contains: the BUILD file globs
 wayland-protocols/*.xml and passes it here.
-"""
 
-_OUT_DIR = "generated/wayland-protocols"
+The headers are generated at the package root: SDL includes them with
+quotes, and Bazel searches the package's output directory for quoted
+includes before any include path, so SDL's own wayland-client-protocol.h
+(from its newer wayland.xml) wins over the one the wayland module exports.
+"""
 
 def wayland_protocol_sources(xmls):
     """Declares the wayland-scanner genrules for `xmls`.
 
     Returns a struct with `srcs` (the generated *-protocol.c files) and `hdrs`
-    (the generated *-client-protocol.h files); both live under generated/wayland-protocols.
+    (the generated *-client-protocol.h files).
     """
     srcs = []
     hdrs = []
     for xml in xmls:
         protocol = xml.removeprefix("wayland-protocols/").removesuffix(".xml")
-        src = "%s/%s-protocol.c" % (_OUT_DIR, protocol)
-        hdr = "%s/%s-client-protocol.h" % (_OUT_DIR, protocol)
+        src = "%s-protocol.c" % protocol
+        hdr = "%s-client-protocol.h" % protocol
         native.genrule(
             name = "%s_wayland_protocol_source" % protocol,
             srcs = [xml],
@@ -36,4 +39,4 @@ def wayland_protocol_sources(xmls):
         )
         srcs.append(src)
         hdrs.append(hdr)
-    return struct(srcs = srcs, hdrs = hdrs, include_dir = _OUT_DIR)
+    return struct(srcs = srcs, hdrs = hdrs)
