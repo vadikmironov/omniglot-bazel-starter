@@ -52,12 +52,15 @@ cc_library(
     strip_include_prefix = "src/video/khronos",
 )
 
+# SDL's sources include "SDL_internal.h" and each other by bare name and by
+# paths relative to src/, so src/ is an include directory, for the build only.
 cc_library(
     name = "private_headers",
     hdrs = glob(
         ["src/**/*.h"],
         exclude = ["src/video/khronos/**"],
     ),
+    strip_include_prefix = "src",
     # .c files SDL includes textually.
     textual_hdrs = [
         "src/hidapi/mac/hid.c",
@@ -281,10 +284,6 @@ cc_library(
         "@platforms//os:macos": _MACOS_SRCS,
         "@platforms//os:windows": _WINDOWS_SRCS,
     }),
-    includes = select({
-        "@platforms//os:linux": [_WAYLAND.include_dir],
-        "//conditions:default": [],
-    }),
     linkopts = select({
         "@platforms//os:linux": _LINUX_LINKOPTS,
         "@platforms//os:macos": _MACOS_LINKOPTS,
@@ -333,6 +332,7 @@ cc_library(
     srcs = glob(["src/test/*.c"]),
     visibility = ["//visibility:public"],
     deps = [":sdl3"],
+    implementation_deps = [":private_headers"],
 )
 
 # What SDL's own test suite (test/testautomation*.c) reads from inside the

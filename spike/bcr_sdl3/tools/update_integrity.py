@@ -24,8 +24,10 @@ source = json.loads(source_json.read_text())
 hashes = {}
 for path in sorted(overlay.rglob("*")):
     relative = path.relative_to(overlay)
-    # bazel-* are the convenience symlinks a local run leaves in the test module.
-    if path.is_symlink() or path.is_dir() or any(part.startswith("bazel-") for part in relative.parts):
+    # A local run leaves bazel-* symlinks and a lockfile in the test module.
+    if path.is_symlink() or path.is_dir() or path.name == "MODULE.bazel.lock":
+        continue
+    if any(part.startswith("bazel-") for part in relative.parts):
         continue
     digest = hashlib.sha256(path.read_bytes()).digest()
     hashes[relative.as_posix()] = "sha256-" + base64.b64encode(digest).decode()

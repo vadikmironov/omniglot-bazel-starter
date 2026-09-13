@@ -1,2 +1,3 @@
-# Convenience symlinks from running Bazel inside the test module.
+# Convenience symlinks and the lockfile from running Bazel inside the test module.
 bazel-*
+MODULE.bazel.lock

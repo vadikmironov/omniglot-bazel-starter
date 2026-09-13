@@ -6,7 +6,10 @@ load("@rules_cc//cc:defs.bzl", "cc_test")
 cc_test(
     name = "testautomation",
     size = "medium",
-    srcs = glob(["testautomation*.c"]),
+    srcs = glob([
+        "testautomation*.c",
+        "testautomation*.h",
+    ]),
     env = {
         "SDL_ASSERT": "abort",
         "SDL_AUDIO_DRIVER": "dummy",
