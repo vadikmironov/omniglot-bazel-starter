@@ -11,3 +11,15 @@ module(
 bazel_dep(name = "pkg-config", version = "0.29.2.bcr.3")
 bazel_dep(name = "ninja", version = "1.13.2")
 bazel_dep(name = "make", version = "4.4.1.bcr.1")
+
+# GNU make's src/config.h.W32 defines HAVE_STDINT_H and HAVE_INTTYPES_H for
+# MinGW only, so under MSVC intmax_t becomes a macro for `long long`, and the
+# first header that then includes <stdint.h> breaks on its own typedef. The
+# ARM64 SDK headers do; the x64 ones happen not to. MSVC has shipped both
+# headers since VS 2013 (_MSC_VER 1800). Same mechanism as the module's own
+# msvc-have-umask.patch.
+single_version_override(
+    module_name = "make",
+    patch_strip = 1,
+    patches = ["//patches:make-4.4.1-msvc-stdint.patch"],
+)

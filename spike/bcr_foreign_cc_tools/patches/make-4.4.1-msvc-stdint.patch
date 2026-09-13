@@ -1,0 +1,22 @@
+diff --git a/src/config.h.W32 b/src/config.h.W32
+index bf23d8d..99d1db5 100644
+--- a/src/config.h.W32
++++ b/src/config.h.W32
+@@ -162,7 +162,7 @@ this program.  If not, see <https://www.gnu.org/licenses/>.  */
+ /* #undef HAVE_ICONV */
+ 
+ /* Define to 1 if you have the <inttypes.h> header file. */
+-#ifdef __MINGW32__
++#if defined(__MINGW32__) || (defined(_MSC_VER) && _MSC_VER >= 1800)
+ #define HAVE_INTTYPES_H 1
+ #endif
+ 
+@@ -281,7 +281,7 @@ this program.  If not, see <https://www.gnu.org/licenses/>.  */
+ /* #undef HAVE_SPAWN_H */
+ 
+ /* Define to 1 if you have the <stdint.h> header file. */
+-#ifdef __MINGW32__
++#if defined(__MINGW32__) || (defined(_MSC_VER) && _MSC_VER >= 1800)
+ #define HAVE_STDINT_H 1
+ #endif
+ 
