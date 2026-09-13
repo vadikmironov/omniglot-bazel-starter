@@ -1,0 +1,110 @@
+name: Spike - SDL3 BCR module
+
+# TEMPORARY. Builds the sdl3@3.4.16 module staged under spike/bcr_sdl3/registry
+# through a file:// registry on the platforms BCR presubmit runs, plus both
+# Windows ARM64 images, and runs the test module where its source exists.
+# The linux-config job regenerates the Linux build config with SDL's own
+# CMake configure and fails if the checked-in header is stale.
+# Delete once the module is in BCR.
+
+on:
+  push:
+    branches: [ "spike/bcr-sdl3" ]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  TEST_MODULE: spike/bcr_sdl3/registry/modules/sdl3/3.4.16/overlay/test
+
+jobs:
+  linux-config:
+    name: Linux build config is up to date
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+    - uses: actions/checkout@v7
+    - name: Regenerate with SDL's CMake configure in ubuntu:20.04
+      run: spike/bcr_sdl3/tools/gen_linux_build_config.sh
+    - uses: actions/upload-artifact@v4
+      with:
+        name: SDL_build_config.h
+        path: spike/bcr_sdl3/registry/modules/sdl3/3.4.16/overlay/bazel/linux/SDL_build_config.h
+    - name: Compare with the checked-in header
+      run: |
+        git --no-pager diff -- spike/bcr_sdl3/registry
+        if [[ -n "$(git status --porcelain -- spike/bcr_sdl3/registry)" ]]; then
+          echo "::error::the generated SDL_build_config.h differs from the checked-in one; download the artifact and commit it"
+          exit 1
+        fi
+
+  build:
+    name: ${{ matrix.label }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: ubuntu-latest,         setup: linux,   label: "Linux x64" }
+          - { runner: windows-2022,          setup: windows, label: "Windows x64, VS 2022" }
+          - { runner: windows-11-arm,        setup: windows, label: "Windows ARM64, VS 2022" }
+          - { runner: windows-11-vs2026-arm, setup: windows, label: "Windows ARM64, VS 2026" }
+          - { runner: macos-latest,          setup: macos,   label: "macOS arm64" }
+          - { runner: macos-15-intel,        setup: macos,   label: "macOS x64" }
+    steps:
+    - uses: actions/checkout@v7
+    - uses: ./.github/actions/setup_windows
+      if: matrix.setup == 'windows'
+      with:
+        bazel_startup_opts: --output_base=C:/bazel_build
+    - uses: ./.github/actions/setup_linux
+      if: matrix.setup == 'linux'
+    # macOS runners ship bazelisk; the repo's setup_macos action fetches the
+    # omniglot LLVM toolchain, which this module does not use.
+
+    - name: Build @sdl3 and SDL3_test from the local registry
+      shell: bash
+      working-directory: ${{ env.TEST_MODULE }}
+      run: |
+        if [[ "$RUNNER_OS" == Windows ]]; then
+          startup="--output_base=C:/bazel_build"
+          registry="file:///$(cd ../../../../.. && pwd -W)"
+        else
+          startup=""
+          registry="file://$(cd ../../../../.. && pwd)"
+        fi
+        echo "registry: $registry"
+        bazel $startup build --verbose_failures \
+          --registry="$registry" --registry=https://bcr.bazel.build \
+          @sdl3//:sdl3 @sdl3//:sdl3_test
+
+    # SDL's automated suite lives in the tarball's test/ directory, where the
+    # overlay puts the test module's BUILD file, so here it is reached through
+    # the sdl3 repo. In BCR presubmit that directory is the test module root
+    # and the same target is //:testautomation. Any .c file added next to the
+    # BUILD file here is run as part of //... as well.
+    - name: Run SDL's automated test suite
+      shell: bash
+      working-directory: ${{ env.TEST_MODULE }}
+      run: |
+        if [[ "$RUNNER_OS" == Windows ]]; then
+          startup="--output_base=C:/bazel_build"
+          registry="file:///$(cd ../../../../.. && pwd -W)"
+        else
+          startup=""
+          registry="file://$(cd ../../../../.. && pwd)"
+        fi
+        targets="@sdl3//test:testautomation"
+        if ls ./*.c >/dev/null 2>&1; then
+          targets="$targets //..."
+        fi
+        bazel $startup test --verbose_failures --test_output=errors \
+          --registry="$registry" --registry=https://bcr.bazel.build \
+          $targets

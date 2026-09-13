@@ -1,0 +1,2 @@
+# Convenience symlinks from running Bazel inside the test module.
+bazel-*
