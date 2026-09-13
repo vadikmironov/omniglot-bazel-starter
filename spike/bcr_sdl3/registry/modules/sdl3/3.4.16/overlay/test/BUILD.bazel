@@ -1,0 +1,20 @@
+load("@rules_cc//cc:defs.bzl", "cc_test")
+
+# SDL's own automated test suite, run the way SDL's ctest runs it: headless,
+# on the dummy video and audio drivers. This BUILD file sits in SDL's test/
+# directory, so the sources are the ones of the release being built.
+cc_test(
+    name = "testautomation",
+    size = "medium",
+    srcs = glob(["testautomation*.c"]),
+    env = {
+        "SDL_ASSERT": "abort",
+        "SDL_AUDIO_DRIVER": "dummy",
+        "SDL_VIDEO_DRIVER": "dummy",
+    },
+    deps = [
+        "@sdl3",
+        "@sdl3//:sdl3_test",
+        "@sdl3//:testautomation_internals",
+    ],
+)

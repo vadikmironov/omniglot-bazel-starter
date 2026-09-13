@@ -1,0 +1,13 @@
+{
+    "url": "https://github.com/libsdl-org/SDL/releases/download/release-3.4.16/SDL3-3.4.16.tar.gz",
+    "integrity": "sha256-cyIjbNEgkMPrQLlyi+TUnHb2atF9BDaVhNTsrVz3fGg=",
+    "strip_prefix": "SDL3-3.4.16",
+    "overlay": {
+        "BUILD.bazel": "sha256-zWCNIz6fk35S4Ja4YjFtZ1qhS7xRXPrWnJXMUaRiRng=",
+        "MODULE.bazel": "sha256-19/JoTNC4SI5Ey0vKqvxqw2FxlsR5WYCkkAF8a3s+vY=",
+        "test/BUILD.bazel": "sha256-v+Z/xyCMReccxOwDsrbBgX+Qe0JYHTNVI/yv3Ws/TWo=",
+        "test/MODULE.bazel": "sha256-GoxsHYpSa0ijxGu+qOMcPp4lsWI4V5D/+2h3rgETtOg=",
+        "wayland_protocols.bzl": "sha256-i/iTb+0/wIIRk1Jyd4vyKRDGbDTBOUOHlS+nx+xs65o="
+    },
+    "patch_strip": 0
+}

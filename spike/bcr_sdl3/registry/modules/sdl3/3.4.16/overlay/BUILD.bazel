@@ -1,0 +1,349 @@
+"""SDL3 built from source with rules_cc.
+
+@sdl3 is the library, linked statically; @sdl3//:sdl3_test is SDL3_test.
+"""
+
+load("@rules_cc//cc:defs.bzl", "cc_library")
+load("@rules_cc//cc:objc_library.bzl", "objc_library")
+load(":wayland_protocols.bzl", "wayland_protocol_sources")
+
+package(default_visibility = ["//visibility:private"])
+
+exports_files(["LICENSE.txt"])
+
+_VERSION = module_version().split(".")
+
+# SDL.c asserts at compile time that the headers match this version.
+_VERSION_DEFINES = [
+    "SDL_BUILD_MAJOR_VERSION=" + _VERSION[0],
+    "SDL_BUILD_MINOR_VERSION=" + _VERSION[1],
+    "SDL_BUILD_MICRO_VERSION=" + _VERSION[2],
+] if len(_VERSION) >= 3 else []
+
+_LOCAL_DEFINES = ["SDL_STATIC_LIB"] + _VERSION_DEFINES
+
+cc_library(
+    name = "sdl3_headers",
+    hdrs = glob(["include/SDL3/*.h"]),
+    includes = ["include"],
+    visibility = ["//visibility:public"],
+)
+
+# SDL_internal.h includes "SDL_build_config.h". Windows and Apple platforms
+# ship theirs under include/build_config/, where SDL_build_config.h picks the
+# platform's file; Linux uses the header tools/gen_linux_build_config.sh
+# generates from SDL's CMake configure.
+cc_library(
+    name = "build_config_shipped",
+    hdrs = glob(["include/build_config/*.h"]),
+    strip_include_prefix = "include/build_config",
+)
+
+cc_library(
+    name = "build_config_linux",
+    hdrs = ["bazel/linux/SDL_build_config.h"],
+    strip_include_prefix = "bazel/linux",
+)
+
+# EGL, GLES and Vulkan headers SDL builds against on every platform.
+cc_library(
+    name = "khronos_headers",
+    hdrs = glob(["src/video/khronos/**/*.h"]),
+    strip_include_prefix = "src/video/khronos",
+)
+
+cc_library(
+    name = "private_headers",
+    hdrs = glob(
+        ["src/**/*.h"],
+        exclude = ["src/video/khronos/**"],
+    ),
+    # .c files SDL includes textually.
+    textual_hdrs = [
+        "src/hidapi/mac/hid.c",
+        "src/hidapi/windows/hid.c",
+        "src/hidapi/windows/hidapi_descriptor_reconstruct.c",
+        "src/thread/generic/SDL_syssem.c",
+    ],
+    deps = [":sdl3_headers"],
+)
+
+# Compiled on every platform. Backend files under these directories select
+# themselves with the SDL_* macros of the build config; SDL's CMake build
+# relies on the same (it globs src/render/*/*.c unconditionally, for one).
+_COMMON_SRCS = glob([
+    "src/*.c",
+    "src/atomic/*.c",
+    "src/audio/*.c",
+    "src/audio/disk/*.c",
+    "src/audio/dummy/*.c",
+    "src/camera/*.c",
+    "src/camera/dummy/*.c",
+    "src/core/*.c",
+    "src/cpuinfo/*.c",
+    "src/dialog/*.c",
+    "src/dynapi/*.c",
+    "src/events/*.c",
+    "src/filesystem/*.c",
+    "src/gpu/*.c",
+    "src/gpu/vulkan/*.c",
+    "src/haptic/*.c",
+    "src/haptic/hidapi/*.c",
+    "src/hidapi/*.c",
+    "src/io/*.c",
+    "src/io/generic/*.c",
+    "src/joystick/*.c",
+    "src/joystick/hidapi/*.c",
+    "src/joystick/virtual/*.c",
+    "src/libm/*.c",
+    "src/locale/*.c",
+    "src/main/*.c",
+    "src/main/generic/*.c",
+    "src/misc/*.c",
+    "src/power/*.c",
+    "src/process/*.c",
+    "src/render/*.c",
+    "src/render/*/*.c",
+    "src/sensor/*.c",
+    "src/sensor/dummy/*.c",
+    "src/stdlib/*.c",
+    "src/storage/*.c",
+    "src/storage/generic/*.c",
+    "src/storage/steam/*.c",
+    "src/thread/*.c",
+    "src/time/*.c",
+    "src/timer/*.c",
+    "src/tray/*.c",
+    "src/video/*.c",
+    "src/video/dummy/*.c",
+    "src/video/offscreen/*.c",
+    "src/video/yuv2rgb/*.c",
+])
+
+_WAYLAND = wayland_protocol_sources(glob(["wayland-protocols/*.xml"]))
+
+_LINUX_SRCS = glob([
+    "src/audio/alsa/*.c",
+    "src/camera/v4l2/*.c",
+    "src/core/unix/*.c",
+    "src/dialog/unix/*.c",
+    "src/filesystem/unix/*.c",
+    "src/haptic/linux/*.c",
+    "src/joystick/linux/*.c",
+    "src/loadso/dlopen/*.c",
+    "src/locale/unix/*.c",
+    "src/misc/unix/*.c",
+    "src/power/linux/*.c",
+    "src/process/posix/*.c",
+    "src/thread/pthread/*.c",
+    "src/time/unix/*.c",
+    "src/timer/unix/*.c",
+    "src/tray/unix/*.c",
+    "src/video/wayland/*.c",
+    "src/video/x11/*.c",
+]) + [
+    # The rest of src/core/linux needs D-Bus or libudev.
+    "src/core/linux/SDL_evdev.c",
+    "src/core/linux/SDL_evdev_capabilities.c",
+    "src/core/linux/SDL_evdev_kbd.c",
+    "src/core/linux/SDL_threadprio.c",
+    "src/filesystem/posix/SDL_sysfsops.c",
+] + _WAYLAND.srcs + _WAYLAND.hdrs
+
+_MACOS_SRCS = glob([
+    "src/haptic/darwin/*.c",
+    "src/joystick/darwin/*.c",
+    "src/loadso/dlopen/*.c",
+    "src/power/macos/*.c",
+    "src/process/posix/*.c",
+    "src/thread/pthread/*.c",
+    "src/time/unix/*.c",
+    "src/timer/unix/*.c",
+]) + [
+    "src/filesystem/posix/SDL_sysfsops.c",
+]
+
+_WINDOWS_SRCS = glob(
+    [
+        "src/audio/directsound/*.c",
+        "src/audio/wasapi/*.c",
+        "src/camera/mediafoundation/*.c",
+        "src/core/windows/*.c",
+        "src/core/windows/*.cpp",
+        "src/dialog/windows/*.c",
+        "src/filesystem/windows/*.c",
+        "src/gpu/d3d12/*.c",
+        "src/haptic/windows/*.c",
+        "src/io/windows/*.c",
+        "src/joystick/gdk/*.cpp",
+        "src/joystick/windows/*.c",
+        "src/loadso/windows/*.c",
+        "src/locale/windows/*.c",
+        "src/main/windows/*.c",
+        "src/misc/windows/*.c",
+        "src/power/windows/*.c",
+        "src/process/windows/*.c",
+        "src/sensor/windows/*.c",
+        "src/thread/windows/*.c",
+        "src/time/windows/*.c",
+        "src/timer/windows/*.c",
+        "src/tray/windows/*.c",
+        "src/video/windows/*.c",
+        "src/video/windows/*.cpp",
+    ],
+    exclude = ["src/core/windows/pch_cpp.cpp"],
+) + [
+    "src/thread/generic/SDL_syscond.c",
+    "src/thread/generic/SDL_sysrwlock.c",
+]
+
+_LINUX_LINKOPTS = [
+    "-ldl",
+    "-lm",
+    "-lpthread",
+]
+
+_WINDOWS_LINKOPTS = [lib + ".lib" for lib in [
+    "advapi32",
+    "dinput8",
+    "gdi32",
+    "imm32",
+    "kernel32",
+    "ole32",
+    "oleaut32",
+    "setupapi",
+    "shell32",
+    "user32",
+    "uuid",
+    "version",
+    "winmm",
+]]
+
+_MACOS_FRAMEWORKS = [
+    "AudioToolbox",
+    "AVFoundation",
+    "Carbon",
+    "Cocoa",
+    "CoreAudio",
+    "CoreMedia",
+    "CoreVideo",
+    "ForceFeedback",
+    "Foundation",
+    "GameController",
+    "IOKit",
+    "Metal",
+    "QuartzCore",
+]
+
+_MACOS_WEAK_FRAMEWORKS = [
+    "CoreHaptics",
+    "UniformTypeIdentifiers",
+]
+
+_MACOS_LINKOPTS = [
+    flag
+    for framework in _MACOS_FRAMEWORKS
+    for flag in ["-framework", framework]
+] + [
+    flag
+    for framework in _MACOS_WEAK_FRAMEWORKS
+    for flag in ["-weak_framework", framework]
+]
+
+objc_library(
+    name = "sdl3_macos_objc",
+    srcs = glob([
+        "src/audio/coreaudio/*.m",
+        "src/camera/coremedia/*.m",
+        "src/dialog/cocoa/*.m",
+        "src/filesystem/cocoa/*.m",
+        "src/gpu/metal/*.m",
+        "src/joystick/apple/*.m",
+        "src/locale/macos/*.m",
+        "src/misc/macos/*.m",
+        "src/render/metal/*.m",
+        "src/tray/cocoa/*.m",
+        "src/video/cocoa/*.m",
+    ]),
+    copts = ["-D" + define for define in _LOCAL_DEFINES],
+    tags = ["manual"],
+    deps = [
+        ":build_config_shipped",
+        ":khronos_headers",
+        ":private_headers",
+    ],
+)
+
+cc_library(
+    name = "sdl3",
+    srcs = _COMMON_SRCS + select({
+        "@platforms//os:linux": _LINUX_SRCS,
+        "@platforms//os:macos": _MACOS_SRCS,
+        "@platforms//os:windows": _WINDOWS_SRCS,
+    }),
+    includes = select({
+        "@platforms//os:linux": [_WAYLAND.include_dir],
+        "//conditions:default": [],
+    }),
+    linkopts = select({
+        "@platforms//os:linux": _LINUX_LINKOPTS,
+        "@platforms//os:macos": _MACOS_LINKOPTS,
+        "@platforms//os:windows": _WINDOWS_LINKOPTS,
+    }),
+    local_defines = _LOCAL_DEFINES + select({
+        # USING_GENERATED_CONFIG_H makes SDL's shipped dispatch header #error
+        # if it were ever picked up instead of the generated one.
+        "@platforms//os:linux": [
+            "_FILE_OFFSET_BITS=64",
+            "USING_GENERATED_CONFIG_H",
+        ],
+        "//conditions:default": [],
+    }),
+    visibility = ["//visibility:public"],
+    deps = [":sdl3_headers"],
+    implementation_deps = [
+        ":khronos_headers",
+        ":private_headers",
+    ] + select({
+        # Headers only: SDL loads these libraries at runtime by soname.
+        "@platforms//os:linux": [
+            ":build_config_linux",
+            "@alsa_lib",
+            "@libx11",
+            "@libxcursor",
+            "@libxext",
+            "@libxfixes",
+            "@libxi",
+            "@libxrandr",
+            "@wayland//:wayland_client",
+            "@wayland//:wayland_cursor",
+            "@wayland//:wayland_egl",
+            "@xkbcommon//:xkbcommon_headers",
+        ],
+        "@platforms//os:macos": [
+            ":build_config_shipped",
+            ":sdl3_macos_objc",
+        ],
+        "@platforms//os:windows": [":build_config_shipped"],
+    }),
+)
+
+cc_library(
+    name = "sdl3_test",
+    srcs = glob(["src/test/*.c"]),
+    visibility = ["//visibility:public"],
+    deps = [":sdl3"],
+)
+
+# What SDL's own test suite (test/testautomation*.c) reads from inside the
+# tree: the build config, and usb_ids.h, which it includes as
+# "../src/joystick/usb_ids.h" and resolves through the include/ directory.
+cc_library(
+    name = "testautomation_internals",
+    hdrs = ["src/joystick/usb_ids.h"],
+    visibility = ["//visibility:public"],
+    deps = [":sdl3_headers"] + select({
+        "@platforms//os:linux": [":build_config_linux"],
+        "//conditions:default": [":build_config_shipped"],
+    }),
+)
