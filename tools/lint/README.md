@@ -137,22 +137,65 @@ only by the Gazelle generator at lint_gen time. Find all uses with
 ### Python (ruff) and C++ (clang-tidy)
 
 ruff and clang-tidy emit machine-applicable patches via `aspect_rules_lint`.
-Build the patches, then apply them:
+Apply the lint aspects with the fix flag, build the patch output group, then
+apply the patches:
 
 ```bash
-# Build patches into bazel-bin (scope to a package, or use //... for the repo)
+# Build patches into bazel-bin (scope to a package, or use //... for the repo).
+# Name the aspects of the languages in the repo: %ruff (Python), %clang_tidy (C++).
 bazel build \
+  --aspects=//tools/lint:linters.bzl%ruff,//tools/lint:linters.bzl%clang_tidy \
   --@aspect_rules_lint//lint:fix \
   --output_groups=rules_lint_patch \
   --remote_download_regex='.*AspectRulesLint.*' \
   //...
 
-# Apply every non-empty patch
-find bazel-bin -name "*.patch" -size +0 -exec patch -p1 -i {} \;
+# Apply every non-empty patch. bazel-bin is a symlink: find needs -L.
+find -L bazel-bin -name "*.patch" -size +0 -exec patch -p1 -N -i {} \;
+
+# clang-tidy fix-its do not indent the braces they add. Format the changed files.
+bazel run //tools/format:format -- $(git diff --name-only)
 ```
 
-`--remote_download_regex` forces patch outputs local under
-`--remote_download_minimal`; `-size +0` skips empty patches (no violations).
+Without `--aspects` the build has no lint actions and writes no patches; the
+`.lint` test targets do not expose the patch output group, so `//...` alone is
+not enough. `--remote_download_regex` forces patch outputs local under
+`--remote_download_minimal`; `-size +0` skips empty patches (no violations);
+`-N` skips hunks that an earlier patch already applied.
+
+#### C++ headers
+
+A patch covers only the `srcs` of its target. Fix-its in headers are never
+written to a patch, so the command above leaves every header, and every
+header-only library, unchanged. Fix headers with a direct `clang-tidy --fix`
+run from the execution root, with the compile flags of the lint action of a
+target that includes them:
+
+```bash
+# 1. Run the lint test of a target that includes the headers, so the clang-tidy
+#    binary and the action's inputs exist. Then read the binary path and the
+#    compile flags (everything after `--`) from that lint action.
+bazel test --test_tag_filters=lint //modules/cpp_library:cpp_library.lint
+ACTION=$(bazel aquery --aspects=//tools/lint:linters.bzl%clang_tidy \
+  'mnemonic("AspectRulesLintClangTidy", //modules/cpp_library:cpp_library)')
+CLANG_TIDY=$(grep -oE '[^ ]*tools/lint/clang_tidy' <<< "$ACTION" | head -1)
+awk '/Command Line:/ {c = 1} c && /^ +-- \\$/ {a = 1; next}
+     c && a {sub(/^ +/, ""); sub(/ \\$/, ""); if (sub(/\)$/, "")) {print; exit}; print}' <<< "$ACTION" \
+  | sed -E "s/^'(.*)'$/\1/" > /tmp/tidy-flags
+
+# 2. Run clang-tidy --fix from the execution root. Source directories are
+#    symlinks there, so the fixes land in the working tree.
+cd "$(bazel info execution_root)"
+FLAGS=(); while IFS= read -r f; do FLAGS+=("$f"); done < /tmp/tidy-flags
+"$CLANG_TIDY" --fix --config-file=.clang-tidy \
+  '--header-filter=modules/cpp_library/include/.*' \
+  modules/cpp_library/src/cpp_library.cpp -- "${FLAGS[@]}"
+```
+
+Use the flags of the lint action unchanged. With other flags the translation
+unit can fail to compile, and clang-tidy then applies no fixes. Fix-its that
+overlap are skipped; run the command a second time to apply them. Review the
+result with `git diff`, then format the headers as above.
 
 ### Rust (clippy)
 
