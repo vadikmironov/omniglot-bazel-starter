@@ -118,3 +118,41 @@ jobs:
         echo "ninja:      ${{ steps.ninja.outcome }}"
         echo "make:       ${{ steps.make.outcome }}"
         [[ "${{ steps.pkgconfig.outcome }}" == success && "${{ steps.ninja.outcome }}" == success && "${{ steps.make.outcome }}" == success ]]
+
+  # The pkgconf module staged for BCR (fork branch pkgconf-3.0.7), consumed
+  # through the branch's raw URL as a registry: the exact files a BCR PR
+  # would add, on the two ARM64 images BCR presubmit runs but we cannot see
+  # before the version is permanent.
+  pkgconf-module:
+    name: pkgconf@3.0.7 from the fork registry, ${{ matrix.label }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: windows-11-arm,        setup: windows, label: "Windows ARM64, VS 2022" }
+          - { runner: windows-11-vs2026-arm, setup: windows, label: "Windows ARM64, VS 2026" }
+          - { runner: windows-2022,          setup: windows, label: "Windows x64, VS 2022" }
+          - { runner: ubuntu-latest,         setup: linux,   label: "Linux x64" }
+    steps:
+    - uses: actions/checkout@v7
+    - uses: ./.github/actions/setup_windows
+      if: matrix.setup == 'windows'
+      with:
+        bazel_startup_opts: --output_base=C:/bazel_build
+    - uses: ./.github/actions/setup_linux
+      if: matrix.setup == 'linux'
+
+    - name: Build and run the sample against pkgconf@3.0.7
+      shell: bash
+      working-directory: spike/bcr_foreign_cc_tools/pkgconf_sample
+      run: |
+        [[ "$RUNNER_OS" == Windows ]] && startup="--output_base=C:/bazel_build" || startup=""
+        bazel $startup build --verbose_failures \
+          --registry=https://raw.githubusercontent.com/vadikmironov/bazel-central-registry/pkgconf-3.0.7 \
+          --registry=https://bcr.bazel.build \
+          //:smoke
+        cat bazel-bin/smoke.txt
