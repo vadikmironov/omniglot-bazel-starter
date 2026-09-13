@@ -25,7 +25,7 @@ fi
 SDL_VERSION="${1:-3.4.16}"
 IMAGE="ubuntu:20.04"
 PACKAGES=(
-    ca-certificates cmake curl gcc make pkg-config
+    ca-certificates cmake curl gcc libc6-dev make pkg-config
     # X11 and Wayland: SDL needs the headers at build time and loads the
     # libraries at runtime. Same set as the BCR modules the overlay depends on;
     # no libxss-dev / libxtst-dev (Xscrnsaver, XTest), no libdecor-0-dev.
