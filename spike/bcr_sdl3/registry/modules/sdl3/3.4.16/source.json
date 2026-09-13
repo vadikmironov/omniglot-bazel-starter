@@ -4,9 +4,11 @@
     "strip_prefix": "SDL3-3.4.16",
     "overlay": {
         "BUILD.bazel": "sha256-zWCNIz6fk35S4Ja4YjFtZ1qhS7xRXPrWnJXMUaRiRng=",
-        "MODULE.bazel": "sha256-19/JoTNC4SI5Ey0vKqvxqw2FxlsR5WYCkkAF8a3s+vY=",
+        "MODULE.bazel": "sha256-FgEKZkW0eLR3gZTo647RYhABFYiCvyMzLan0XGr/MKg=",
+        "bazel/linux/SDL_build_config.h": "sha256-llPbgYxkqdROEz1Z1ls/d2NEZhV6ZcaAe7IQOZD29A4=",
         "test/BUILD.bazel": "sha256-v+Z/xyCMReccxOwDsrbBgX+Qe0JYHTNVI/yv3Ws/TWo=",
-        "test/MODULE.bazel": "sha256-GoxsHYpSa0ijxGu+qOMcPp4lsWI4V5D/+2h3rgETtOg=",
+        "test/MODULE.bazel": "sha256-HKsCaVv/zUewi5wJZDEO09s14yTJB2dSEsLA65JtYeE=",
+        "test/MODULE.bazel.lock": "sha256-1D4mzST3ufjHmqXKpAqHiPZkxaEnRuzqyiCtHQOU1/I=",
         "wayland_protocols.bzl": "sha256-i/iTb+0/wIIRk1Jyd4vyKRDGbDTBOUOHlS+nx+xs65o="
     },
     "patch_strip": 0
