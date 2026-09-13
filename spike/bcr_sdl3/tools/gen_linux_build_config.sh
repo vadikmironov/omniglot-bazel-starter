@@ -87,6 +87,7 @@ EOF
     exit 0
 fi
 
+mkdir -p "$(dirname "$out")"
 docker run --rm \
     -v "$here/$(basename "${BASH_SOURCE[0]}"):/gen.sh:ro" \
     "$IMAGE" bash /gen.sh --inside "$SDL_VERSION" > "$out.tmp"
