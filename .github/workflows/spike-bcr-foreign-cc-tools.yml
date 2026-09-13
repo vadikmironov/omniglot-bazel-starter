@@ -1,0 +1,68 @@
+name: Spike - BCR foreign_cc tools on Windows ARM64
+
+# TEMPORARY. rules_foreign_cc#1582 moves the make, ninja and pkg-config
+# toolchains to the BCR modules built with rules_cc; BCR presubmit tests
+# pkg-config and glib on Windows x64 but never on windows_arm64, the platform
+# //tools/cpp/foreign_cc exists for. This builds and runs the three binaries at
+# the versions #1582 pins, on both Windows ARM64 images, with x64 and Linux as
+# controls. Delete once the answer is recorded.
+
+on:
+  push:
+    branches: [ "spike/bcr-foreign-cc-tools" ]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  probe:
+    name: ${{ matrix.label }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: windows-11-arm,        setup: windows, label: "Windows ARM64, VS 2022" }
+          - { runner: windows-11-vs2026-arm, setup: windows, label: "Windows ARM64, VS 2026" }
+          - { runner: windows-2022,          setup: windows, label: "Windows x64, VS 2022" }
+          - { runner: ubuntu-latest,         setup: linux,   label: "Linux x64" }
+
+    steps:
+    - uses: actions/checkout@v7
+    - uses: ./.github/actions/setup_windows
+      if: matrix.setup == 'windows'
+      with:
+        bazel_startup_opts: --output_base=C:/bazel_build
+    - uses: ./.github/actions/setup_linux
+      if: matrix.setup == 'linux'
+
+    - name: Build pkg-config, ninja and make from BCR
+      shell: bash
+      working-directory: spike/bcr_foreign_cc_tools
+      run: |
+        [[ "$RUNNER_OS" == Windows ]] && startup="--output_base=C:/bazel_build" || startup=""
+        bazel $startup info release
+        bazel $startup build @pkg-config//:pkg-config @ninja//:ninja @make//:make
+
+    # Building is half the answer; each binary has to run on the host too.
+    - name: Run them
+      shell: bash
+      working-directory: spike/bcr_foreign_cc_tools
+      run: |
+        set -x
+        [[ "$RUNNER_OS" == Windows ]] && startup="--output_base=C:/bazel_build" || startup=""
+        [[ "$RUNNER_OS" == Windows ]] && export PKG_CONFIG_PATH="$(pwd -W)" || export PKG_CONFIG_PATH="$PWD"
+        bazel $startup run @pkg-config//:pkg-config -- --version
+        bazel $startup run @pkg-config//:pkg-config -- --modversion sample
+        bazel $startup run @pkg-config//:pkg-config -- --cflags --libs sample
+        if bazel $startup run @pkg-config//:pkg-config -- --exists no-such-package; then
+          echo "pkg-config --exists returned success for a missing package" >&2
+          exit 1
+        fi
+        bazel $startup run @ninja//:ninja -- --version
+        bazel $startup run @make//:make -- --version

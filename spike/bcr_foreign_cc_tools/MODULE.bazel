@@ -1,0 +1,13 @@
+# TEMPORARY probe: can the BCR modules rules_foreign_cc#1582 switches to be
+# built and run where we need them, Windows ARM64 above all? BCR presubmit
+# covers neither pkg-config nor glib on windows_arm64.
+#
+# The versions are the ones #1582 pins.
+module(
+    name = "bcr_foreign_cc_tools_probe",
+    version = "0.0.0",
+)
+
+bazel_dep(name = "pkg-config", version = "0.29.2.bcr.3")
+bazel_dep(name = "ninja", version = "1.13.2")
+bazel_dep(name = "make", version = "4.4.1.bcr.1")
