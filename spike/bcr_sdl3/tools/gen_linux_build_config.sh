@@ -7,8 +7,8 @@
 # BCR's presubmit, so nothing newer than glibc 2.31 gets detected), with the
 # packages below installed and every feature that has no Bazel module
 # switched off. The result is copied over the checked-in header verbatim,
-# with a banner naming this script, plus one documented edit (GLX, see the
-# end of this file).
+# with a banner naming this script, plus the two documented edits at the end
+# of this file.
 #
 #   tools/gen_linux_build_config.sh            # regenerate for 3.4.16
 #   tools/gen_linux_build_config.sh 3.4.18     # for another version
@@ -33,9 +33,10 @@ PACKAGES=(
     libwayland-dev libxkbcommon-dev
     # ALSA headers, loaded at runtime too.
     libasound2-dev
-    # Desktop OpenGL headers for the SDL_VIDEO_OPENGL check; EGL and GLES come
-    # from the headers SDL vendors in src/video/khronos.
-    libgl-dev
+    # Desktop OpenGL headers for the SDL_VIDEO_OPENGL check, and egl.pc, which
+    # the Wayland check requires; the EGL and GLES headers themselves come
+    # from the ones SDL vendors in src/video/khronos.
+    libgl-dev libegl-dev
 )
 # Every SDL option that would otherwise probe the container for libraries
 # that have no Bazel module, or that the overlay does not build.
@@ -80,9 +81,15 @@ if [[ -n "$inside" ]]; then
   Do not edit; rerun the script.
 */
 EOF
-    # GLX needs GL/glx.h from Mesa, which is not a Bazel module; without it
-    # SDL uses EGL for OpenGL on X11, as it does on Wayland.
+    # Two edits to CMake's output:
+    # - GLX needs GL/glx.h from Mesa, which is not a Bazel module; without it
+    #   SDL uses EGL for OpenGL on X11, as it does on Wayland.
+    # - SDL_DISABLE_<intrinsics> records what the container's x86_64 compiler
+    #   could not target (NEON, LoongArch). The header serves every CPU the
+    #   module builds for, and SDL_intrin.h already selects intrinsics by
+    #   the compiler's own feature macros, so the opt-outs are dropped.
     sed -e 's|^#define SDL_VIDEO_OPENGL_GLX 1$|/* #undef SDL_VIDEO_OPENGL_GLX */ /* Bazel: no Mesa headers, OpenGL over EGL */|' \
+        -e 's|^#define \(SDL_DISABLE_\(SSE\|SSE2\|SSE3\|SSE4_1\|SSE4_2\|AVX\|AVX2\|AVX512F\|MMX\|LSX\|LASX\|NEON\)\) 1$|/* #undef \1 */ /* Bazel: per-CPU, left to SDL_intrin.h */|' \
         "$generated"
     exit 0
 fi

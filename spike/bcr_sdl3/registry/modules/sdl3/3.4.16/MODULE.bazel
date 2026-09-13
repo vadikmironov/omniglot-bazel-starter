@@ -5,11 +5,12 @@ module(
     compatibility_level = 1,
 )
 
+# macOS: the Objective-C sources need apple_support's C++ toolchain, which
+# Bazel only picks over the autoconfigured one if apple_support is declared
+# before rules_cc (toolchains register in bazel_dep order).
+bazel_dep(name = "apple_support", version = "2.3.0")
 bazel_dep(name = "platforms", version = "1.0.0")
 bazel_dep(name = "rules_cc", version = "0.2.16")
-
-# macOS: Objective-C sources and the Apple C++ toolchain.
-bazel_dep(name = "apple_support", version = "2.3.0")
 
 # Linux: headers only. SDL loads these libraries at runtime by soname.
 bazel_dep(name = "alsa_lib", version = "1.2.9.bcr.4")

@@ -1,0 +1,3 @@
+# source.json records sha256 hashes of the overlay files; a CRLF checkout on
+# Windows would change them.
+* text eol=lf
