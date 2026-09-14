@@ -29,6 +29,9 @@ def wayland_protocol_sources(xmls):
             outs = [src],
             cmd = "$(location @wayland//:wayland_scanner) private-code < $(location %s) > $@" % xml,
             tools = ["@wayland//:wayland_scanner"],
+            # Keeps `...` from analysing the scanner elsewhere; the Wayland
+            # backend is Linux-only anyway.
+            target_compatible_with = ["@platforms//os:linux"],
         )
         native.genrule(
             name = "%s_wayland_protocol_header" % protocol,
@@ -36,6 +39,9 @@ def wayland_protocol_sources(xmls):
             outs = [hdr],
             cmd = "$(location @wayland//:wayland_scanner) client-header < $(location %s) > $@" % xml,
             tools = ["@wayland//:wayland_scanner"],
+            # Keeps `...` from analysing the scanner elsewhere; the Wayland
+            # backend is Linux-only anyway.
+            target_compatible_with = ["@platforms//os:linux"],
         )
         srcs.append(src)
         hdrs.append(hdr)

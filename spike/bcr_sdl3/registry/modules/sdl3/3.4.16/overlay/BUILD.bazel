@@ -52,9 +52,13 @@ cc_library(
 
 # Linux gets the one SDL's CMake configure would generate, from the same
 # probes run against Bazel's toolchain; sdl3_config_checks.bzl mirrors them.
+# The chain is Linux-only so that `...` does not run the probes elsewhere.
+_LINUX_ONLY = ["@platforms//os:linux"]
+
 autoconf(
     name = "autoconf",
     checks = SDL3_CONFIG_CHECKS_LIBC + SDL3_CONFIG_CHECKS_COMPILER + SDL3_CONFIG_CHECKS_LINUX,
+    target_compatible_with = _LINUX_ONLY,
 )
 
 # The tarball's own template, so a later release's entries come from
@@ -66,6 +70,7 @@ genrule(
     srcs = ["include/build_config/SDL_build_config.h.cmake"],
     outs = ["bazel/SDL_build_config.h.in"],
     cmd = "sed -E 's/^#cmakedefine ([A-Za-z0-9_]+).*$$/#undef \\1/' $< > $@",
+    target_compatible_with = _LINUX_ONLY,
 )
 
 # An entry with no matching check renders as `/* #undef NAME */`; a check
@@ -85,6 +90,7 @@ autoconf_hdr(
         # Only read under SDL_DEFAULT_ASSERT_LEVEL_CONFIGURED, which is off.
         "@SDL_DEFAULT_ASSERT_LEVEL@": "",
     },
+    target_compatible_with = _LINUX_ONLY,
     template = ":build_config_h_in",
     deps = [":autoconf"],
 )
@@ -93,6 +99,7 @@ cc_library(
     name = "build_config_linux",
     hdrs = [":config_h"],
     strip_include_prefix = "bazel/linux",
+    target_compatible_with = _LINUX_ONLY,
 )
 
 # EGL, GLES and Vulkan headers SDL builds against on every platform.
