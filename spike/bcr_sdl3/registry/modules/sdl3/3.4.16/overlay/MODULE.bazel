@@ -1,7 +1,9 @@
+"""https://github.com/libsdl-org/SDL"""
+
 module(
     name = "sdl3",
     version = "3.4.16",
-    bazel_compatibility = [">=7.2.1"],
+    bazel_compatibility = [">=7.4.0"],
     compatibility_level = 1,
 )
 
@@ -11,6 +13,10 @@ module(
 bazel_dep(name = "apple_support", version = "2.3.0")
 bazel_dep(name = "platforms", version = "1.0.0")
 bazel_dep(name = "rules_cc", version = "0.2.16")
+
+# Linux: the build config is generated from feature probes, as SDL's CMake
+# configure does it.
+bazel_dep(name = "rules_cc_autoconf", version = "0.24.0")
 
 # Linux: headers only. SDL loads these libraries at runtime by soname.
 bazel_dep(name = "alsa_lib", version = "1.2.9.bcr.4")

@@ -5,6 +5,14 @@
 
 load("@rules_cc//cc:defs.bzl", "cc_library")
 load("@rules_cc//cc:objc_library.bzl", "objc_library")
+load("@rules_cc_autoconf//autoconf:autoconf.bzl", "autoconf")
+load("@rules_cc_autoconf//autoconf:autoconf_hdr.bzl", "autoconf_hdr")
+load(
+    ":sdl3_config_checks.bzl",
+    "SDL3_CONFIG_CHECKS_COMPILER",
+    "SDL3_CONFIG_CHECKS_LIBC",
+    "SDL3_CONFIG_CHECKS_LINUX",
+)
 load(":wayland_protocols.bzl", "wayland_protocol_sources")
 
 package(default_visibility = ["//visibility:private"])
@@ -29,19 +37,61 @@ cc_library(
     visibility = ["//visibility:public"],
 )
 
+# =============================================================================
+# Build config
+# =============================================================================
+
 # SDL_internal.h includes "SDL_build_config.h". Windows and Apple platforms
 # ship theirs under include/build_config/, where SDL_build_config.h picks the
-# platform's file; Linux uses the header tools/gen_linux_build_config.sh
-# generates from SDL's CMake configure.
+# platform's file.
 cc_library(
     name = "build_config_shipped",
     hdrs = glob(["include/build_config/*.h"]),
     strip_include_prefix = "include/build_config",
 )
 
+# Linux gets the one SDL's CMake configure would generate, from the same
+# probes run against Bazel's toolchain; sdl3_config_checks.bzl mirrors them.
+autoconf(
+    name = "autoconf",
+    checks = SDL3_CONFIG_CHECKS_LIBC + SDL3_CONFIG_CHECKS_COMPILER + SDL3_CONFIG_CHECKS_LINUX,
+)
+
+# The tarball's own template, so a later release's entries come from
+# upstream. autoconf_hdr fills autoheader-style `#undef NAME` lines, which is
+# what CMake's `#cmakedefine NAME ...` becomes here; the `@VAR@` lines that
+# remain are substituted below.
+genrule(
+    name = "build_config_h_in",
+    srcs = ["include/build_config/SDL_build_config.h.cmake"],
+    outs = ["bazel/SDL_build_config.h.in"],
+    cmd = "sed -E 's/^#cmakedefine ([A-Za-z0-9_]+).*$$/#undef \\1/' $< > $@",
+)
+
+# An entry with no matching check renders as `/* #undef NAME */`; a check
+# with no template entry is dropped. README.md has the check for both.
+autoconf_hdr(
+    name = "config_h",
+    out = "bazel/linux/SDL_build_config.h",
+    substitutions = {
+        # The xkbcommon the Wayland backend compiles against is the module
+        # pinned in MODULE.bazel; there is no libdecor.
+        "@SDL_XKBCOMMON_VERSION_MAJOR@": "1",
+        "@SDL_XKBCOMMON_VERSION_MINOR@": "9",
+        "@SDL_XKBCOMMON_VERSION_PATCH@": "2",
+        "@SDL_LIBDECOR_VERSION_MAJOR@": "0",
+        "@SDL_LIBDECOR_VERSION_MINOR@": "0",
+        "@SDL_LIBDECOR_VERSION_PATCH@": "0",
+        # Only read under SDL_DEFAULT_ASSERT_LEVEL_CONFIGURED, which is off.
+        "@SDL_DEFAULT_ASSERT_LEVEL@": "",
+    },
+    template = ":build_config_h_in",
+    deps = [":autoconf"],
+)
+
 cc_library(
     name = "build_config_linux",
-    hdrs = ["bazel/linux/SDL_build_config.h"],
+    hdrs = [":config_h"],
     strip_include_prefix = "bazel/linux",
 )
 

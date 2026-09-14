@@ -20,25 +20,30 @@ env:
   TEST_MODULE: spike/bcr_sdl3/registry/modules/sdl3/3.4.16/overlay/test
 
 jobs:
-  linux-config:
-    name: Linux build config is up to date
+  # The oracles: what SDL's own CMake configure produces on the oldest and
+  # the newest Ubuntu BCR presubmit uses. The module's autoconf-generated
+  # header is diffed against them in the Linux build job.
+  linux-oracles:
+    name: CMake oracles are up to date
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     permissions:
       contents: read
     steps:
     - uses: actions/checkout@v7
-    - name: Regenerate with SDL's CMake configure in ubuntu:20.04
-      run: spike/bcr_sdl3/tools/gen_linux_build_config.sh
+    - name: Generate with SDL's CMake configure
+      run: |
+        spike/bcr_sdl3/tools/gen_linux_build_config.sh 3.4.16 ubuntu:20.04
+        spike/bcr_sdl3/tools/gen_linux_build_config.sh 3.4.16 ubuntu:24.04
     - uses: actions/upload-artifact@v4
       with:
-        name: SDL_build_config.h
-        path: spike/bcr_sdl3/registry/modules/sdl3/3.4.16/overlay/bazel/linux/SDL_build_config.h
-    - name: Compare with the checked-in header
+        name: oracles
+        path: spike/bcr_sdl3/oracle/
+    - name: Compare with the checked-in oracles
       run: |
-        git --no-pager diff -- spike/bcr_sdl3/registry
-        if [[ -n "$(git status --porcelain -- spike/bcr_sdl3/registry)" ]]; then
-          echo "::error::the generated SDL_build_config.h differs from the checked-in one; download the artifact and commit it"
+        git --no-pager diff -- spike/bcr_sdl3/oracle
+        if [[ -n "$(git status --porcelain -- spike/bcr_sdl3/oracle)" ]]; then
+          echo "::error::the generated oracles differ from the checked-in ones; download the artifact and commit it"
           exit 1
         fi
 
@@ -84,6 +89,20 @@ jobs:
         bazel $startup build --verbose_failures \
           --registry="$registry" --registry=https://bcr.bazel.build \
           @sdl3//:sdl3 @sdl3//:sdl3_test
+
+    # The autoconf-generated Linux config has to reproduce what SDL's CMake
+    # configure produces on this runner's Ubuntu; the oracle comes from the
+    # linux-oracles job.
+    - name: Diff the generated Linux config against the CMake oracle
+      if: matrix.setup == 'linux'
+      shell: bash
+      working-directory: ${{ env.TEST_MODULE }}
+      run: |
+        registry="file://$(cd ../../../../.. && pwd)"
+        bazel build --registry="$registry" --registry=https://bcr.bazel.build @sdl3//:config_h
+        generated="$(bazel cquery --registry="$registry" --registry=https://bcr.bazel.build --output=files @sdl3//:config_h)"
+        spike="$(cd ../../../../../.. && pwd)"
+        "$spike/tools/diff_config.sh" "$generated" "$spike/oracle/SDL_build_config.ubuntu2404.h"
 
     # SDL's automated suite lives in the tarball's test/ directory, where the
     # overlay puts the test module's BUILD file, so here it is reached through
