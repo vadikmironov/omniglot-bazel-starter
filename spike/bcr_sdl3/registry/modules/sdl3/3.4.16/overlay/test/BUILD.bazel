@@ -1,23 +1,101 @@
-load("@rules_cc//cc:defs.bzl", "cc_test")
+load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test")
 
-# SDL's own automated test suite, run the way SDL's ctest runs it: headless,
-# on the dummy video and audio drivers. This BUILD file sits in SDL's test/
-# directory, so the sources are the ones of the release being built.
-cc_test(
-    name = "testautomation",
-    size = "medium",
+# SDL's non-interactive test programs, run the way SDL's ctest runs them:
+# headless on the dummy video and audio drivers, with assertions fatal.
+# https://github.com/libsdl-org/SDL/blob/release-3.4.16/test/CMakeLists.txt#L596-L608
+#
+# Not here: testyuv reads its resource files next to the executable (via
+# SDL_GetBasePath), which a Bazel test has no way to arrange; testsymbols
+# checks the exported symbols of the shared library; pretest is 32-bit
+# Windows only. Everything else in this directory is interactive.
+_ENV = {
+    "SDL_ASSERT": "abort",
+    "SDL_AUDIO_DRIVER": "dummy",
+    "SDL_VIDEO_DRIVER": "dummy",
+}
+
+# ctest runs testautomation and testplatform a second time with every CPU
+# feature masked off.
+# https://github.com/libsdl-org/SDL/blob/release-3.4.16/test/CMakeLists.txt#L681-L688
+_ENV_NO_SIMD = dict(_ENV, SDL_CPU_FEATURE_MASK = "-all")
+
+# The automated suite. Its main() comes from testautomation.c through
+# SDL_main.h, hence alwayslink; the library lets the two runs below share
+# the objects. It reads the build config and a private header.
+# https://github.com/libsdl-org/SDL/blob/release-3.4.16/test/CMakeLists.txt#L324-L325
+cc_library(
+    name = "testautomation_lib",
+    testonly = True,
     srcs = glob([
         "testautomation*.c",
         "testautomation*.h",
     ]),
-    env = {
-        "SDL_ASSERT": "abort",
-        "SDL_AUDIO_DRIVER": "dummy",
-        "SDL_VIDEO_DRIVER": "dummy",
-    },
+    alwayslink = True,
     deps = [
         "@sdl3",
         "@sdl3//:sdl3_test",
-        "@sdl3//:testautomation_internals",
+        "@sdl3//:test_internals",
     ],
 )
+
+cc_test(
+    name = "testautomation",
+    size = "medium",
+    env = _ENV,
+    deps = [":testautomation_lib"],
+)
+
+cc_test(
+    name = "testautomation_no_simd",
+    size = "medium",
+    env = _ENV_NO_SIMD,
+    deps = [":testautomation_lib"],
+)
+
+cc_test(
+    name = "testplatform_no_simd",
+    size = "small",
+    srcs = ["testplatform.c"],
+    env = _ENV_NO_SIMD,
+    deps = [
+        "@sdl3",
+        "@sdl3//:sdl3_test",
+    ],
+)
+
+# One target per NONINTERACTIVE executable, with the arguments and, where
+# CMake sets one above the default, the timeout ctest uses.
+# https://github.com/libsdl-org/SDL/blob/release-3.4.16/test/CMakeLists.txt#L332-L444
+[
+    cc_test(
+        name = name,
+        size = "small",
+        timeout = timeout,
+        srcs = [name + ".c"],
+        args = args,
+        env = _ENV,
+        deps = [
+            "@sdl3",
+            "@sdl3//:sdl3_test",
+        ] + extra_deps,
+    )
+    for name, args, timeout, extra_deps in [
+        ("testatomic", [], "short", []),
+        ("testbounds", [], "short", []),
+        ("testerror", [], "short", []),
+        # Includes SDL_evdev_capabilities.c from src/ textually.
+        ("testevdev", [], "short", ["@sdl3//:test_internals"]),
+        ("testfile", [], "short", []),
+        ("testfilesystem", [], "short", []),
+        ("testlocale", [], "short", []),
+        ("testplatform", [], "short", []),
+        ("testpower", [], "short", []),
+        ("testqsort", [], "short", []),
+        ("testrwlock", [], "moderate", []),
+        ("testsem", ["10"], "moderate", []),
+        ("testthread", [], "moderate", []),
+        ("testtimer", ["--no-interactive"], "moderate", []),
+        ("testver", [], "short", []),
+        ("torturethread", [], "moderate", []),
+    ]
+]

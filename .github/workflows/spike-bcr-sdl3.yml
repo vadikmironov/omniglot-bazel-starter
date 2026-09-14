@@ -1,10 +1,10 @@
 name: Spike - SDL3 BCR module
 
-# TEMPORARY. Builds the sdl3@3.4.16 module staged under spike/bcr_sdl3/registry
-# through a file:// registry on the platforms BCR presubmit runs, plus both
-# Windows ARM64 images, and runs the test module where its source exists.
-# The linux-config job regenerates the Linux build config with SDL's own
-# CMake configure and fails if the checked-in header is stale.
+# TEMPORARY. Builds and tests the sdl3@3.4.16 module staged under
+# spike/bcr_sdl3/registry, through a file:// registry, from the consumer
+# module in spike/bcr_sdl3/consumer, on the platforms BCR presubmit runs plus
+# both Windows ARM64 images. The linux-oracles job regenerates the CMake
+# oracles the Linux job diffs the generated build config against.
 # Delete once the module is in BCR.
 
 on:
@@ -17,7 +17,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  TEST_MODULE: spike/bcr_sdl3/registry/modules/sdl3/3.4.16/overlay/test
+  CONSUMER: spike/bcr_sdl3/consumer
 
 jobs:
   # The oracles: what SDL's own CMake configure produces on the oldest and
@@ -74,21 +74,24 @@ jobs:
     # macOS runners ship bazelisk; the repo's setup_macos action fetches the
     # omniglot LLVM toolchain, which this module does not use.
 
-    - name: Build @sdl3 and SDL3_test from the local registry
+    # Every step runs Bazel from the consumer module with the staged
+    # registry in front of BCR; the variables are recomputed per step
+    # because a step's shell does not outlive it.
+    - name: Build the module
       shell: bash
-      working-directory: ${{ env.TEST_MODULE }}
+      working-directory: ${{ env.CONSUMER }}
       run: |
         if [[ "$RUNNER_OS" == Windows ]]; then
           startup="--output_base=C:/bazel_build"
-          registry="file:///$(cd ../../../../.. && pwd -W)"
+          registry="file:///$(cd .. && pwd -W)/registry"
         else
           startup=""
-          registry="file://$(cd ../../../../.. && pwd)"
+          registry="file://$(cd .. && pwd)/registry"
         fi
         echo "registry: $registry"
         bazel $startup build --verbose_failures \
           --registry="$registry" --registry=https://bcr.bazel.build \
-          @sdl3//:sdl3 @sdl3//:sdl3_test
+          @sdl3//...
 
     # The autoconf-generated Linux config has to reproduce what SDL's CMake
     # configure produces on this runner's Ubuntu; the oracle comes from the
@@ -96,31 +99,26 @@ jobs:
     - name: Diff the generated Linux config against the CMake oracle
       if: matrix.setup == 'linux'
       shell: bash
-      working-directory: ${{ env.TEST_MODULE }}
+      working-directory: ${{ env.CONSUMER }}
       run: |
-        registry="file://$(cd ../../../../.. && pwd)"
-        bazel build --registry="$registry" --registry=https://bcr.bazel.build @sdl3//:config_h
+        registry="file://$(cd .. && pwd)/registry"
         generated="$(bazel cquery --registry="$registry" --registry=https://bcr.bazel.build --output=files @sdl3//:config_h)"
-        spike="$(cd ../../../../../.. && pwd)"
-        "$spike/tools/diff_config.sh" "$generated" "$spike/oracle/SDL_build_config.ubuntu2404.h"
+        ../tools/diff_config.sh "$generated" ../oracle/SDL_build_config.ubuntu2404.h
 
-    # SDL's automated suite lives in the tarball's test/ directory, where the
-    # overlay puts the test module's BUILD file, so here it is reached through
-    # the sdl3 repo. In BCR presubmit that directory is the test module root
-    # and the same target is //:testautomation. Any .c file added next to the
-    # BUILD file here is run as part of //... as well.
-    - name: Run SDL's automated test suite
+    # SDL's own non-interactive tests, from the module's test/ package, plus
+    # anything a consumer-side source next to MODULE.bazel adds.
+    - name: Run the module's tests
       shell: bash
-      working-directory: ${{ env.TEST_MODULE }}
+      working-directory: ${{ env.CONSUMER }}
       run: |
         if [[ "$RUNNER_OS" == Windows ]]; then
           startup="--output_base=C:/bazel_build"
-          registry="file:///$(cd ../../../../.. && pwd -W)"
+          registry="file:///$(cd .. && pwd -W)/registry"
         else
           startup=""
-          registry="file://$(cd ../../../../.. && pwd)"
+          registry="file://$(cd .. && pwd)/registry"
         fi
-        targets="@sdl3//test:testautomation"
+        targets="@sdl3//..."
         if ls ./*.c >/dev/null 2>&1; then
           targets="$targets //..."
         fi
