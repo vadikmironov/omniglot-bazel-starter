@@ -3,9 +3,9 @@
     "integrity": "sha256-cyIjbNEgkMPrQLlyi+TUnHb2atF9BDaVhNTsrVz3fGg=",
     "strip_prefix": "SDL3-3.4.16",
     "overlay": {
-        "BUILD.bazel": "sha256-R/YNvauVC2o0PGjfs9b0n5j6PcumOj+aypyXixNJ/dY=",
-        "MODULE.bazel": "sha256-FgEKZkW0eLR3gZTo647RYhABFYiCvyMzLan0XGr/MKg=",
-        "bazel/linux/SDL_build_config.h": "sha256-jPyTtQHiyjK8JZ2kn31+3Ng3KRSV3b+0MrEDbaedWGg=",
+        "BUILD.bazel": "sha256-JftcgRrATUullkyWiO67LCxq3vxp0F4ofeTh8ypP42U=",
+        "MODULE.bazel": "sha256-uYv9YR/fxVtC3SMkzrgpNMPW+xCE9zY0xjUmkq0Y9wM=",
+        "sdl3_config_checks.bzl": "sha256-yCsEVRwql+ji3xh81ijd/KCZboo84uYuTrP9vyyNQZ8=",
         "test/BUILD.bazel": "sha256-Cx2JtV0PkpXusROYO9NhXq/LOGq1q/Zq8MBOO4ozV7o=",
         "test/MODULE.bazel": "sha256-HKsCaVv/zUewi5wJZDEO09s14yTJB2dSEsLA65JtYeE=",
         "wayland_protocols.bzl": "sha256-rC6u+PwqOzkLa455+Pex+PZYmSsR+3G9xFFqDSawBH8="

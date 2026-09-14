@@ -1,20 +1,20 @@
 #!/usr/bin/env bash
-# Regenerates the Linux SDL_build_config.h of the sdl3 overlay.
+# Generates an oracle for the sdl3 overlay's Linux build config: what SDL's
+# own CMake configure produces on a given Ubuntu image, for the module's
+# autoconf-generated header to be diffed against. Spike tooling, not part of
+# the module.
 #
-# SDL ships hand-written build configs for Windows and Apple platforms and
-# generates the Linux one with CMake. This runs that CMake configure, on the
-# SDL release tarball, inside an Ubuntu 20.04 container (the oldest glibc in
-# BCR's presubmit, so nothing newer than glibc 2.31 gets detected), with the
-# packages below installed and every feature that has no Bazel module
-# switched off. The result is copied over the checked-in header verbatim,
-# with a banner naming this script, plus the two documented edits at the end
-# of this file.
+# Runs the CMake configure on the SDL release tarball inside the container,
+# with the packages below installed and every feature that has no Bazel
+# module switched off, and writes oracle/SDL_build_config.<image>.h with a
+# banner naming this script, plus the two documented edits at the end of
+# this file.
 #
-#   tools/gen_linux_build_config.sh            # regenerate for 3.4.16
-#   tools/gen_linux_build_config.sh 3.4.18     # for another version
+#   tools/gen_linux_build_config.sh                       # 3.4.16, ubuntu:20.04
+#   tools/gen_linux_build_config.sh 3.4.16 ubuntu:24.04   # another image
 #
-# Needs docker. The spike workflow runs it and fails if the output differs
-# from the checked-in file.
+# Needs docker. The spike workflow runs it for both images and fails if the
+# output differs from the checked-in oracle.
 set -euo pipefail
 
 inside=""
@@ -23,7 +23,7 @@ if [[ "${1:-}" == "--inside" ]]; then
     shift
 fi
 SDL_VERSION="${1:-3.4.16}"
-IMAGE="ubuntu:20.04"
+IMAGE="${2:-ubuntu:20.04}"
 PACKAGES=(
     ca-certificates cmake curl gcc libc6-dev make pkg-config
     # X11 and Wayland: SDL needs the headers at build time and loads the
@@ -58,7 +58,7 @@ CMAKE_FLAGS=(
 )
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-out="$here/../registry/modules/sdl3/$SDL_VERSION/overlay/bazel/linux/SDL_build_config.h"
+out="$here/../oracle/SDL_build_config.${IMAGE//[:.]/}.h"
 
 if [[ -n "$inside" ]]; then
     # Runs inside the container.
@@ -100,6 +100,6 @@ fi
 mkdir -p "$(dirname "$out")"
 docker run --rm \
     -v "$here/$(basename "${BASH_SOURCE[0]}"):/gen.sh:ro" \
-    "$IMAGE" bash /gen.sh --inside "$SDL_VERSION" > "$out.tmp"
+    "$IMAGE" bash /gen.sh --inside "$SDL_VERSION" "$IMAGE" > "$out.tmp"
 mv "$out.tmp" "$out"
 echo "wrote $out"
