@@ -64,7 +64,10 @@ cc_test(
 )
 
 # One target per NONINTERACTIVE executable, with the arguments and, where
-# CMake sets one above the default, the timeout ctest uses.
+# CMake sets one above the default, the timeout ctest uses. testsem and
+# testtimer assert on wall-clock durations (a 2 s wait must take at most
+# 2050 ms), which other tests running alongside on a shared runner can
+# break, so they run alone.
 # https://github.com/libsdl-org/SDL/blob/release-3.4.16/test/CMakeLists.txt#L332-L444
 [
     cc_test(
@@ -74,28 +77,29 @@ cc_test(
         srcs = [name + ".c"],
         args = args,
         env = _ENV,
+        tags = tags,
         deps = [
             "@sdl3",
             "@sdl3//:sdl3_test",
         ] + extra_deps,
     )
-    for name, args, timeout, extra_deps in [
-        ("testatomic", [], "short", []),
-        ("testbounds", [], "short", []),
-        ("testerror", [], "short", []),
+    for name, args, timeout, extra_deps, tags in [
+        ("testatomic", [], "short", [], []),
+        ("testbounds", [], "short", [], []),
+        ("testerror", [], "short", [], []),
         # Includes SDL_evdev_capabilities.c from src/ textually.
-        ("testevdev", [], "short", ["@sdl3//:test_internals"]),
-        ("testfile", [], "short", []),
-        ("testfilesystem", [], "short", []),
-        ("testlocale", [], "short", []),
-        ("testplatform", [], "short", []),
-        ("testpower", [], "short", []),
-        ("testqsort", [], "short", []),
-        ("testrwlock", [], "moderate", []),
-        ("testsem", ["10"], "moderate", []),
-        ("testthread", [], "moderate", []),
-        ("testtimer", ["--no-interactive"], "moderate", []),
-        ("testver", [], "short", []),
-        ("torturethread", [], "moderate", []),
+        ("testevdev", [], "short", ["@sdl3//:test_internals"], []),
+        ("testfile", [], "short", [], []),
+        ("testfilesystem", [], "short", [], []),
+        ("testlocale", [], "short", [], []),
+        ("testplatform", [], "short", [], []),
+        ("testpower", [], "short", [], []),
+        ("testqsort", [], "short", [], []),
+        ("testrwlock", [], "moderate", [], []),
+        ("testsem", ["10"], "moderate", [], ["exclusive"]),
+        ("testthread", [], "moderate", [], []),
+        ("testtimer", ["--no-interactive"], "moderate", [], ["exclusive"]),
+        ("testver", [], "short", [], []),
+        ("torturethread", [], "moderate", [], []),
     ]
 ]
