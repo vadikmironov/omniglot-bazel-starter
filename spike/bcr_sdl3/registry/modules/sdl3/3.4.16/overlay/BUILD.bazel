@@ -111,8 +111,9 @@ cc_library(
         exclude = ["src/video/khronos/**"],
     ),
     strip_include_prefix = "src",
-    # .c files SDL includes textually.
+    # .c files SDL includes textually; the last one from test/testevdev.c.
     textual_hdrs = [
+        "src/core/linux/SDL_evdev_capabilities.c",
         "src/hidapi/mac/hid.c",
         "src/hidapi/windows/hid.c",
         "src/hidapi/windows/hidapi_descriptor_reconstruct.c",
@@ -385,14 +386,14 @@ cc_library(
     implementation_deps = [":private_headers"],
 )
 
-# What SDL's own test suite (test/testautomation*.c) reads from inside the
-# tree: the build config, and usb_ids.h, which it includes as
-# "../src/joystick/usb_ids.h" and resolves through the include/ directory.
+# What SDL's own tests (test/testautomation*.c, test/testevdev.c) read from
+# inside the tree: the build config and private headers, which they include
+# as "../src/..." and resolve through the include/ directory.
 cc_library(
-    name = "testautomation_internals",
-    hdrs = ["src/joystick/usb_ids.h"],
-    visibility = ["//visibility:public"],
-    deps = [":sdl3_headers"] + select({
+    name = "test_internals",
+    testonly = True,
+    visibility = ["//test:__pkg__"],
+    deps = [":private_headers"] + select({
         "@platforms//os:linux": [":build_config_linux"],
         "//conditions:default": [":build_config_shipped"],
     }),

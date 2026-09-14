@@ -1,5 +1,8 @@
+# The spike's consumer of the staged sdl3 module: the workflow builds and
+# tests @sdl3//... from here through the file:// registry. Not part of the
+# module. A program of your own goes next to this file with a cc_test.
 module(
-    name = "sdl3_smoke",
+    name = "sdl3_consumer",
     version = "0.0.0",
 )
 
