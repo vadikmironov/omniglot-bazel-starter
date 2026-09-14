@@ -3,11 +3,11 @@
     "integrity": "sha256-cyIjbNEgkMPrQLlyi+TUnHb2atF9BDaVhNTsrVz3fGg=",
     "strip_prefix": "SDL3-3.4.16",
     "overlay": {
-        "BUILD.bazel": "sha256-kxaAYyGsvJrBnGitBDqJgSLHOuXPr92lls/Gxg5akw8=",
+        "BUILD.bazel": "sha256-BLy+77KyF51JOWfFZQsxMaxKD5T3CT7H5+5jEiKzlv0=",
         "MODULE.bazel": "sha256-uYv9YR/fxVtC3SMkzrgpNMPW+xCE9zY0xjUmkq0Y9wM=",
         "sdl3_config_checks.bzl": "sha256-yCsEVRwql+ji3xh81ijd/KCZboo84uYuTrP9vyyNQZ8=",
         "test/BUILD.bazel": "sha256-5Fa3mW/Eht+X27SLNqwgiMZA21yHshqC4k//zRtyr00=",
-        "wayland_protocols.bzl": "sha256-rC6u+PwqOzkLa455+Pex+PZYmSsR+3G9xFFqDSawBH8="
+        "wayland_protocols.bzl": "sha256-8brB58ms+HePwb7Yzf9kiQZzwTEaX7nKZnHR2rKBL28="
     },
     "patch_strip": 0
 }
