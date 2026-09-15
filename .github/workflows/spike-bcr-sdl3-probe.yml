@@ -62,7 +62,7 @@ jobs:
     # Windows ARM64: each testprocess case on its own, to find the one that
     # takes the process down.
     - name: testprocess case by case
-      if: contains(matrix.label, 'ARM64')
+      if: always() && contains(matrix.label, 'ARM64')
       shell: bash
       working-directory: spike/bcr_sdl3/consumer
       run: |
