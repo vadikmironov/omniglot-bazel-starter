@@ -7,9 +7,29 @@ documents the port; below is what a consumer and a version bump need.
 
 - `@sdl3` (`SDL3::SDL3-static`), `@sdl3//:sdl3_headers` (`SDL3::Headers`),
   `@sdl3//:sdl3_test` (`SDL3::SDL3_test`).
-- On macOS, declare `apple_support` before `rules_cc` in your `MODULE.bazel`:
-  the Objective-C sources need its C++ toolchain, and toolchains register in
-  `bazel_dep` order.
+- Linux, macOS and Windows. On other platforms `@sdl3` is incompatible, so a
+  wildcard build skips it.
+
+## macOS: declare apple_support above rules_cc
+
+The Objective-C sources are an `objc_library`, which needs the C++ toolchain
+from `apple_support`. Bazel takes the first registered toolchain that matches,
+and the root module registers first. A consumer whose `MODULE.bazel` declares
+`rules_cc` before `apple_support`, or has no `apple_support` at all, gets the
+autoconfigured toolchain and this error on macOS:
+
+    Compiling objc_library targets requires the Apple CC toolchain
+
+Declare `apple_support` above `rules_cc`, even with no Objective-C of your own:
+
+```starlark
+bazel_dep(name = "apple_support", version = "2.3.0")
+bazel_dep(name = "rules_cc", version = "0.2.16")
+bazel_dep(name = "sdl3", version = "3.4.16")
+```
+
+This is `apple_support`'s own requirement, and it applies to every module with
+Objective-C sources.
 
 ## Build configuration
 
@@ -21,15 +41,25 @@ mirrors the probes in `CMakeLists.txt` and `cmake/sdlchecks.cmake` with
 PipeWire, JACK, sndio, KMSDRM, libdecor, D-Bus (portal dialogs, IME, screensaver
 inhibition), libudev (hotplug and the HIDAPI hidraw backend), libusb, liburing,
 GLX (OpenGL goes through EGL, as on Wayland), fribidi, libthai. X11, Wayland,
-ALSA and xkbcommon are loaded at runtime by soname; their headers come from
-the BCR modules pinned in `MODULE.bazel`.
+ALSA and xkbcommon are loaded at runtime by soname. Their headers come from the
+BCR modules in `MODULE.bazel`, at those versions or newer.
 
 ## Tests
 
 `test/BUILD.bazel` runs every non-interactive program from `test/CMakeLists.txt`
-the way ctest does: dummy video and audio drivers, `SDL_ASSERT=abort`, plus the
-no-SIMD reruns of testautomation and testplatform. Not reproduced: ctest's
-`--trackmem` leak check, which is a regex over stdout.
+the way ctest does: dummy video and audio drivers, `SDL_ASSERT=abort`,
+`HAVE_BUILD_CONFIG`, and the no-SIMD reruns of testautomation and testplatform.
+Where it differs from ctest:
+
+- testprocess runs through `test/bazel_testprocess_main.cc`, which finds
+  childprocess in the runfiles.
+- `patches/0001-testprocess-bounded-EOF-search.patch` is upstream commit
+  [32c19b9dc](https://github.com/libsdl-org/SDL/commit/32c19b9dc8c229e239434fedc94541c6abb3f84a).
+  No 3.4.x release has it yet. Without it testprocess reads past a buffer and
+  crashes on Windows ARM64, a platform SDL's own CI does not run tests on.
+- testsem does not run on macOS, and testtimer is retried. Both assert on
+  wall-clock durations, which GitHub-hosted macOS runners miss.
+- ctest's `--trackmem` leak check is not reproduced; it is a regex over stdout.
 
 ## Upgrading
 
@@ -40,7 +70,7 @@ no-SIMD reruns of testautomation and testplatform. Not reproduced: ctest's
 
    ```shell
    bazel build @sdl3//:config_h
-   grep '#undef' bazel-bin/external/sdl3+/bazel/linux/SDL_build_config.h
+   grep '#undef' "$(bazel cquery --output=files @sdl3//:config_h)"
    ```
 
    The expected `#undef` set is the Windows, Apple, console, BSD and
@@ -48,9 +78,13 @@ no-SIMD reruns of testautomation and testplatform. Not reproduced: ctest's
 
 2. Diff the `sdl_glob_sources`/`sdl_sources` calls in `CMakeLists.txt` against
    the source lists in `overlay/BUILD.bazel`; a new backend directory is a new
-   glob. `wayland-protocols/*.xml` is globbed and needs nothing.
+   glob. `wayland-protocols/*.xml` is globbed and needs nothing. testsymbols
+   fails to link if a source file is missing.
 
-3. To confirm the Linux config against upstream, run SDL's own configure and
+3. If `test/testprocess.c` in the new release already bounds its EOF search
+   (`SDL_strnstr`), delete `patches/` and the `patches` entry in `source.json`.
+
+4. To confirm the Linux config against upstream, run SDL's own configure and
    compare `#define` lines with the generated header. On an Ubuntu with the
    X11, Wayland, xkbcommon, ALSA, GL and EGL dev packages installed:
 
@@ -66,15 +100,15 @@ no-SIMD reruns of testautomation and testplatform. Not reproduced: ctest's
      -DSDL_VULKAN=ON -DSDL_DBUS=OFF -DSDL_IBUS=OFF -DSDL_LIBUDEV=OFF \
      -DSDL_LIBURING=OFF -DSDL_HIDAPI_LIBUSB=OFF
    diff <(grep '^#define' build/include-config-release/build_config/SDL_build_config.h | sort) \
-        <(grep '^#define' bazel-bin/external/sdl3+/bazel/linux/SDL_build_config.h | sort)
+        <(grep '^#define' "$(bazel cquery --output=files @sdl3//:config_h)" | sort)
    ```
 
    Expected differences: `SDL_VIDEO_OPENGL_GLX` (CMake finds Mesa's
    `GL/glx.h`, the module has no GLX), the `SDL_DISABLE_<intrinsics>` lines
    (per CPU of the machine running CMake; the module leaves them to
    `SDL_intrin.h`), and the xkbcommon and libdecor version macros (the machine's
-   packages against the pinned module).
+   packages against the module's floor).
 
-4. `bazel run //tools:update_integrity -- sdl3 --version=<new>`, then the
+5. `bazel run //tools:update_integrity -- sdl3 --version=<new>`, then the
    presubmit matrix. Windows ARM64 is in it because SDL's own MSVC build
    targets it and nothing here is x86-specific.
