@@ -14,6 +14,13 @@
 # Included from the root MODULE.bazel (included files cannot themselves call
 # include(), so the wiring lives there).
 #
+# m4 stays a host tool. 0.16.0 changed its default to a source build, and that
+# build is gnulib, whose headers spell C99 `restrict` in a way MSVC rejects
+# (regex.h and spawn.h fail to compile on both Windows x64 and ARM64). This is
+# the opt-out the release documents, and it is what every earlier version did.
+tools = use_extension("@rules_foreign_cc//foreign_cc:extensions.bzl", "tools")
+tools.m4(mode = "system")
+
 http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
 # rules_foreign_cc maps prebuilt cmake and ninja to x86_64 and i386 on Windows
