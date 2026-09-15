@@ -64,10 +64,9 @@ cc_test(
 )
 
 # One target per NONINTERACTIVE executable, with the arguments and, where
-# CMake sets one above the default, the timeout ctest uses. testsem and
-# testtimer assert on wall-clock durations (a 2 s wait must take at most
-# 2050 ms), which other tests running alongside on a shared runner can
-# break, so they run alone.
+# CMake sets one above the default, the timeout ctest uses. testtimer
+# asserts on wall-clock durations, which other tests running alongside on a
+# shared runner can break, so it runs alone.
 # https://github.com/libsdl-org/SDL/blob/release-3.4.16/test/CMakeLists.txt#L332-L444
 [
     cc_test(
@@ -96,10 +95,33 @@ cc_test(
         ("testpower", [], "short", [], []),
         ("testqsort", [], "short", [], []),
         ("testrwlock", [], "moderate", [], []),
-        ("testsem", ["10"], "moderate", [], ["exclusive"]),
         ("testthread", [], "moderate", [], []),
         ("testtimer", ["--no-interactive"], "moderate", [], ["exclusive"]),
         ("testver", [], "short", [], []),
         ("torturethread", [], "moderate", [], []),
     ]
 ]
+
+# testsem asserts that a 2 s SDL_WaitSemaphoreTimeout ends within 2050 ms.
+# On macOS, where SDL's semaphore is the generic one over a condition
+# variable, GitHub-hosted runners measured 2070 to 2148 ms even with nothing
+# else running, so the test is off there; the same window holds on Linux
+# and Windows.
+# https://github.com/libsdl-org/SDL/blob/release-3.4.16/test/testsem.c#L106-L126
+cc_test(
+    name = "testsem",
+    size = "small",
+    timeout = "moderate",
+    srcs = ["testsem.c"],
+    args = ["10"],
+    env = _ENV,
+    tags = ["exclusive"],
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "@sdl3",
+        "@sdl3//:sdl3_test",
+    ],
+)
