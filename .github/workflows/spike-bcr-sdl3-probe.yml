@@ -1,0 +1,81 @@
+name: Spike - SDL3 BCR module probe
+
+# TEMPORARY. Two questions from review: do the remaining NONINTERACTIVE SDL
+# tests run under Bazel on every platform, and does a macOS consumer that
+# declares rules_cc before (or without) apple_support still build sdl3.
+
+on:
+  push:
+    branches: [ "spike/bcr-sdl3-probe" ]
+
+jobs:
+  tests:
+    name: New tests, ${{ matrix.label }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: ubuntu-latest,         setup: linux,   label: "Linux x64" }
+          - { runner: windows-2022,          setup: windows, label: "Windows x64, VS 2022" }
+          - { runner: windows-11-arm,        setup: windows, label: "Windows ARM64, VS 2022" }
+          - { runner: windows-11-vs2026-arm, setup: windows, label: "Windows ARM64, VS 2026" }
+          - { runner: macos-latest,          setup: macos,   label: "macOS arm64" }
+          - { runner: macos-15-intel,        setup: macos,   label: "macOS x64" }
+    steps:
+    - uses: actions/checkout@v7
+    - uses: ./.github/actions/setup_windows
+      if: matrix.setup == 'windows'
+      with:
+        bazel_startup_opts: --output_base=C:/bazel_build
+    - uses: ./.github/actions/setup_linux
+      if: matrix.setup == 'linux'
+    - name: Run the new tests one by one
+      shell: bash
+      working-directory: spike/bcr_sdl3/consumer
+      run: |
+        if [[ "$RUNNER_OS" == Windows ]]; then
+          startup="--output_base=C:/bazel_build"
+          registry="file:///$(cd .. && pwd -W)/registry"
+        else
+          startup=""
+          registry="file://$(cd .. && pwd)/registry"
+        fi
+        status=0
+        for t in testprocess testaudioinfo testdisplayinfo testkeys testsymbols testyuv; do
+          echo "::group::$t"
+          if bazel $startup test --verbose_failures --test_output=all \
+              --registry="$registry" --registry=https://bcr.bazel.build \
+              "@sdl3//test:$t"; then
+            echo "RESULT $t PASS"
+          else
+            echo "RESULT $t FAIL"; status=1
+          fi
+          echo "::endgroup::"
+        done
+        exit $status
+
+  ordering:
+    name: Consumer ordering, ${{ matrix.consumer }}, ${{ matrix.label }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ macos-latest ]
+        label: [ "macOS arm64" ]
+        consumer: [ consumer_rules_cc_only, consumer_rules_cc_first ]
+    steps:
+    - uses: actions/checkout@v7
+    - name: Build sdl3 and run testautomation
+      shell: bash
+      working-directory: spike/bcr_sdl3/${{ matrix.consumer }}
+      run: |
+        registry="file://$(cd .. && pwd)/registry"
+        bazel build --verbose_failures --registry="$registry" --registry=https://bcr.bazel.build @sdl3//:sdl3
+        bazel test --test_output=errors --registry="$registry" --registry=https://bcr.bazel.build @sdl3//test:testautomation

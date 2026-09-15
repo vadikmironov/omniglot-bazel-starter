@@ -6,7 +6,7 @@
         "BUILD.bazel": "sha256-n9hxIAZhDzgDYRHeBoAfw+guvHj38BM94NgWSIE6de4=",
         "MODULE.bazel": "sha256-uYv9YR/fxVtC3SMkzrgpNMPW+xCE9zY0xjUmkq0Y9wM=",
         "sdl3_config_checks.bzl": "sha256-yCsEVRwql+ji3xh81ijd/KCZboo84uYuTrP9vyyNQZ8=",
-        "test/BUILD.bazel": "sha256-sC3zK3Y0mkFfugA4aHTuqyMIqXZ0ZGVEZu3T/Kv3LoA=",
+        "test/BUILD.bazel": "sha256-z4N+O1ldz09damdhtagLbxXbIMyfLjsbIYrjKsQbeA8=",
         "wayland_protocols.bzl": "sha256-8brB58ms+HePwb7Yzf9kiQZzwTEaX7nKZnHR2rKBL28="
     },
     "patch_strip": 0
