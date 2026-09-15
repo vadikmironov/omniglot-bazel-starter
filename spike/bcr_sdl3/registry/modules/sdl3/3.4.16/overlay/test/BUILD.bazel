@@ -4,10 +4,11 @@ load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library", "cc_test")
 # headless on the dummy video and audio drivers, with assertions fatal.
 # https://github.com/libsdl-org/SDL/blob/release-3.4.16/test/CMakeLists.txt#L596-L608
 #
-# Not here: testyuv reads its resource files next to the executable (via
-# SDL_GetBasePath), which a Bazel test has no way to arrange; testsymbols
-# checks the exported symbols of the shared library; pretest is 32-bit
-# Windows only. Everything else in this directory is interactive.
+# Every program test/CMakeLists.txt marks NONINTERACTIVE is here, including
+# the ones it marks so only when the dummy drivers are on. The one left out is
+# pretest, which upstream builds for 32-bit Windows only.
+# https://github.com/libsdl-org/SDL/blob/release-3.4.16/test/CMakeLists.txt#L409-L411
+# https://github.com/libsdl-org/SDL/blob/release-3.4.16/test/CMakeLists.txt#L497-L505
 _ENV = {
     "SDL_ASSERT": "abort",
     "SDL_AUDIO_DRIVER": "dummy",
@@ -22,9 +23,29 @@ _ENV_NO_SIMD = dict(
     SDL_CPU_FEATURE_MASK = "-all",
 )
 
+# Upstream compiles every test with HAVE_BUILD_CONFIG, which some of them read
+# to include SDL's build config or SDL_internal.h; without it testevdev passes
+# without testing anything.
+# https://github.com/libsdl-org/SDL/blob/release-3.4.16/test/CMakeLists.txt#L144
+_DEFINES = ["HAVE_BUILD_CONFIG"]
+
+_DEPS = [
+    "@sdl3",
+    "@sdl3//:sdl3_test",
+    "@sdl3//:test_internals",
+]
+
+# testver is C90 upstream.
+# https://github.com/libsdl-org/SDL/blob/release-3.4.16/test/CMakeLists.txt#L430
+_C90 = select({
+    "@rules_cc//cc/compiler:clang": ["-std=c90"],
+    "@rules_cc//cc/compiler:gcc": ["-std=c90"],
+    "//conditions:default": [],
+})
+
 # The automated suite. Its main() comes from testautomation.c through
-# SDL_main.h, hence alwayslink; the library lets the two runs below share
-# the objects. It reads the build config and a private header.
+# SDL_main.h, hence alwayslink; the library lets the two runs below share the
+# objects.
 # https://github.com/libsdl-org/SDL/blob/release-3.4.16/test/CMakeLists.txt#L324-L325
 cc_library(
     name = "testautomation_lib",
@@ -33,11 +54,8 @@ cc_library(
         "testautomation*.c",
         "testautomation*.h",
     ]),
-    deps = [
-        "@sdl3",
-        "@sdl3//:sdl3_test",
-        "@sdl3//:test_internals",
-    ],
+    local_defines = _DEFINES,
+    deps = _DEPS,
     alwayslink = True,
 )
 
@@ -60,114 +78,110 @@ cc_test(
     size = "small",
     srcs = ["testplatform.c"],
     env = _ENV_NO_SIMD,
-    deps = [
-        "@sdl3",
-        "@sdl3//:sdl3_test",
-    ],
+    local_defines = _DEFINES,
+    deps = _DEPS,
 )
 
-# One target per NONINTERACTIVE executable, with the arguments and, where
-# CMake sets one above the default, the timeout ctest uses.
-# https://github.com/libsdl-org/SDL/blob/release-3.4.16/test/CMakeLists.txt#L332-L444
+# One target per NONINTERACTIVE program that needs no arguments, with the
+# timeout ctest gives it where that is above the default.
+# https://github.com/libsdl-org/SDL/blob/release-3.4.16/test/CMakeLists.txt#L321-L444
 [
     cc_test(
         name = name,
         size = "small",
         timeout = timeout,
         srcs = [name + ".c"],
+        copts = copts,
         env = _ENV,
-        deps = [
-            "@sdl3",
-            "@sdl3//:sdl3_test",
-        ] + extra_deps,
+        local_defines = _DEFINES,
+        deps = _DEPS,
     )
-    for name, timeout, extra_deps in [
+    for name, timeout, copts in [
         ("testatomic", "short", []),
+        ("testaudioinfo", "short", []),
         ("testbounds", "short", []),
+        ("testdisplayinfo", "short", []),
         ("testerror", "short", []),
-        # Includes SDL_evdev_capabilities.c from src/ textually.
-        (
-            "testevdev",
-            "short",
-            ["@sdl3//:test_internals"],
-        ),
+        ("testevdev", "short", []),
         ("testfile", "short", []),
         ("testfilesystem", "short", []),
+        ("testkeys", "short", []),
         ("testlocale", "short", []),
         ("testplatform", "short", []),
         ("testpower", "short", []),
         ("testqsort", "short", []),
         ("testrwlock", "moderate", []),
         ("testthread", "moderate", []),
-        ("testver", "short", []),
+        ("testver", "short", _C90),
         ("torturethread", "moderate", []),
     ]
 ]
 
-# The two tests below assert on wall-clock durations, so they run alone.
-#
-# testtimer checks that consecutive 1 ms delays stay regular; a GitHub-hosted
-# macOS runner stalled one of them for 109 ms once in a thousand iterations,
-# so a failed run is retried.
-# https://github.com/libsdl-org/SDL/blob/release-3.4.16/test/testtimer.c
+# testsymbols takes the address of every function SDL exports, which against
+# a static library catches a source file missing from the lists above.
+# https://github.com/libsdl-org/SDL/blob/release-3.4.16/test/CMakeLists.txt#L340
 cc_test(
-    name = "testtimer",
+    name = "testsymbols",
     size = "small",
-    timeout = "moderate",
-    srcs = ["testtimer.c"],
-    args = ["--no-interactive"],
-    env = _ENV,
-    flaky = True,
-    tags = ["exclusive"],
-    deps = [
-        "@sdl3",
-        "@sdl3//:sdl3_test",
+    srcs = ["testsymbols.c"],
+    args = [
+        "0",
+        "10",
+        "20",
+        "40",
+        "80",
+        "160",
+        "320",
+        "640",
     ],
+    env = _ENV,
+    local_defines = _DEFINES,
+    deps = _DEPS,
 )
 
-# testsem asserts that a 2 s SDL_WaitSemaphoreTimeout ends within 2050 ms.
-# On macOS, where SDL's semaphore is the generic one over a condition
-# variable, GitHub-hosted runners measured 2070 to 2151 ms in 11 of 12 runs,
-# with and without Bazel's sandbox, so the test is off there; the window
-# holds on Linux and Windows.
-# https://github.com/libsdl-org/SDL/blob/release-3.4.16/test/testsem.c#L106-L126
+# ctest runs testyuv with --automated alone: the automated check generates its
+# own images. Given a file name as well, the program frees that argv string on
+# exit and crashes.
+# https://github.com/libsdl-org/SDL/blob/release-3.4.16/test/CMakeLists.txt#L435
 cc_test(
-    name = "testsem",
+    name = "testyuv",
     size = "small",
-    timeout = "moderate",
-    srcs = ["testsem.c"],
-    args = ["10"],
-    env = _ENV,
-    tags = ["exclusive"],
-    target_compatible_with = select({
-        "@platforms//os:macos": ["@platforms//:incompatible"],
-        "//conditions:default": [],
-    }),
-    deps = [
-        "@sdl3",
-        "@sdl3//:sdl3_test",
+    srcs = [
+        "testutils.c",
+        "testutils.h",
+        "testyuv.c",
+        "testyuv_cvt.c",
+        "testyuv_cvt.h",
     ],
+    args = ["--automated"],
+    env = _ENV,
+    local_defines = _DEFINES,
+    deps = _DEPS,
 )
 
-# PROBE: the NONINTERACTIVE tests not wired yet.
+# testprocess starts childprocess through SDL's process API and checks
+# arguments, environment, exit codes, signals and pipes. ctest passes it the
+# absolute path of childprocess; bazel_testprocess_main.cc resolves both
+# programs from the runfiles instead, which on Windows are a manifest rather
+# than a directory. patches/0001-testprocess-bounded-EOF-search.patch is
+# upstream's fix for an out-of-bounds read in this test that crashes it on
+# Windows ARM64.
+# https://github.com/libsdl-org/SDL/blob/release-3.4.16/test/CMakeLists.txt#L456-L463
+# https://github.com/libsdl-org/SDL/commit/32c19b9dc8c229e239434fedc94541c6abb3f84a
 cc_binary(
     name = "childprocess",
     testonly = True,
     srcs = ["childprocess.c"],
-    deps = [
-        "@sdl3",
-        "@sdl3//:sdl3_test",
-    ],
+    local_defines = _DEFINES,
+    deps = _DEPS,
 )
 
 cc_binary(
     name = "testprocess_bin",
     testonly = True,
     srcs = ["testprocess.c"],
-    deps = [
-        "@sdl3",
-        "@sdl3//:sdl3_test",
-    ],
+    local_defines = _DEFINES,
+    deps = _DEPS,
 )
 
 cc_test(
@@ -186,51 +200,43 @@ cc_test(
     deps = ["@rules_cc//cc/runfiles"],
 )
 
-[
-    cc_test(
-        name = name,
-        size = "small",
-        srcs = [name + ".c"],
-        env = _ENV,
-        deps = [
-            "@sdl3",
-            "@sdl3//:sdl3_test",
-        ],
-    )
-    for name in [
-        "testaudioinfo",
-        "testdisplayinfo",
-        "testkeys",
-    ]
-]
-
+# The two tests below assert on wall-clock durations, so they run alone.
+#
+# testtimer checks that consecutive 1 ms delays stay regular; a GitHub-hosted
+# macOS runner stalled one of them for 109 ms once in a thousand iterations,
+# so a failed run is retried.
+# https://github.com/libsdl-org/SDL/blob/release-3.4.16/test/testtimer.c
 cc_test(
-    name = "testsymbols",
+    name = "testtimer",
     size = "small",
-    srcs = ["testsymbols.c"],
-    args = ["0", "10", "20", "40", "80", "160", "320", "640"],
+    timeout = "moderate",
+    srcs = ["testtimer.c"],
+    args = ["--no-interactive"],
     env = _ENV,
-    deps = [
-        "@sdl3",
-        "@sdl3//:sdl3_test",
-        "@sdl3//:test_internals",
-    ],
+    flaky = True,
+    local_defines = _DEFINES,
+    tags = ["exclusive"],
+    deps = _DEPS,
 )
 
+# testsem asserts that a 2 s SDL_WaitSemaphoreTimeout ends within 2050 ms.
+# On macOS, where SDL's semaphore is the generic one over a condition
+# variable, GitHub-hosted runners measured 2070 to 2151 ms in 11 of 12 runs,
+# with and without Bazel's sandbox, so the test is off there; the window
+# holds on Linux and Windows.
+# https://github.com/libsdl-org/SDL/blob/release-3.4.16/test/testsem.c#L106-L126
 cc_test(
-    name = "testyuv",
+    name = "testsem",
     size = "small",
-    srcs = [
-        "testutils.c",
-        "testutils.h",
-        "testyuv.c",
-        "testyuv_cvt.c",
-        "testyuv_cvt.h",
-    ],
-    args = ["--automated"],
+    timeout = "moderate",
+    srcs = ["testsem.c"],
+    args = ["10"],
     env = _ENV,
-    deps = [
-        "@sdl3",
-        "@sdl3//:sdl3_test",
-    ],
+    local_defines = _DEFINES,
+    tags = ["exclusive"],
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = _DEPS,
 )

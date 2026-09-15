@@ -9,7 +9,7 @@ name: Spike - SDL3 BCR module
 
 on:
   push:
-    branches: [ "spike/bcr-sdl3" ]
+    branches: [ "spike/bcr-sdl3-probe" ]
   workflow_dispatch:
 
 concurrency:

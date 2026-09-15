@@ -8,13 +8,13 @@ sysroot Bazel builds with. Each group links the CMake lines it mirrors.
 
 Two kinds of entries:
 
-  * probes (AC_CHECK_HEADER, AC_CHECK_DECL, AC_TRY_COMPILE, ...) wherever
-    CMake probes the system;
+  * probes wherever CMake probes the system. CMake's check_symbol_exists and
+    check_c_source_compiles build and link an executable, so these do too;
   * fixed AC_DEFINEs where CMake's answer follows from a build option, or
-    from a dependency this module pins in MODULE.bazel. The X11, Wayland,
-    xkbcommon and ALSA headers come from Bazel modules, which autoconf probes
-    cannot see, so their feature levels are written against the pinned
-    versions rather than probed.
+    from a dependency in MODULE.bazel. The X11, Wayland, xkbcommon and ALSA
+    headers come from Bazel modules, which autoconf probes cannot see, so
+    their feature levels are written against the version floors there, which
+    a consumer can only resolve to or above.
 
 A template entry with no check renders as `/* #undef NAME */`; a check with
 no template entry is dropped. README.md has the procedure for a version bump.
@@ -47,13 +47,26 @@ def _includes(headers):
     # `includes` takes preprocessor lines, not header names.
     return ["#include <%s>" % header for header in headers]
 
+def _builds(define, code, copts = [], linkopts = [], requires = None):
+    # A compile-and-link probe that defines `define` only when it succeeds:
+    # SDL reads these macros with #ifdef, so a `#define HAVE_X 0` on failure
+    # would count as present.
+    return checks.AC_TRY_LINK(
+        code = code,
+        copts = _PROBE_COPTS + copts,
+        define = define,
+        if_false = None,
+        linkopts = linkopts,
+        requires = requires,
+    )
+
 def _decl(symbol, headers):
-    # CMake's check_symbol_exists: a macro or a declaration passes, and a
-    # failure leaves the macro undefined. SDL reads these with #ifdef, so
-    # AC_CHECK_DECL's `#define HAVE_X 0` on failure would count as present;
-    # a plain compile probe defines only on success.
-    return checks.AC_TRY_COMPILE(
-        code = "\n".join(_includes(headers)) + """
+    # CMake's check_symbol_exists: a macro passes, a function has to link.
+    # CMake links libm into these probes.
+    # https://github.com/libsdl-org/SDL/blob/release-3.4.16/CMakeLists.txt#L1107-L1119
+    return _builds(
+        _define_name("HAVE_", symbol),
+        "\n".join(_includes(headers)) + """
 int main(void) {
 #ifndef %s
     (void)%s;
@@ -61,16 +74,7 @@ int main(void) {
     return 0;
 }
 """ % (symbol, symbol),
-        copts = _PROBE_COPTS,
-        define = _define_name("HAVE_", symbol),
-    )
-
-def _compiles(define, code, copts = [], requires = None):
-    return checks.AC_TRY_COMPILE(
-        code = code,
-        copts = _PROBE_COPTS + copts,
-        define = define,
-        requires = requires,
+        linkopts = ["-lm"],
     )
 
 # =============================================================================
@@ -227,17 +231,17 @@ _FLOAT_CLASS_COPTS = [
 def _float_class_checks(fn):
     upper = fn.upper()
     return [
-        _compiles(
+        _builds(
             "HAVE_" + upper,
             "#include <math.h>\nint main(void) { double d = 3.14159; return %s(d); }\n" % fn,
             copts = _FLOAT_CLASS_COPTS,
         ),
-        _compiles(
+        _builds(
             "HAVE_%s_FLOAT_MACRO" % upper,
             "#include <math.h>\nint main(void) { float f = 3.14159f; return %s(f); }\n" % fn,
             copts = _FLOAT_CLASS_COPTS,
         ),
-        _compiles(
+        _builds(
             "HAVE_%sF" % upper,
             "#include <math.h>\nint main(void) { float f = 3.14159f; return %sf(f); }\n" % fn,
             copts = _FLOAT_CLASS_COPTS,
@@ -303,9 +307,9 @@ SDL3_CONFIG_CHECKS_LIBC = [
         define = "HAVE_ST_MTIM",
         includes = _includes(["sys/stat.h"]),
     ),
-    # https://github.com/libsdl-org/SDL/blob/release-3.4.16/CMakeLists.txt#L1025-L1039
+    # CMake sets SDL_DISABLE_ALLOCA only under MSVC.
+    # https://github.com/libsdl-org/SDL/blob/release-3.4.16/CMakeLists.txt#L1025-L1040
     _header("alloca.h"),
-    checks.AC_DEFINE("SDL_DISABLE_ALLOCA", "1", requires = ["!HAVE_ALLOCA_H"]),
 ]
 
 # =============================================================================
@@ -314,7 +318,7 @@ SDL3_CONFIG_CHECKS_LIBC = [
 
 # https://github.com/libsdl-org/SDL/blob/release-3.4.16/CMakeLists.txt#L618-L640
 SDL3_CONFIG_CHECKS_COMPILER = [
-    _compiles(
+    _builds(
         "HAVE_GCC_ATOMICS",
         """int main(int argc, char **argv) {
     int a;
@@ -327,7 +331,7 @@ SDL3_CONFIG_CHECKS_COMPILER = [
     return 0; }
 """,
     ),
-    _compiles(
+    _builds(
         "HAVE_GCC_SYNC_LOCK_TEST_AND_SET",
         """int main(int argc, char **argv) {
     int a;
@@ -343,39 +347,51 @@ SDL3_CONFIG_CHECKS_COMPILER = [
 # Linux
 # =============================================================================
 
-# https://github.com/libsdl-org/SDL/blob/release-3.4.16/cmake/sdlchecks.cmake#L1021-L1088
+# CMake adds -D_REENTRANT -pthread to every probe here.
+# https://github.com/libsdl-org/SDL/blob/release-3.4.16/cmake/sdlchecks.cmake#L967-L969
+# https://github.com/libsdl-org/SDL/blob/release-3.4.16/cmake/sdlchecks.cmake#L1020-L1088
+_PTHREAD = {
+    "copts": ["-pthread"],
+    "linkopts": ["-pthread"],
+}
+
 _PTHREAD_CHECKS = [
-    _compiles(
+    _builds(
         "HAVE_PTHREADS",
         "#include <pthread.h>\nint main(void) { pthread_attr_t type; pthread_attr_init(&type); return 0; }\n",
+        **_PTHREAD
     ),
     checks.AC_DEFINE("SDL_THREAD_PTHREAD", "1", requires = ["HAVE_PTHREADS"]),
-    _compiles(
+    _builds(
         "SDL_THREAD_PTHREAD_RECURSIVE_MUTEX",
         "#include <pthread.h>\nint main(void) { pthread_mutexattr_t attr; pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE); return 0; }\n",
         requires = ["HAVE_PTHREADS"],
+        **_PTHREAD
     ),
-    _compiles(
+    _builds(
         "SDL_THREAD_PTHREAD_RECURSIVE_MUTEX_NP",
         "#include <pthread.h>\nint main(void) { pthread_mutexattr_t attr; pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE_NP); return 0; }\n",
         requires = [
             "HAVE_PTHREADS",
             "!SDL_THREAD_PTHREAD_RECURSIVE_MUTEX",
         ],
+        **_PTHREAD
     ),
-    _compiles(
+    _builds(
         "HAVE_PTHREADS_SEM",
         "#include <pthread.h>\n#include <semaphore.h>\nint main(void) { return 0; }\n",
         requires = ["HAVE_PTHREADS"],
+        **_PTHREAD
     ),
-    _compiles(
+    _builds(
         "HAVE_SEM_TIMEDWAIT",
         "#include <pthread.h>\n#include <semaphore.h>\nint main(void) { sem_timedwait(NULL, NULL); return 0; }\n",
         requires = ["HAVE_PTHREADS_SEM"],
+        **_PTHREAD
     ),
     _header("pthread.h"),
     _header("pthread_np.h"),
-    _compiles(
+    _builds(
         "HAVE_PTHREAD_SETNAME_NP",
         """#include <pthread.h>
 int main(void) {
@@ -387,6 +403,7 @@ int main(void) {
     return 0; }
 """,
         requires = ["HAVE_PTHREAD_H"],
+        **_PTHREAD
     ),
     checks.AC_CHECK_DECL(
         "pthread_set_name_np",
@@ -402,11 +419,11 @@ int main(void) {
 
 # https://github.com/libsdl-org/SDL/blob/release-3.4.16/CMakeLists.txt#L1850-L1941
 _LINUX_INPUT_CHECKS = [
-    _compiles(
+    _builds(
         "HAVE_LINUX_INPUT_H",
         "#include <linux/input.h>\n#ifndef EVIOCGNAME\n#error EVIOCGNAME() ioctl not available\n#endif\nint main(void) { return 0; }\n",
     ),
-    _compiles(
+    _builds(
         "HAVE_INPUT_KD",
         """#include <linux/kd.h>
 #include <linux/keyboard.h>
@@ -418,7 +435,7 @@ int main(void) {
     return 0; }
 """,
     ),
-    _compiles(
+    _builds(
         "HAVE_LINUX_VIDEODEV2_H",
         "#include <linux/videodev2.h>\nint main(void) { return 0; }\n",
     ),
@@ -442,7 +459,7 @@ _UNIX_CHECKS = [
     _decl("dlopen", ["dlfcn.h"]),
     checks.AC_DEFINE("SDL_LOADSO_DLOPEN", "1", requires = ["HAVE_DLOPEN"]),
     checks.AC_DEFINE("DYNAPI_NEEDS_DLOPEN", "1"),
-    _compiles(
+    _builds(
         "HAVE_O_CLOEXEC",
         "#include <fcntl.h>\nint flag = O_CLOEXEC;\nint main(void) { return 0; }\n",
     ),
@@ -519,12 +536,12 @@ _LINUX_FIXED = [
     checks.AC_DEFINE("SDL_VIDEO_RENDER_GPU", "1"),
 ]
 
-# X11, loaded at runtime by soname; the headers are the BCR modules pinned in
+# X11, loaded at runtime by soname; the headers are the BCR modules in
 # MODULE.bazel. The feature checks CMake runs against the headers
 # (XGenericEventCookie, XIScrollClassInfo, XITouchClassInfo,
-# XIGesturePinchEvent, BarrierEventID) all hold for libx11 1.8, libxi 1.8
-# and xorgproto 2024.1. Xscrnsaver and XTest have no Bazel module.
-# https://github.com/libsdl-org/SDL/blob/release-3.4.16/cmake/sdlchecks.cmake#L379-L556
+# XIGesturePinchEvent, BarrierEventID) all hold from libx11 1.8, libxi 1.8
+# and xorgproto 2024.1 on. Xscrnsaver and XTest have no Bazel module.
+# https://github.com/libsdl-org/SDL/blob/release-3.4.16/cmake/sdlchecks.cmake#L273-L564
 _X11_FIXED = [
     checks.AC_DEFINE("SDL_VIDEO_DRIVER_X11", "1"),
     checks.AC_DEFINE("SDL_VIDEO_DRIVER_X11_DYNAMIC", '"libX11.so.6"'),
