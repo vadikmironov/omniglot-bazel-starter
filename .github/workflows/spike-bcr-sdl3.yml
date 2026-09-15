@@ -125,3 +125,30 @@ jobs:
         bazel $startup test --verbose_failures --test_output=errors \
           --registry="$registry" --registry=https://bcr.bazel.build \
           $targets
+
+    # TEMPORARY investigation. testsem is off on macOS because its 2050 ms
+    # window on a 2 s wait was missed under Bazel's sandbox. Three runs
+    # sandboxed and three unsandboxed, to see whether the sandbox is the
+    # variable. Lifts the exclusion in the checked-out overlay for this step.
+    - name: Investigate testsem on macOS, sandboxed vs local
+      if: matrix.setup == 'macos'
+      continue-on-error: true
+      shell: bash
+      working-directory: ${{ env.CONSUMER }}
+      run: |
+        registry="file://$(cd .. && pwd)/registry"
+        python3 - ../registry/modules/sdl3/3.4.16/overlay/test/BUILD.bazel <<'EOF'
+        import re, sys, pathlib
+        p = pathlib.Path(sys.argv[1]); s = p.read_text()
+        s = re.sub(r'    target_compatible_with = select\(\{\n        "@platforms//os:macos": \["@platforms//:incompatible"\],\n        "//conditions:default": \[\],\n    \}\),\n', '', s)
+        p.write_text(s)
+        EOF
+        python3 ../tools/update_integrity.py
+        bazel shutdown
+        for strategy in sandboxed local; do
+          echo "::group::testsem, spawn strategy $strategy"
+          bazel test --registry="$registry" --registry=https://bcr.bazel.build \
+            --spawn_strategy=$strategy --test_output=all --runs_per_test=3 \
+            @sdl3//test:testsem 2>&1 | grep -E 'Wait took|PASSED|FAILED|Assertion failure' || true
+          echo "::endgroup::"
+        done
