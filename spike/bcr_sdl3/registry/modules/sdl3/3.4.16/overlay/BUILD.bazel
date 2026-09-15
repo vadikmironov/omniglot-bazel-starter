@@ -7,6 +7,7 @@ load("@rules_cc//cc:defs.bzl", "cc_library")
 load("@rules_cc//cc:objc_library.bzl", "objc_library")
 load("@rules_cc_autoconf//autoconf:autoconf.bzl", "autoconf")
 load("@rules_cc_autoconf//autoconf:autoconf_hdr.bzl", "autoconf_hdr")
+load(":cc_headers_only.bzl", "cc_headers_only")
 load(
     ":sdl3_config_checks.bzl",
     "SDL3_CONFIG_CHECKS_COMPILER",
@@ -439,6 +440,28 @@ objc_library(
     ],
 )
 
+# The Linux libraries SDL loads at runtime by soname, as upstream does by
+# default. SDL compiles against their headers and links none of them, so
+# nothing of theirs is built.
+# https://github.com/libsdl-org/SDL/blob/release-3.4.16/CMakeLists.txt#L234
+cc_headers_only(
+    name = "linux_runtime_loaded_headers",
+    target_compatible_with = _LINUX_ONLY,
+    deps = [
+        "@alsa_lib",
+        "@libx11",
+        "@libxcursor",
+        "@libxext",
+        "@libxfixes",
+        "@libxi",
+        "@libxrandr",
+        "@wayland//:wayland_client",
+        "@wayland//:wayland_cursor",
+        "@wayland//:wayland_egl",
+        "@xkbcommon//:xkbcommon_headers",
+    ],
+)
+
 cc_library(
     name = "sdl3",
     srcs = _COMMON_SRCS + select({
@@ -447,25 +470,20 @@ cc_library(
         "@platforms//os:windows": _WINDOWS_SRCS,
         "//conditions:default": [],
     }),
+    # The public headers are on this target too, so a consumer that depends on
+    # @sdl3 alone passes layering_check.
+    hdrs = glob(["include/SDL3/*.h"]),
     copts = _COPTS,
+    # SDL's own sources include X11 headers from modules they do not depend on
+    # directly, such as X11/keysym.h from xorgproto.
+    features = ["-layering_check"],
     implementation_deps = [
         ":khronos_headers",
         ":private_headers",
     ] + select({
-        # Headers only: SDL loads these libraries at runtime by soname.
         "@platforms//os:linux": [
             ":build_config_linux",
-            "@alsa_lib",
-            "@libx11",
-            "@libxcursor",
-            "@libxext",
-            "@libxfixes",
-            "@libxi",
-            "@libxrandr",
-            "@wayland//:wayland_client",
-            "@wayland//:wayland_cursor",
-            "@wayland//:wayland_egl",
-            "@xkbcommon//:xkbcommon_headers",
+            ":linux_runtime_loaded_headers",
         ],
         "@platforms//os:macos": [
             ":build_config_shipped",
@@ -474,6 +492,7 @@ cc_library(
         "@platforms//os:windows": [":build_config_shipped"],
         "//conditions:default": [],
     }),
+    includes = ["include"],
     linkopts = select({
         "@platforms//os:linux": _LINUX_LINKOPTS,
         "@platforms//os:macos": _MACOS_LINKOPTS,
@@ -499,7 +518,6 @@ cc_library(
     }),
     target_compatible_with = _SUPPORTED_OS,
     visibility = ["//visibility:public"],
-    deps = [":sdl3_headers"],
 )
 
 # SDL3_test, the helper library SDL's own tests link.

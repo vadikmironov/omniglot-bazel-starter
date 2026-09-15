@@ -35,6 +35,12 @@ _DEPS = [
     "@sdl3//:test_internals",
 ]
 
+# SDL's tests include its private headers by relative path ("../src/...") and
+# get the build config through test_internals, which exports nothing of its
+# own, so layering_check is off for them. A consumer depending on @sdl3 alone
+# passes it.
+_FEATURES = ["-layering_check"]
+
 # testver is C90 upstream.
 # https://github.com/libsdl-org/SDL/blob/release-3.4.16/test/CMakeLists.txt#L430
 _C90 = select({
@@ -54,6 +60,7 @@ cc_library(
         "testautomation*.c",
         "testautomation*.h",
     ]),
+    features = _FEATURES,
     local_defines = _DEFINES,
     deps = _DEPS,
     alwayslink = True,
@@ -63,6 +70,7 @@ cc_test(
     name = "testautomation",
     size = "medium",
     env = _ENV,
+    features = _FEATURES,
     deps = [":testautomation_lib"],
 )
 
@@ -70,6 +78,7 @@ cc_test(
     name = "testautomation_no_simd",
     size = "medium",
     env = _ENV_NO_SIMD,
+    features = _FEATURES,
     deps = [":testautomation_lib"],
 )
 
@@ -78,6 +87,7 @@ cc_test(
     size = "small",
     srcs = ["testplatform.c"],
     env = _ENV_NO_SIMD,
+    features = _FEATURES,
     local_defines = _DEFINES,
     deps = _DEPS,
 )
@@ -93,6 +103,7 @@ cc_test(
         srcs = [name + ".c"],
         copts = copts,
         env = _ENV,
+        features = _FEATURES,
         local_defines = _DEFINES,
         deps = _DEPS,
     )
@@ -135,6 +146,7 @@ cc_test(
         "640",
     ],
     env = _ENV,
+    features = _FEATURES,
     local_defines = _DEFINES,
     deps = _DEPS,
 )
@@ -155,6 +167,7 @@ cc_test(
     ],
     args = ["--automated"],
     env = _ENV,
+    features = _FEATURES,
     local_defines = _DEFINES,
     deps = _DEPS,
 )
@@ -172,6 +185,7 @@ cc_binary(
     name = "childprocess",
     testonly = True,
     srcs = ["childprocess.c"],
+    features = _FEATURES,
     local_defines = _DEFINES,
     deps = _DEPS,
 )
@@ -180,6 +194,7 @@ cc_binary(
     name = "testprocess_bin",
     testonly = True,
     srcs = ["testprocess.c"],
+    features = _FEATURES,
     local_defines = _DEFINES,
     deps = _DEPS,
 )
@@ -197,6 +212,7 @@ cc_test(
         ":testprocess_bin",
     ],
     env = _ENV,
+    features = _FEATURES,
     deps = ["@rules_cc//cc/runfiles"],
 )
 
@@ -213,6 +229,7 @@ cc_test(
     srcs = ["testtimer.c"],
     args = ["--no-interactive"],
     env = _ENV,
+    features = _FEATURES,
     flaky = True,
     local_defines = _DEFINES,
     tags = ["exclusive"],
@@ -232,6 +249,7 @@ cc_test(
     srcs = ["testsem.c"],
     args = ["10"],
     env = _ENV,
+    features = _FEATURES,
     local_defines = _DEFINES,
     tags = ["exclusive"],
     target_compatible_with = select({
