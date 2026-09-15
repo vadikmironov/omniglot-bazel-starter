@@ -127,8 +127,9 @@ cc_test(
 
 # testsem asserts that a 2 s SDL_WaitSemaphoreTimeout ends within 2050 ms.
 # On macOS, where SDL's semaphore is the generic one over a condition
-# variable, GitHub-hosted runners measured 2070 to 2148 ms every time, so
-# the test is off there; the window holds on Linux and Windows.
+# variable, GitHub-hosted runners measured 2070 to 2151 ms in 11 of 12 runs,
+# with and without Bazel's sandbox, so the test is off there; the window
+# holds on Linux and Windows.
 # https://github.com/libsdl-org/SDL/blob/release-3.4.16/test/testsem.c#L106-L126
 cc_test(
     name = "testsem",
