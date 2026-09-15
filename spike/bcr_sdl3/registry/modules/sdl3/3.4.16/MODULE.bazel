@@ -9,10 +9,6 @@ module(
     compatibility_level = 1,
 )
 
-# macOS: objc_library needs apple_support's C++ toolchain. Toolchains register
-# root module first, then in dependency order, so apple_support has to come
-# before rules_cc here and in the root module of every consumer; see README.md.
-bazel_dep(name = "apple_support", version = "2.3.0")
 bazel_dep(name = "platforms", version = "1.0.0")
 bazel_dep(name = "rules_cc", version = "0.2.16")
 

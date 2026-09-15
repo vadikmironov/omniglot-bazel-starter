@@ -1,0 +1,30 @@
+name: Spike - SDL3 Objective-C without apple_support
+
+# TEMPORARY. SDL's Objective-C compiled through cc_library instead of
+# objc_library, with no apple_support dependency, from three consumer shapes.
+
+on:
+  push:
+    branches: [ "spike/bcr-sdl3-objc" ]
+
+jobs:
+  macos:
+    name: ${{ matrix.consumer }}, ${{ matrix.runner }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ macos-latest, macos-15-intel ]
+        consumer: [ consumer, consumer_rules_cc_only, consumer_llvm ]
+    steps:
+    - uses: actions/checkout@v7
+    - name: Build and test the module
+      shell: bash
+      working-directory: spike/bcr_sdl3/${{ matrix.consumer }}
+      run: |
+        registry="file://$(cd .. && pwd)/registry"
+        bazel build --verbose_failures --registry="$registry" --registry=https://bcr.bazel.build @sdl3//...
+        bazel test --test_output=errors --registry="$registry" --registry=https://bcr.bazel.build @sdl3//...

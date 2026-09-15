@@ -4,7 +4,6 @@
 """
 
 load("@rules_cc//cc:defs.bzl", "cc_library")
-load("@rules_cc//cc:objc_library.bzl", "objc_library")
 load("@rules_cc_autoconf//autoconf:autoconf.bzl", "autoconf")
 load("@rules_cc_autoconf//autoconf:autoconf_hdr.bzl", "autoconf_hdr")
 load(
@@ -195,7 +194,7 @@ cc_library(
         "src/hidapi/windows/hid.c",
         "src/hidapi/windows/hidapi_descriptor_reconstruct.c",
         "src/thread/generic/SDL_syssem.c",
-    ],
+    ] + glob(["src/**/*.m"]),
     deps = [":sdl3_headers"],
 )
 
@@ -408,29 +407,49 @@ _MACOS_LINKOPTS = [
     ]
 ]
 
-# The Objective-C sources, compiled with ARC as upstream requires, which is
-# objc_library's default.
+# The Objective-C sources. objc_library would tie every macOS consumer to
+# apple_support's C++ toolchain, the only one that enables objc-compile, and
+# that toolchain loses to rules_cc's or toolchains_llvm's when either
+# registers first. Instead each .m file gets a one-line .c file that includes
+# it, compiled as Objective-C with ARC by whatever C toolchain is in use;
+# quoted includes inside the .m still resolve next to it.
 # https://github.com/libsdl-org/SDL/blob/release-3.4.16/CMakeLists.txt#L2493-L2750
 # https://github.com/libsdl-org/SDL/blob/release-3.4.16/CMakeLists.txt#L3864-L3871
-objc_library(
+_OBJC_SRCS = glob([
+    "src/audio/coreaudio/*.m",
+    "src/camera/coremedia/*.m",
+    "src/dialog/cocoa/*.m",
+    "src/filesystem/cocoa/*.m",
+    "src/gpu/metal/*.m",
+    "src/joystick/apple/*.m",
+    "src/locale/macos/*.m",
+    "src/misc/macos/*.m",
+    "src/render/metal/*.m",
+    "src/tray/cocoa/*.m",
+    "src/video/cocoa/*.m",
+])
+
+[
+    genrule(
+        name = "objc_" + src.replace("/", "_").replace(".", "_"),
+        outs = ["objc/" + src + ".c"],
+        cmd = "echo '#include \"%s\"' > $@" % src.removeprefix("src/"),
+        target_compatible_with = ["@platforms//os:macos"],
+    )
+    for src in _OBJC_SRCS
+]
+
+cc_library(
     name = "sdl3_macos_objc",
-    srcs = glob([
-        "src/audio/coreaudio/*.m",
-        "src/camera/coremedia/*.m",
-        "src/dialog/cocoa/*.m",
-        "src/filesystem/cocoa/*.m",
-        "src/gpu/metal/*.m",
-        "src/joystick/apple/*.m",
-        "src/locale/macos/*.m",
-        "src/misc/macos/*.m",
-        "src/render/metal/*.m",
-        "src/tray/cocoa/*.m",
-        "src/video/cocoa/*.m",
-    ]),
-    copts = _COPTS + ["-D" + define for define in _LOCAL_DEFINES] + select({
-        ":debug_build": ["-DDEBUG"],
-        "//conditions:default": [],
-    }),
+    srcs = ["objc/" + src + ".c" for src in _OBJC_SRCS],
+    # -fobjc-weak as upstream gives the joystick sources; harmless elsewhere.
+    copts = _COPTS + [
+        "-x",
+        "objective-c",
+        "-fobjc-arc",
+        "-fobjc-weak",
+    ],
+    local_defines = _LOCAL_DEFINES + _DEBUG_DEFINES,
     target_compatible_with = ["@platforms//os:macos"],
     deps = [
         ":build_config_shipped",
