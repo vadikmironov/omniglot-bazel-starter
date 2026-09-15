@@ -118,7 +118,11 @@ build:gcc_hermetic --cxxopt=-Wall
 # The toolchain links via the `gcc` C driver, which does not auto-add the C++
 # runtime; statically link the toolchain's own libstdc++ so C++ binaries resolve
 # std symbols with no libstdc++.so runtime dependency (keeps binaries hermetic).
+# Needed in both configurations: rules_cc_autoconf's feature-probe resolvers are
+# C++ binaries that run as build tools, so they link in the exec configuration,
+# which --linkopt does not reach.
 build:gcc_hermetic --linkopt=-l:libstdc++.a
+build:gcc_hermetic --host_linkopt=-l:libstdc++.a
 # rules_python's prebuilt CPython (libpython*.so) references openpty/forkpty from
 # libutil; the gcc driver doesn't pull it in, so link it from the hermetic sysroot
 # (needed by the cpp_py_* modules; a harmless no-op for non-Python C++ targets).
