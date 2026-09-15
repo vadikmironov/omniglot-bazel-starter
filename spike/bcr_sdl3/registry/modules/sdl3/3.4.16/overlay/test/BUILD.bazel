@@ -17,7 +17,10 @@ _ENV = {
 # ctest runs testautomation and testplatform a second time with every CPU
 # feature masked off.
 # https://github.com/libsdl-org/SDL/blob/release-3.4.16/test/CMakeLists.txt#L681-L688
-_ENV_NO_SIMD = dict(_ENV, SDL_CPU_FEATURE_MASK = "-all")
+_ENV_NO_SIMD = dict(
+    _ENV,
+    SDL_CPU_FEATURE_MASK = "-all",
+)
 
 # The automated suite. Its main() comes from testautomation.c through
 # SDL_main.h, hence alwayslink; the library lets the two runs below share
@@ -30,12 +33,12 @@ cc_library(
         "testautomation*.c",
         "testautomation*.h",
     ]),
-    alwayslink = True,
     deps = [
         "@sdl3",
         "@sdl3//:sdl3_test",
         "@sdl3//:test_internals",
     ],
+    alwayslink = True,
 )
 
 cc_test(
@@ -83,7 +86,11 @@ cc_test(
         ("testbounds", "short", []),
         ("testerror", "short", []),
         # Includes SDL_evdev_capabilities.c from src/ textually.
-        ("testevdev", "short", ["@sdl3//:test_internals"]),
+        (
+            "testevdev",
+            "short",
+            ["@sdl3//:test_internals"],
+        ),
         ("testfile", "short", []),
         ("testfilesystem", "short", []),
         ("testlocale", "short", []),

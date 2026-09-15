@@ -30,6 +30,16 @@ _VERSION_DEFINES = [
 
 _LOCAL_DEFINES = ["SDL_STATIC_LIB"] + _VERSION_DEFINES
 
+# SDL is built here as a dependency inside other projects' builds, where its
+# warnings are noise; upstream otherwise asks for its own -W list and /wd
+# suppressions. The split is by argument syntax, which puts clang-cl with MSVC.
+# https://github.com/libsdl-org/SDL/blob/release-3.4.16/cmake/sdlcompilers.cmake
+_COPTS = select({
+    "@rules_cc//cc/compiler:clang-cl": ["/w"],
+    "@rules_cc//cc/compiler:msvc-cl": ["/w"],
+    "//conditions:default": ["-w"],
+})
+
 cc_library(
     name = "sdl3_headers",
     hdrs = glob(["include/SDL3/*.h"]),
@@ -132,6 +142,9 @@ cc_library(
 # Compiled on every platform. Backend files under these directories select
 # themselves with the SDL_* macros of the build config; SDL's CMake build
 # relies on the same (it globs src/render/*/*.c unconditionally, for one).
+# https://github.com/libsdl-org/SDL/blob/release-3.4.16/CMakeLists.txt#L1235-L1294
+# https://github.com/libsdl-org/SDL/blob/release-3.4.16/CMakeLists.txt#L1333-L1414
+# https://github.com/libsdl-org/SDL/blob/release-3.4.16/CMakeLists.txt#L3524-L3567
 _COMMON_SRCS = glob([
     "src/*.c",
     "src/atomic/*.c",
@@ -181,8 +194,12 @@ _COMMON_SRCS = glob([
     "src/video/yuv2rgb/*.c",
 ])
 
+# https://github.com/libsdl-org/SDL/blob/release-3.4.16/cmake/sdlchecks.cmake#L642-L646
 _WAYLAND = wayland_protocol_sources(glob(["wayland-protocols/*.xml"]))
 
+# https://github.com/libsdl-org/SDL/blob/release-3.4.16/CMakeLists.txt#L1774-L2137
+# https://github.com/libsdl-org/SDL/blob/release-3.4.16/CMakeLists.txt#L3441-L3447
+# https://github.com/libsdl-org/SDL/blob/release-3.4.16/cmake/sdlchecks.cmake#L1090-L1101
 _LINUX_SRCS = glob([
     "src/audio/alsa/*.c",
     "src/camera/v4l2/*.c",
@@ -204,6 +221,7 @@ _LINUX_SRCS = glob([
     "src/video/x11/*.c",
 ]) + [
     # The rest of src/core/linux needs D-Bus or libudev.
+    # https://github.com/libsdl-org/SDL/blob/release-3.4.16/CMakeLists.txt#L1990-L2060
     "src/core/linux/SDL_evdev.c",
     "src/core/linux/SDL_evdev_capabilities.c",
     "src/core/linux/SDL_evdev_kbd.c",
@@ -211,6 +229,8 @@ _LINUX_SRCS = glob([
     "src/filesystem/posix/SDL_sysfsops.c",
 ] + _WAYLAND.srcs + _WAYLAND.hdrs
 
+# https://github.com/libsdl-org/SDL/blob/release-3.4.16/CMakeLists.txt#L2493-L2660
+# https://github.com/libsdl-org/SDL/blob/release-3.4.16/CMakeLists.txt#L3454-L3456
 _MACOS_SRCS = glob([
     "src/haptic/darwin/*.c",
     "src/joystick/darwin/*.c",
@@ -224,6 +244,9 @@ _MACOS_SRCS = glob([
     "src/filesystem/posix/SDL_sysfsops.c",
 ]
 
+# https://github.com/libsdl-org/SDL/blob/release-3.4.16/CMakeLists.txt#L2165-L2488
+# https://github.com/libsdl-org/SDL/blob/release-3.4.16/CMakeLists.txt#L3451-L3453
+# https://github.com/libsdl-org/SDL/blob/release-3.4.16/CMakeLists.txt#L3465-L3471
 _WINDOWS_SRCS = glob(
     [
         "src/audio/directsound/*.c",
@@ -252,18 +275,26 @@ _WINDOWS_SRCS = glob(
         "src/video/windows/*.c",
         "src/video/windows/*.cpp",
     ],
+    # A precompiled-header stub, nothing to compile on its own.
     exclude = ["src/core/windows/pch_cpp.cpp"],
 ) + [
+    # https://github.com/libsdl-org/SDL/blob/release-3.4.16/CMakeLists.txt#L2337-L2351
     "src/thread/generic/SDL_syscond.c",
     "src/thread/generic/SDL_sysrwlock.c",
 ]
 
+# libm, dlopen and pthreads, as upstream links them.
+# https://github.com/libsdl-org/SDL/blob/release-3.4.16/CMakeLists.txt#L1107-L1112
+# https://github.com/libsdl-org/SDL/blob/release-3.4.16/cmake/sdlchecks.cmake#L52-L66
+# https://github.com/libsdl-org/SDL/blob/release-3.4.16/cmake/sdlchecks.cmake#L967-L969
 _LINUX_LINKOPTS = [
     "-ldl",
     "-lm",
-    "-lpthread",
+    "-pthread",
 ]
 
+# https://github.com/libsdl-org/SDL/blob/release-3.4.16/CMakeLists.txt#L2390
+# https://github.com/libsdl-org/SDL/blob/release-3.4.16/CMakeLists.txt#L2452
 _WINDOWS_LINKOPTS = [lib + ".lib" for lib in [
     "advapi32",
     "dinput8",
@@ -280,6 +311,7 @@ _WINDOWS_LINKOPTS = [lib + ".lib" for lib in [
     "winmm",
 ]]
 
+# https://github.com/libsdl-org/SDL/blob/release-3.4.16/CMakeLists.txt#L2755-L2821
 _MACOS_FRAMEWORKS = [
     "AudioToolbox",
     "AVFoundation",
@@ -304,13 +336,23 @@ _MACOS_WEAK_FRAMEWORKS = [
 _MACOS_LINKOPTS = [
     flag
     for framework in _MACOS_FRAMEWORKS
-    for flag in ["-framework", framework]
+    for flag in [
+        "-framework",
+        framework,
+    ]
 ] + [
     flag
     for framework in _MACOS_WEAK_FRAMEWORKS
-    for flag in ["-weak_framework", framework]
+    for flag in [
+        "-weak_framework",
+        framework,
+    ]
 ]
 
+# The Objective-C sources, compiled with ARC as upstream requires, which is
+# objc_library's default.
+# https://github.com/libsdl-org/SDL/blob/release-3.4.16/CMakeLists.txt#L2493-L2750
+# https://github.com/libsdl-org/SDL/blob/release-3.4.16/CMakeLists.txt#L3864-L3871
 objc_library(
     name = "sdl3_macos_objc",
     srcs = glob([
@@ -326,7 +368,7 @@ objc_library(
         "src/tray/cocoa/*.m",
         "src/video/cocoa/*.m",
     ]),
-    copts = ["-D" + define for define in _LOCAL_DEFINES],
+    copts = _COPTS + ["-D" + define for define in _LOCAL_DEFINES],
     tags = ["manual"],
     deps = [
         ":build_config_shipped",
@@ -342,22 +384,7 @@ cc_library(
         "@platforms//os:macos": _MACOS_SRCS,
         "@platforms//os:windows": _WINDOWS_SRCS,
     }),
-    linkopts = select({
-        "@platforms//os:linux": _LINUX_LINKOPTS,
-        "@platforms//os:macos": _MACOS_LINKOPTS,
-        "@platforms//os:windows": _WINDOWS_LINKOPTS,
-    }),
-    local_defines = _LOCAL_DEFINES + select({
-        # USING_GENERATED_CONFIG_H makes SDL's shipped dispatch header #error
-        # if it were ever picked up instead of the generated one.
-        "@platforms//os:linux": [
-            "_FILE_OFFSET_BITS=64",
-            "USING_GENERATED_CONFIG_H",
-        ],
-        "//conditions:default": [],
-    }),
-    visibility = ["//visibility:public"],
-    deps = [":sdl3_headers"],
+    copts = _COPTS,
     implementation_deps = [
         ":khronos_headers",
         ":private_headers",
@@ -383,14 +410,37 @@ cc_library(
         ],
         "@platforms//os:windows": [":build_config_shipped"],
     }),
+    linkopts = select({
+        "@platforms//os:linux": _LINUX_LINKOPTS,
+        "@platforms//os:macos": _MACOS_LINKOPTS,
+        "@platforms//os:windows": _WINDOWS_LINKOPTS,
+    }),
+    local_defines = _LOCAL_DEFINES + select({
+        # _FILE_OFFSET_BITS and _REENTRANT as upstream compiles with;
+        # USING_GENERATED_CONFIG_H makes SDL's shipped dispatch header #error
+        # if it were ever picked up instead of the generated one.
+        # https://github.com/libsdl-org/SDL/blob/release-3.4.16/CMakeLists.txt#L516
+        # https://github.com/libsdl-org/SDL/blob/release-3.4.16/cmake/sdlchecks.cmake#L967-L969
+        "@platforms//os:linux": [
+            "_FILE_OFFSET_BITS=64",
+            "_REENTRANT",
+            "USING_GENERATED_CONFIG_H",
+        ],
+        "//conditions:default": [],
+    }),
+    visibility = ["//visibility:public"],
+    deps = [":sdl3_headers"],
 )
 
+# SDL3_test, the helper library SDL's own tests link.
+# https://github.com/libsdl-org/SDL/blob/release-3.4.16/CMakeLists.txt#L495-L520
 cc_library(
     name = "sdl3_test",
     srcs = glob(["src/test/*.c"]),
+    copts = _COPTS,
+    implementation_deps = [":private_headers"],
     visibility = ["//visibility:public"],
     deps = [":sdl3"],
-    implementation_deps = [":private_headers"],
 )
 
 # What SDL's own tests (test/testautomation*.c, test/testevdev.c) read from
