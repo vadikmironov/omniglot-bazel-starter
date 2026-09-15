@@ -6,7 +6,8 @@
         "BUILD.bazel": "sha256-n9hxIAZhDzgDYRHeBoAfw+guvHj38BM94NgWSIE6de4=",
         "MODULE.bazel": "sha256-uYv9YR/fxVtC3SMkzrgpNMPW+xCE9zY0xjUmkq0Y9wM=",
         "sdl3_config_checks.bzl": "sha256-yCsEVRwql+ji3xh81ijd/KCZboo84uYuTrP9vyyNQZ8=",
-        "test/BUILD.bazel": "sha256-kUWz75WCIKhFdMkW9/Opq7Z9O6/3H0CdfiVWA9KNi3c=",
+        "test/BUILD.bazel": "sha256-jHR2AyXnQl648I2pRWiZj14Vio4no2Sj0QsNlq2Fjt0=",
+        "test/bazel_testprocess_main.cc": "sha256-G2j8XF4L/gWvYbTjg/Ssbw3O7ckUp4TMeo7IvAJy1+Y=",
         "wayland_protocols.bzl": "sha256-8brB58ms+HePwb7Yzf9kiQZzwTEaX7nKZnHR2rKBL28="
     },
     "patch_strip": 0

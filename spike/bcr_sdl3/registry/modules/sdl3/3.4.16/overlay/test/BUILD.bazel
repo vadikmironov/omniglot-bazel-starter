@@ -160,17 +160,30 @@ cc_binary(
     ],
 )
 
-cc_test(
-    name = "testprocess",
-    size = "small",
+cc_binary(
+    name = "testprocess_bin",
+    testonly = True,
     srcs = ["testprocess.c"],
-    args = ["$(rootpath :childprocess)"],
-    data = [":childprocess"],
-    env = _ENV,
     deps = [
         "@sdl3",
         "@sdl3//:sdl3_test",
     ],
+)
+
+cc_test(
+    name = "testprocess",
+    size = "small",
+    srcs = ["bazel_testprocess_main.cc"],
+    args = [
+        "$(rlocationpath :testprocess_bin)",
+        "$(rlocationpath :childprocess)",
+    ],
+    data = [
+        ":childprocess",
+        ":testprocess_bin",
+    ],
+    env = _ENV,
+    deps = ["@rules_cc//cc/runfiles"],
 )
 
 [
@@ -200,6 +213,7 @@ cc_test(
     deps = [
         "@sdl3",
         "@sdl3//:sdl3_test",
+        "@sdl3//:test_internals",
     ],
 )
 
@@ -213,11 +227,7 @@ cc_test(
         "testyuv_cvt.c",
         "testyuv_cvt.h",
     ],
-    args = [
-        "--automated",
-        "$(rootpath testyuv.png)",
-    ],
-    data = ["testyuv.png"],
+    args = ["--automated"],
     env = _ENV,
     deps = [
         "@sdl3",
