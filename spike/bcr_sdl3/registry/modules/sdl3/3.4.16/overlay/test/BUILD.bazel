@@ -64,9 +64,7 @@ cc_test(
 )
 
 # One target per NONINTERACTIVE executable, with the arguments and, where
-# CMake sets one above the default, the timeout ctest uses. testtimer
-# asserts on wall-clock durations, which other tests running alongside on a
-# shared runner can break, so it runs alone.
+# CMake sets one above the default, the timeout ctest uses.
 # https://github.com/libsdl-org/SDL/blob/release-3.4.16/test/CMakeLists.txt#L332-L444
 [
     cc_test(
@@ -74,39 +72,56 @@ cc_test(
         size = "small",
         timeout = timeout,
         srcs = [name + ".c"],
-        args = args,
         env = _ENV,
-        tags = tags,
         deps = [
             "@sdl3",
             "@sdl3//:sdl3_test",
         ] + extra_deps,
     )
-    for name, args, timeout, extra_deps, tags in [
-        ("testatomic", [], "short", [], []),
-        ("testbounds", [], "short", [], []),
-        ("testerror", [], "short", [], []),
+    for name, timeout, extra_deps in [
+        ("testatomic", "short", []),
+        ("testbounds", "short", []),
+        ("testerror", "short", []),
         # Includes SDL_evdev_capabilities.c from src/ textually.
-        ("testevdev", [], "short", ["@sdl3//:test_internals"], []),
-        ("testfile", [], "short", [], []),
-        ("testfilesystem", [], "short", [], []),
-        ("testlocale", [], "short", [], []),
-        ("testplatform", [], "short", [], []),
-        ("testpower", [], "short", [], []),
-        ("testqsort", [], "short", [], []),
-        ("testrwlock", [], "moderate", [], []),
-        ("testthread", [], "moderate", [], []),
-        ("testtimer", ["--no-interactive"], "moderate", [], ["exclusive"]),
-        ("testver", [], "short", [], []),
-        ("torturethread", [], "moderate", [], []),
+        ("testevdev", "short", ["@sdl3//:test_internals"]),
+        ("testfile", "short", []),
+        ("testfilesystem", "short", []),
+        ("testlocale", "short", []),
+        ("testplatform", "short", []),
+        ("testpower", "short", []),
+        ("testqsort", "short", []),
+        ("testrwlock", "moderate", []),
+        ("testthread", "moderate", []),
+        ("testver", "short", []),
+        ("torturethread", "moderate", []),
     ]
 ]
 
+# The two tests below assert on wall-clock durations, so they run alone.
+#
+# testtimer checks that consecutive 1 ms delays stay regular; a GitHub-hosted
+# macOS runner stalled one of them for 109 ms once in a thousand iterations,
+# so a failed run is retried.
+# https://github.com/libsdl-org/SDL/blob/release-3.4.16/test/testtimer.c
+cc_test(
+    name = "testtimer",
+    size = "small",
+    timeout = "moderate",
+    srcs = ["testtimer.c"],
+    args = ["--no-interactive"],
+    env = _ENV,
+    flaky = True,
+    tags = ["exclusive"],
+    deps = [
+        "@sdl3",
+        "@sdl3//:sdl3_test",
+    ],
+)
+
 # testsem asserts that a 2 s SDL_WaitSemaphoreTimeout ends within 2050 ms.
 # On macOS, where SDL's semaphore is the generic one over a condition
-# variable, GitHub-hosted runners measured 2070 to 2148 ms even with nothing
-# else running, so the test is off there; the same window holds on Linux
-# and Windows.
+# variable, GitHub-hosted runners measured 2070 to 2148 ms every time, so
+# the test is off there; the window holds on Linux and Windows.
 # https://github.com/libsdl-org/SDL/blob/release-3.4.16/test/testsem.c#L106-L126
 cc_test(
     name = "testsem",
