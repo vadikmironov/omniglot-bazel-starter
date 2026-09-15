@@ -10,5 +10,8 @@
         "test/bazel_testprocess_main.cc": "sha256-AEOotcRfSZH/AlcEgfD0QfrxRrxaJrCQOR0A80RelSg=",
         "wayland_protocols.bzl": "sha256-8brB58ms+HePwb7Yzf9kiQZzwTEaX7nKZnHR2rKBL28="
     },
-    "patch_strip": 0
+    "patch_strip": 1,
+    "patches": {
+        "0001-testprocess-bounded-EOF-search.patch": "sha256-XtUVPZB/rawlKo+t2csY1CMB3JGMeX5ciLWfKf55IBs="
+    }
 }

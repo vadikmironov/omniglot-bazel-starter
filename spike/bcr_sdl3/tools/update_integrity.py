@@ -32,5 +32,13 @@ for path in sorted(overlay.rglob("*")):
     digest = hashlib.sha256(path.read_bytes()).digest()
     hashes[relative.as_posix()] = "sha256-" + base64.b64encode(digest).decode()
 source["overlay"] = hashes
+# Upstream fixes carried until a release has them; applied with -p1.
+patches = version_dir / "patches"
+if patches.is_dir():
+    source["patches"] = {
+        patch.name: "sha256-" + base64.b64encode(hashlib.sha256(patch.read_bytes()).digest()).decode()
+        for patch in sorted(patches.glob("*.patch"))
+    }
+    source["patch_strip"] = 1
 source_json.write_text(json.dumps(source, indent=4) + "\n")
 print(f"{source_json}: {len(hashes)} overlay files")
