@@ -10,6 +10,7 @@
 #include <cstdio>
 #include <memory>
 #include <string>
+#include <vector>
 
 #ifdef _WIN32
 #include <process.h>
@@ -37,8 +38,8 @@ std::string resolve(const Runfiles &runfiles, const char *rlocation) {
 }  // namespace
 
 int main(int argc, char *argv[]) {
-  if (argc != 3) {
-    std::fprintf(stderr, "usage: %s <testprocess rlocation> <childprocess rlocation>\n", argv[0]);
+  if (argc < 3) {
+    std::fprintf(stderr, "usage: %s <testprocess rlocation> <childprocess rlocation> [harness args...]\n", argv[0]);
     return 2;
   }
 
@@ -58,18 +59,23 @@ int main(int argc, char *argv[]) {
 
 #ifdef _WIN32
   // _spawnv joins argv into one command line, so quote each argument.
-  const std::string quoted_testprocess = "\"" + testprocess + "\"";
-  const std::string quoted_childprocess = "\"" + childprocess + "\"";
-  const char *child_argv[] = {quoted_testprocess.c_str(), quoted_childprocess.c_str(), nullptr};
-  const intptr_t status = _spawnv(_P_WAIT, testprocess.c_str(), child_argv);
+  std::vector<std::string> quoted = {"\"" + testprocess + "\"", "\"" + childprocess + "\""};
+  for (int i = 3; i < argc; ++i) quoted.push_back(std::string("\"") + argv[i] + "\"");
+  std::vector<const char *> child_argv;
+  for (const std::string &arg : quoted) child_argv.push_back(arg.c_str());
+  child_argv.push_back(nullptr);
+  const intptr_t status = _spawnv(_P_WAIT, testprocess.c_str(), child_argv.data());
   if (status == -1) {
     std::perror("bazel_testprocess_main: _spawnv");
     return 1;
   }
+  std::fprintf(stderr, "bazel_testprocess_main: testprocess exited with %d (0x%08lx)\n", static_cast<int>(status), static_cast<unsigned long>(status));
   return static_cast<int>(status);
 #else
-  const char *child_argv[] = {testprocess.c_str(), childprocess.c_str(), nullptr};
-  execv(testprocess.c_str(), const_cast<char *const *>(child_argv));
+  std::vector<const char *> child_argv = {testprocess.c_str(), childprocess.c_str()};
+  for (int i = 3; i < argc; ++i) child_argv.push_back(argv[i]);
+  child_argv.push_back(nullptr);
+  execv(testprocess.c_str(), const_cast<char *const *>(child_argv.data()));
   std::perror("bazel_testprocess_main: execv");
   return 1;
 #endif
