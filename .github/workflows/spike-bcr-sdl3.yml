@@ -1,10 +1,10 @@
 name: Spike - SDL3 BCR module
 
 # TEMPORARY. Builds and tests the sdl3@3.4.16 module staged under
-# spike/bcr_sdl3/registry, through a file:// registry, from the consumer
-# module in spike/bcr_sdl3/consumer, on the platforms BCR presubmit runs plus
-# both Windows ARM64 images. The linux-oracles job regenerates the CMake
-# oracles the Linux job diffs the generated build config against.
+# spike/bcr_sdl3/registry, through a file:// registry, on the platforms BCR
+# presubmit runs plus both Windows ARM64 images, from consumer modules of
+# different shapes. The linux-oracles job regenerates the CMake oracles the
+# Linux job diffs the generated build config against.
 # Delete once the module is in BCR.
 
 on:
@@ -16,13 +16,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  CONSUMER: spike/bcr_sdl3/consumer
-
 jobs:
   # The oracles: what SDL's own CMake configure produces on the oldest and
-  # the newest Ubuntu BCR presubmit uses. The module's autoconf-generated
-  # header is diffed against them in the Linux build job.
+  # the newest Ubuntu BCR presubmit uses.
   linux-oracles:
     name: CMake oracles are up to date
     runs-on: ubuntu-latest
@@ -57,12 +53,17 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { runner: ubuntu-latest,         setup: linux,   label: "Linux x64" }
-          - { runner: windows-2022,          setup: windows, label: "Windows x64, VS 2022" }
-          - { runner: windows-11-arm,        setup: windows, label: "Windows ARM64, VS 2022" }
-          - { runner: windows-11-vs2026-arm, setup: windows, label: "Windows ARM64, VS 2026" }
-          - { runner: macos-latest,          setup: macos,   label: "macOS arm64" }
-          - { runner: macos-15-intel,        setup: macos,   label: "macOS x64" }
+          - { runner: ubuntu-latest,         setup: linux,   consumer: consumer, bazel: "",      label: "Linux x64" }
+          - { runner: ubuntu-latest,         setup: linux,   consumer: consumer, bazel: "7.4.0", label: "Linux x64, Bazel 7.4.0" }
+          - { runner: windows-2022,          setup: windows, consumer: consumer, bazel: "",      label: "Windows x64, VS 2022" }
+          - { runner: windows-11-arm,        setup: windows, consumer: consumer, bazel: "",      label: "Windows ARM64, VS 2022" }
+          - { runner: windows-11-vs2026-arm, setup: windows, consumer: consumer, bazel: "",      label: "Windows ARM64, VS 2026" }
+          - { runner: macos-latest,          setup: macos,   consumer: consumer, bazel: "",      label: "macOS arm64" }
+          - { runner: macos-15-intel,        setup: macos,   consumer: consumer, bazel: "",      label: "macOS x64" }
+          - { runner: macos-latest,          setup: macos,   consumer: consumer_rules_cc_only, bazel: "", label: "macOS arm64, consumer with rules_cc only" }
+          - { runner: macos-latest,          setup: macos,   consumer: consumer_llvm,          bazel: "", label: "macOS arm64, consumer on toolchains_llvm" }
+    env:
+      USE_BAZEL_VERSION: ${{ matrix.bazel }}
     steps:
     - uses: actions/checkout@v7
     - uses: ./.github/actions/setup_windows
@@ -79,8 +80,9 @@ jobs:
     # because a step's shell does not outlive it.
     - name: Build the module
       shell: bash
-      working-directory: ${{ env.CONSUMER }}
+      working-directory: spike/bcr_sdl3/${{ matrix.consumer }}
       run: |
+        [[ -z "$USE_BAZEL_VERSION" ]] && unset USE_BAZEL_VERSION
         if [[ "$RUNNER_OS" == Windows ]]; then
           startup="--output_base=C:/bazel_build"
           registry="file:///$(cd .. && pwd -W)/registry"
@@ -88,29 +90,28 @@ jobs:
           startup=""
           registry="file://$(cd .. && pwd)/registry"
         fi
-        echo "registry: $registry"
+        bazel $startup version | head -1
         bazel $startup build --verbose_failures \
           --registry="$registry" --registry=https://bcr.bazel.build \
           @sdl3//...
 
     # The autoconf-generated Linux config has to reproduce what SDL's CMake
-    # configure produces on this runner's Ubuntu; the oracle comes from the
-    # linux-oracles job.
+    # configure produces on this runner's Ubuntu.
     - name: Diff the generated Linux config against the CMake oracle
       if: matrix.setup == 'linux'
       shell: bash
-      working-directory: ${{ env.CONSUMER }}
+      working-directory: spike/bcr_sdl3/${{ matrix.consumer }}
       run: |
+        [[ -z "$USE_BAZEL_VERSION" ]] && unset USE_BAZEL_VERSION
         registry="file://$(cd .. && pwd)/registry"
         generated="$(bazel cquery --registry="$registry" --registry=https://bcr.bazel.build --output=files @sdl3//:config_h)"
         ../tools/diff_config.sh "$generated" ../oracle/SDL_build_config.ubuntu2404.h
 
-    # SDL's own non-interactive tests, from the module's test/ package, plus
-    # anything a consumer-side source next to MODULE.bazel adds.
     - name: Run the module's tests
       shell: bash
-      working-directory: ${{ env.CONSUMER }}
+      working-directory: spike/bcr_sdl3/${{ matrix.consumer }}
       run: |
+        [[ -z "$USE_BAZEL_VERSION" ]] && unset USE_BAZEL_VERSION
         if [[ "$RUNNER_OS" == Windows ]]; then
           startup="--output_base=C:/bazel_build"
           registry="file:///$(cd .. && pwd -W)/registry"
