@@ -20,7 +20,7 @@ bazel_dep(name = "rules_cc", version = "0.2.22")
 # Please find documentation here:
 # https://github.com/bazel-contrib/rules_foreign_cc/releases
 #
-bazel_dep(name = "rules_foreign_cc", version = "0.15.1")
+bazel_dep(name = "rules_foreign_cc", version = "0.16.0")
 
 # Fixes against 0.15.1, which is 14 months old and still the newest release.
 # Backported verbatim rather than moving to HEAD: main is ~99 commits ahead and
