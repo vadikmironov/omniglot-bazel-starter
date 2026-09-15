@@ -20,34 +20,24 @@ bazel_dep(name = "rules_cc", version = "0.2.22")
 # Please find documentation here:
 # https://github.com/bazel-contrib/rules_foreign_cc/releases
 #
-bazel_dep(name = "rules_foreign_cc", version = "0.15.1")
+bazel_dep(name = "rules_foreign_cc", version = "0.16.0")
 
-# Fixes against 0.15.1, which is 14 months old and still the newest release.
-# Backported verbatim rather than moving to HEAD: main is ~99 commits ahead and
-# includes a hub/spoke toolchain refactor, which is a lot of unreleased surface
-# for a starter template to carry.
+# One fix against 0.16.0, backported verbatim from an open pull request:
 #
-#   cc_import_load    Windows pkg-config generates BUILD files calling
-#                     cc_import with no load(); Bazel 9 removed the native
-#                     rule, so cmake()/make() fail analysis on Windows.
-#                     https://github.com/bazel-contrib/rules_foreign_cc/pull/1570
 #   postfixed_outputs cmake() matched declared outputs literally, so a build
 #                     whose library picks up a suffix (CMAKE_DEBUG_POSTFIX
 #                     under -c dbg) could not be named. Resolves the real file
 #                     from the CMake File API codemodel instead.
 #                     https://github.com/bazel-contrib/rules_foreign_cc/issues/1041
 #
-# Three further patches were dropped when //tools/cpp/foreign_cc took over the
-# pkg-config toolchain: the bundled pkg-config bootstrap builds glib, and all
-# three existed only to keep that building (glib under GCC 15's C23 default,
-# bzlmod-canonical paths for the MSVC nmake build, and target-arch detection on
-# Windows ARM64). Nothing builds glib now.
+# 0.16.0 cleared the rest. cc_import_load shipped in it, and the three
+# pkg-config patches went earlier: the release replaces the glib-linked
+# bootstrap with the pkgconf registry module, so nothing builds glib now.
 single_version_override(
     module_name = "rules_foreign_cc",
     patch_strip = 1,
     patches = [
-        "//tools/cpp/patches:rules_foreign_cc_0.15.1_cc_import_load.patch",
-        "//tools/cpp/patches:rules_foreign_cc_0.15.1_postfixed_outputs.patch",
+        "//tools/cpp/patches:rules_foreign_cc_0.16.0_postfixed_outputs.patch",
     ],
 )
 

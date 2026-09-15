@@ -5,33 +5,22 @@
 # own do not cover every platform we build on. Each is registered from the root
 # module, which outranks the toolchains rules_foreign_cc registers for itself.
 #
-#   pkgconf  replaces the bundled pkg-config everywhere. It has no dependencies,
-#            so it compiles from source wherever Bazel's C++ toolchain runs,
-#            unlike the bundled one which links glib.
-#            https://github.com/pkgconf/pkgconf
 #   cmake    Windows ARM64 only; the prebuilts upstream maps stop at x86_64.
 #   ninja    Windows ARM64 only, same reason.
+#
+# pkg-config is no longer here: 0.16.0 takes it from the pkgconf registry
+# module, which is what this repository used to register by hand.
 #
 # Included from the root MODULE.bazel (included files cannot themselves call
 # include(), so the wiring lives there).
 #
 http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
-http_archive(
-    name = "pkgconf_src",
-    build_file = "//tools/cpp/foreign_cc:pkgconf.BUILD",
-    sha256 = "01da06de506241a124faa7ba0a34b5ad549b49df8d280337d42d00e78ac37d5d",
-    strip_prefix = "pkgconf-3.0.6",
-    urls = ["https://github.com/pkgconf/pkgconf/releases/download/pkgconf-3.0.6/pkgconf-3.0.6.tar.gz"],
-)
-
-register_toolchains("//tools/cpp/foreign_cc:pkgconf_toolchain")
-
 # rules_foreign_cc maps prebuilt cmake and ninja to x86_64 and i386 on Windows
-# only, so on ARM64 nothing matches and it falls back to building cmake from
-# source, which does not compile. Both projects publish ARM64 binaries; these
-# fill in the missing platform and are constrained to it, leaving the upstream
-# prebuilts in charge everywhere else.
+# only. On ARM64 nothing matches and each falls through to its system entry,
+# which means whatever the host happens to have on PATH. Both projects publish
+# ARM64 binaries; these fill in the missing platform and are constrained to it,
+# leaving the upstream prebuilts in charge everywhere else.
 http_archive(
     name = "cmake_windows_arm64",
     build_file = "//tools/cpp/foreign_cc:cmake_windows_arm64.BUILD",
