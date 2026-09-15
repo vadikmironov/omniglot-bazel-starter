@@ -148,3 +148,79 @@ cc_test(
         "@sdl3//:sdl3_test",
     ],
 )
+
+# PROBE: the NONINTERACTIVE tests not wired yet.
+cc_binary(
+    name = "childprocess",
+    testonly = True,
+    srcs = ["childprocess.c"],
+    deps = [
+        "@sdl3",
+        "@sdl3//:sdl3_test",
+    ],
+)
+
+cc_test(
+    name = "testprocess",
+    size = "small",
+    srcs = ["testprocess.c"],
+    args = ["$(rootpath :childprocess)"],
+    data = [":childprocess"],
+    env = _ENV,
+    deps = [
+        "@sdl3",
+        "@sdl3//:sdl3_test",
+    ],
+)
+
+[
+    cc_test(
+        name = name,
+        size = "small",
+        srcs = [name + ".c"],
+        env = _ENV,
+        deps = [
+            "@sdl3",
+            "@sdl3//:sdl3_test",
+        ],
+    )
+    for name in [
+        "testaudioinfo",
+        "testdisplayinfo",
+        "testkeys",
+    ]
+]
+
+cc_test(
+    name = "testsymbols",
+    size = "small",
+    srcs = ["testsymbols.c"],
+    args = ["0", "10", "20", "40", "80", "160", "320", "640"],
+    env = _ENV,
+    deps = [
+        "@sdl3",
+        "@sdl3//:sdl3_test",
+    ],
+)
+
+cc_test(
+    name = "testyuv",
+    size = "small",
+    srcs = [
+        "testutils.c",
+        "testutils.h",
+        "testyuv.c",
+        "testyuv_cvt.c",
+        "testyuv_cvt.h",
+    ],
+    args = [
+        "--automated",
+        "$(rootpath testyuv.png)",
+    ],
+    data = ["testyuv.png"],
+    env = _ENV,
+    deps = [
+        "@sdl3",
+        "@sdl3//:sdl3_test",
+    ],
+)
