@@ -45,7 +45,7 @@ jobs:
           registry="file://$(cd .. && pwd)/registry"
         fi
         status=0
-        for t in testprocess testaudioinfo testdisplayinfo testkeys testsymbols testyuv; do
+        for t in testprocess; do
           echo "::group::$t"
           if bazel $startup test --verbose_failures --test_output=all \
               --registry="$registry" --registry=https://bcr.bazel.build \
@@ -58,3 +58,19 @@ jobs:
         done
         exit $status
 
+
+    # Windows ARM64: each testprocess case on its own, to find the one that
+    # takes the process down.
+    - name: testprocess case by case
+      if: contains(matrix.label, 'ARM64')
+      shell: bash
+      working-directory: spike/bcr_sdl3/consumer
+      run: |
+        startup="--output_base=C:/bazel_build"
+        registry="file:///$(cd .. && pwd -W)/registry"
+        for c in process_testArguments process_testExitCode process_testInheritedEnv process_testNewEnv process_testKill process_testStdinToStdout process_testStdinToStderr process_testSimpleStdinToStdout process_testMultiprocessStdinToStdout process_testWriteToFinishedProcess process_testNonExistingExecutable process_testBatBadButVulnerability process_testFileRedirection process_testWindowsCmdline process_testWindowsCmdlinePrecedence; do
+          out="$(bazel $startup test --registry="$registry" --registry=https://bcr.bazel.build \
+            --test_output=all --test_arg=--filter --test_arg=$c @sdl3//test:testprocess 2>&1)"
+          if echo "$out" | grep -q "PASSED in"; then echo "CASE $c PASS"; else
+            echo "CASE $c FAIL"; echo "$out" | grep -E "bazel_testprocess_main|Assert '.*': Failed|>>> Test" | tail -4; fi
+        done
