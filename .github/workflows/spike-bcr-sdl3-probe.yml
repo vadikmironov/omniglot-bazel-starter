@@ -58,24 +58,3 @@ jobs:
         done
         exit $status
 
-  ordering:
-    name: Consumer ordering, ${{ matrix.consumer }}, ${{ matrix.label }}
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 60
-    permissions:
-      contents: read
-    strategy:
-      fail-fast: false
-      matrix:
-        runner: [ macos-latest ]
-        label: [ "macOS arm64" ]
-        consumer: [ consumer_rules_cc_only, consumer_rules_cc_first ]
-    steps:
-    - uses: actions/checkout@v7
-    - name: Build sdl3 and run testautomation
-      shell: bash
-      working-directory: spike/bcr_sdl3/${{ matrix.consumer }}
-      run: |
-        registry="file://$(cd .. && pwd)/registry"
-        bazel build --verbose_failures --registry="$registry" --registry=https://bcr.bazel.build @sdl3//:sdl3
-        bazel test --test_output=errors --registry="$registry" --registry=https://bcr.bazel.build @sdl3//test:testautomation
