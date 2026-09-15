@@ -54,7 +54,10 @@ jobs:
       matrix:
         include:
           - { runner: ubuntu-latest,         setup: linux,   consumer: consumer, bazel: "",      label: "Linux x64" }
-          - { runner: ubuntu-latest,         setup: linux,   consumer: consumer, bazel: "7.4.0", label: "Linux x64, Bazel 7.4.0" }
+          # Bazel 7 rejects `common` options a command does not take, such as the
+          # repository .bazelrc's --downloader_config for `bazel version`; a
+          # consumer module should not read that file anyway.
+          - { runner: ubuntu-latest,         setup: linux,   consumer: consumer, bazel: "7.4.0", rc: "--ignore_all_rc_files", label: "Linux x64, Bazel 7.4.0" }
           - { runner: windows-2022,          setup: windows, consumer: consumer, bazel: "",      label: "Windows x64, VS 2022" }
           - { runner: windows-11-arm,        setup: windows, consumer: consumer, bazel: "",      label: "Windows ARM64, VS 2022" }
           - { runner: windows-11-vs2026-arm, setup: windows, consumer: consumer, bazel: "",      label: "Windows ARM64, VS 2026" }
@@ -87,10 +90,10 @@ jobs:
           startup="--output_base=C:/bazel_build"
           registry="file:///$(cd .. && pwd -W)/registry"
         else
-          startup=""
+          startup="${{ matrix.rc }}"
           registry="file://$(cd .. && pwd)/registry"
         fi
-        bazel $startup version | head -1
+        bazel $startup version
         bazel $startup build --verbose_failures \
           --registry="$registry" --registry=https://bcr.bazel.build \
           @sdl3//...
@@ -104,7 +107,7 @@ jobs:
       run: |
         [[ -z "$USE_BAZEL_VERSION" ]] && unset USE_BAZEL_VERSION
         registry="file://$(cd .. && pwd)/registry"
-        generated="$(bazel cquery --registry="$registry" --registry=https://bcr.bazel.build --output=files @sdl3//:config_h)"
+        generated="$(bazel ${{ matrix.rc }} cquery --registry="$registry" --registry=https://bcr.bazel.build --output=files @sdl3//:config_h)"
         ../tools/diff_config.sh "$generated" ../oracle/SDL_build_config.ubuntu2404.h
 
     - name: Run the module's tests
@@ -116,7 +119,7 @@ jobs:
           startup="--output_base=C:/bazel_build"
           registry="file:///$(cd .. && pwd -W)/registry"
         else
-          startup=""
+          startup="${{ matrix.rc }}"
           registry="file://$(cd .. && pwd)/registry"
         fi
         targets="@sdl3//..."
