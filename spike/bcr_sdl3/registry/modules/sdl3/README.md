@@ -10,26 +10,14 @@ documents the port; below is what a consumer and a version bump need.
 - Linux, macOS and Windows. On other platforms `@sdl3` is incompatible, so a
   wildcard build skips it.
 
-## macOS: declare apple_support above rules_cc
+## macOS
 
-The Objective-C sources are an `objc_library`, which needs the C++ toolchain
-from `apple_support`. Bazel takes the first registered toolchain that matches,
-and the root module registers first. A consumer whose `MODULE.bazel` declares
-`rules_cc` before `apple_support`, or has no `apple_support` at all, gets the
-autoconfigured toolchain and this error on macOS:
-
-    Compiling objc_library targets requires the Apple CC toolchain
-
-Declare `apple_support` above `rules_cc`, even with no Objective-C of your own:
-
-```starlark
-bazel_dep(name = "apple_support", version = "2.3.0")
-bazel_dep(name = "rules_cc", version = "0.2.16")
-bazel_dep(name = "sdl3", version = "3.4.16")
-```
-
-This is `apple_support`'s own requirement, and it applies to every module with
-Objective-C sources.
+SDL's Objective-C sources compile through `cc_library`, as Objective-C with ARC,
+so any C toolchain that targets macOS builds them: `apple_support`'s, the one
+`rules_cc` configures, or `toolchains_llvm`'s. A consumer needs no
+`apple_support` dependency and no particular `bazel_dep` order. `objc_library`
+would work only with `apple_support`'s toolchain registered ahead of every other
+C++ toolchain.
 
 ## Build configuration
 
@@ -43,6 +31,19 @@ inhibition), libudev (hotplug and the HIDAPI hidraw backend), libusb, liburing,
 GLX (OpenGL goes through EGL, as on Wayland), fribidi, libthai. X11, Wayland,
 ALSA and xkbcommon are loaded at runtime by soname. Their headers come from the
 BCR modules in `MODULE.bazel`, at those versions or newer.
+
+On Windows the GameInput joystick and keyboard backends are built when the
+Windows SDK in use has `gameinput.h`, as in SDL's own MSVC build. As upstream,
+the static library honours the `SDL_DYNAMIC_API` environment variable.
+
+## Dependency footprint on Linux
+
+SDL compiles against the X11, Wayland, ALSA and xkbcommon headers only, so none
+of those libraries is compiled or linked. libX11's headers include libxcb's,
+and SDL's Vulkan renderer includes `xcb/xcb.h`; libxcb generates those headers
+with Python, so a Linux build fetches a `rules_python` toolchain. On Bazel 7 the
+libxcb module also raises `rules_python` and `protobuf` in a consumer's module
+graph on every platform; Bazel 9 resolves newer versions of both anyway.
 
 ## Tests
 

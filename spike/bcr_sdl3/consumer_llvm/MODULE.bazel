@@ -1,0 +1,15 @@
+# a consumer on the hermetic LLVM toolchain, as omniglot configures it.
+module(
+    name = "sdl3_consumer_llvm",
+    version = "0.0.0",
+)
+
+bazel_dep(name = "rules_cc", version = "0.2.16")
+bazel_dep(name = "sdl3", version = "3.4.16")
+bazel_dep(name = "toolchains_llvm", version = "1.9.0")
+
+llvm = use_extension("@toolchains_llvm//toolchain/extensions:llvm.bzl", "llvm")
+llvm.toolchain(llvm_version = "22.1.8")
+use_repo(llvm, "llvm_toolchain", "llvm_toolchain_llvm")
+
+register_toolchains("@llvm_toolchain//:all")

@@ -9,10 +9,6 @@ module(
     compatibility_level = 1,
 )
 
-# macOS: objc_library needs apple_support's C++ toolchain. Toolchains register
-# root module first, then in dependency order, so apple_support has to come
-# before rules_cc here and in the root module of every consumer; see README.md.
-bazel_dep(name = "apple_support", version = "2.3.0")
 bazel_dep(name = "platforms", version = "1.0.0")
 bazel_dep(name = "rules_cc", version = "0.2.16")
 
@@ -23,10 +19,6 @@ bazel_dep(name = "rules_cc_autoconf", version = "0.24.0")
 # Linux: headers only. SDL loads these libraries at runtime by soname.
 bazel_dep(name = "alsa_lib", version = "1.2.9.bcr.4")
 bazel_dep(name = "libx11", version = "1.8.12.bcr.5")
-
-# A direct dependency only so overlay/BUILD.bazel can leave its headers out;
-# libx11 depends on it anyway.
-bazel_dep(name = "libxcb", version = "1.17.0.bcr.2")
 bazel_dep(name = "libxcursor", version = "1.2.3")
 bazel_dep(name = "libxext", version = "1.3.6")
 bazel_dep(name = "libxfixes", version = "6.0.2")
