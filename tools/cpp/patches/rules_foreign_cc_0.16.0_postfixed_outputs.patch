@@ -310,20 +310,25 @@ index cf73a54..f17bc75 100644
      rm_rf = rm_rf,
      script_extension = script_extension,
 diff --git a/foreign_cc/private/framework.bzl b/foreign_cc/private/framework.bzl
-index b822e2b..2dc6297 100644
+index b822e2b..8f3597e 100644
 --- a/foreign_cc/private/framework.bzl
 +++ b/foreign_cc/private/framework.bzl
-@@ -560,6 +560,13 @@ def cc_external_rule_impl(ctx, attrs):
-         "##replace_sandbox_paths## $$INSTALLDIR$$ $$EXT_BUILD_ROOT$$",
-         installdir_copy.script,
-         "cd $$EXT_BUILD_ROOT$$",
-+    ] + [
-+        "##resolve_postfixed_output## {}".format(file.path)
+@@ -551,7 +551,17 @@ def cc_external_rule_impl(ctx, attrs):
+         "##mkdirs## $$EXT_BUILD_DEPS$$",
+     ] + _print_env() + _copy_deps_and_tools(inputs) + [
+         "cd $$BUILD_TMPDIR$$",
+-    ] + attrs.create_configure_script(ConfigureParameters(ctx = ctx, attrs = attrs, inputs = inputs)) + postfix_script + validation_script + [
++    ] + attrs.create_configure_script(ConfigureParameters(ctx = ctx, attrs = attrs, inputs = inputs)) + postfix_script + [
++        # Before the outputs are validated: a declared library the build renamed
++        # (a debug postfix, say) is resolved to what CMake reports it produced,
++        # so validation sees the name the rule declared.
++        "##resolve_postfixed_output## $$INSTALLDIR$$/{}".format(file.path[len(installdir) + 1:])
 +        for file in (
 +            outputs.libraries.static_libraries +
 +            outputs.libraries.shared_libraries +
 +            outputs.libraries.interface_libraries
 +        )
-     ] + [
-         "##replace_symlink## {}".format(file.path)
-         for file in (
++    ] + validation_script + [
+         # replace references to the root directory when building ($BUILD_TMPDIR)
+         # and the root where the dependencies were installed ($EXT_BUILD_DEPS)
+         # for the results which are in $INSTALLDIR (with placeholder)
