@@ -57,8 +57,10 @@ Where it differs from ctest:
   [32c19b9dc](https://github.com/libsdl-org/SDL/commit/32c19b9dc8c229e239434fedc94541c6abb3f84a).
   No 3.4.x release has it yet. Without it testprocess reads past a buffer and
   crashes on Windows ARM64, a platform SDL's own CI does not run tests on.
-- testsem does not run on macOS, and testtimer is retried. Both assert on
-  wall-clock durations, which GitHub-hosted macOS runners miss.
+- As in SDL's own CI, `SDL_TESTS_QUICK=1` skips the slow, timing-sensitive
+  parts of testatomic, testerror, testthread and testtimer, and testsem is
+  built with `SDL_ASSERT_LEVEL=1`. Its 2 s wait comes back up to 150 ms late on
+  macOS, which SDL's CI, building RelWithDebInfo, only logs.
 - ctest's `--trackmem` leak check is not reproduced; it is a regex over stdout.
 
 ## Upgrading
