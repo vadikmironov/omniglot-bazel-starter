@@ -433,7 +433,10 @@ _OBJC_SRCS = glob([
     genrule(
         name = "objc_" + src.replace("/", "_").replace(".", "_"),
         outs = ["objc/" + src + ".c"],
-        cmd = "echo '#include \"%s\"' > $@" % src.removeprefix("src/"),
+        # The path from the repository root, which is a quote-include
+        # directory: the .m file is found in the source tree, and its own
+        # relative includes resolve next to it there.
+        cmd = "echo '#include \"%s\"' > $@" % src,
         target_compatible_with = ["@platforms//os:macos"],
     )
     for src in _OBJC_SRCS

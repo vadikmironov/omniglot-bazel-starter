@@ -19,6 +19,9 @@ jobs:
       matrix:
         runner: [ macos-latest, macos-15-intel ]
         consumer: [ consumer, consumer_rules_cc_only, consumer_llvm ]
+        # toolchains_llvm has no macOS x86_64 build of LLVM 22.
+        exclude:
+          - { runner: macos-15-intel, consumer: consumer_llvm }
     steps:
     - uses: actions/checkout@v7
     - name: Build and test the module
