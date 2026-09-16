@@ -18,6 +18,15 @@ name: Spike - Q2 PBS Windows build
 # freethreaded+pgo) plus ours (debug, freethreaded+debug) is built here with
 # --vs 2026. Upstream's own probe is astral-sh/python-build-standalone#1261.
 #
+# Q4 (this job, pbs-arm64-native): upstream's own answer to Q3. The branch
+# jjh/win_arm64_native stacks eight commits that move the Visual Studio
+# environment inside build.py, make the toolset and tools version explicit, and
+# switch arm64 from the x64-hosted cross compiler to native arm64 tools. Two
+# things it does not answer by passing: whether v143 covers the Win32
+# _freeze_module step on that image, and whether PGO survives - the comment it
+# deletes said the arm toolset ignores PGO, and every arm64 configuration
+# upstream ships is a pgo one.
+#
 # Delete this workflow, and spike/, once #183 has its answer.
 
 on:
@@ -32,6 +41,10 @@ on:
       python:
         description: --python value
         default: cpython-3.14
+        type: string
+      arm64_native_ref:
+        description: ref for the Q4 arm64-native job
+        default: jjh/win_arm64_native
         type: string
 
 concurrency:
@@ -266,3 +279,148 @@ jobs:
       run: |
         set PATH=%CD%\pbs\unpacked\python\install;%PATH%
         embed_probe.exe %CD%\pbs\unpacked\python\install
+
+  # Q4: upstream's stack, unpatched. Our patch series is deliberately not applied
+  # - the questions here are upstream's, and eight commits rewriting build.py
+  # would fight it. build.py resolves vcvars itself on this ref, so there is no
+  # VCVARS step either.
+  pbs-arm64-native:
+    runs-on: windows-11-vs2026-arm
+    strategy:
+      fail-fast: false
+      matrix:
+        python:
+          - cpython-3.11
+          - cpython-3.12
+          - cpython-3.13
+          - cpython-3.14
+          - cpython-3.15
+    name: "Q4 ${{ matrix.python }} arm64 native pgo"
+    timeout-minutes: 120
+    permissions:
+      contents: read
+
+    steps:
+    - uses: actions/checkout@v7
+
+    - name: Check out python-build-standalone
+      uses: actions/checkout@v7
+      with:
+        repository: astral-sh/python-build-standalone
+        ref: ${{ inputs.arm64_native_ref || 'jjh/win_arm64_native' }}
+        path: pbs
+
+    - name: Report the ref under test
+      shell: bash
+      working-directory: pbs
+      run: git --no-pager log --oneline -8
+
+    - name: Report free disk space
+      shell: pwsh
+      run: Get-PSDrive -PSProvider FileSystem | Select-Object Name, Used, Free | Format-Table
+
+    - name: Install Cygwin
+      uses: cygwin/cygwin-install-action@v6
+      with:
+        packages: autoconf automake libtool
+
+    - uses: astral-sh/setup-uv@v9.0.0
+      with:
+        enable-cache: false
+
+    - name: Cache the pythonbuild crate
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          pbs/target
+        key: pbs-crate-${{ hashFiles('pbs/Cargo.lock') }}
+
+    - name: Build pythonbuild.exe
+      shell: pwsh
+      working-directory: pbs
+      run: |
+        cargo build --release
+        Copy-Item target/release/pythonbuild.exe . -Force
+
+    - name: Bootstrap the Python environment
+      shell: pwsh
+      working-directory: pbs
+      run: uv run --no-dev build.py --help
+
+    - name: Restore the PBS dependency cache
+      id: pbs-cache
+      uses: actions/cache/restore@v4
+      with:
+        path: pbs/build
+        key: pbs-q4-v1-${{ matrix.python }}-${{ hashFiles('pbs/pythonbuild/downloads.py') }}
+        restore-keys: pbs-q4-v1-${{ matrix.python }}-
+
+    # ci-targets.yaml on this ref gives arm64 vs_version 2026 with v143 and
+    # 14.4, so those are passed explicitly rather than left to the defaults,
+    # which pick v145 for 3.15. That combination is the one under test.
+    - name: Build ${{ matrix.python }} arm64 --options pgo
+      shell: cmd
+      working-directory: pbs
+      run: |
+        uv run --no-dev build.py --python %MATRIX_PYTHON% --sh c:\cygwin\bin\sh.exe ^
+          --options pgo --vs 2026 --platform-toolset v143 --vc-tools-version 14.4
+      env:
+        MATRIX_PYTHON: ${{ matrix.python }}
+
+    - name: Save the PBS dependency cache
+      if: success() && steps.pbs-cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: pbs/build
+        key: ${{ steps.pbs-cache.outputs.cache-primary-key }}
+
+    # The question a green build cannot answer. The deleted comment claimed the
+    # arm toolset ignores PGO, so look for the instrument and update passes in
+    # the build log and fail if the training run left no trace.
+    - name: Did PGO actually run?
+      if: always()
+      shell: pwsh
+      working-directory: pbs
+      run: |
+        $log = "build/build.log"
+        if (-not (Test-Path $log)) { Write-Host "no build.log"; exit 1 }
+        $instrument = Select-String -Path $log -Pattern "PGInstrument" -SimpleMatch
+        $update     = Select-String -Path $log -Pattern "PGUpdate"    -SimpleMatch
+        $pgd        = Select-String -Path $log -Pattern ".pgd"        -SimpleMatch
+        Write-Host "PGInstrument lines: $($instrument.Count)"
+        Write-Host "PGUpdate lines:     $($update.Count)"
+        Write-Host ".pgd mentions:      $($pgd.Count)"
+        if ($instrument.Count -eq 0 -or $update.Count -eq 0) {
+          Write-Host "::warning::no PGO instrument/update evidence in the build log"
+          exit 1
+        }
+
+    - name: What it produced
+      if: always()
+      shell: pwsh
+      working-directory: pbs
+      run: |
+        Get-ChildItem dist -ErrorAction SilentlyContinue |
+          Select-Object Name, @{n='MB';e={[math]::Round($_.Length/1MB,1)}} | Format-Table
+        if (Test-Path build/build.log) {
+          Write-Host "=== tail of build.log ==="
+          Get-Content build/build.log -Tail 40
+        }
+
+    - name: Validate the distribution
+      if: success()
+      shell: pwsh
+      working-directory: pbs
+      run: |
+        $dists = Resolve-Path -Path "dist/*.tar.zst" -Relative
+        ./pythonbuild.exe validate-distribution $dists
+
+    - name: Run the distribution tests
+      if: success()
+      shell: pwsh
+      working-directory: pbs
+      run: |
+        $dists = Resolve-Path -Path "dist/*.tar.zst" -Relative
+        uv run --no-dev test-distribution.py $dists
