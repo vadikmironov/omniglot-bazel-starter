@@ -247,11 +247,9 @@ _COMMON_SRCS = glob([
 ])
 
 # https://github.com/libsdl-org/SDL/blob/release-3.4.16/cmake/sdlchecks.cmake#L616-L641
-# https://github.com/libsdl-org/SDL/blob/release-3.4.16/cmake/sdlchecks.cmake#L686-L689
 _WAYLAND = wayland_protocol_sources(glob(["wayland-protocols/*.xml"]))
 
 # https://github.com/libsdl-org/SDL/blob/release-3.4.16/CMakeLists.txt#L1774-L2137
-# https://github.com/libsdl-org/SDL/blob/release-3.4.16/CMakeLists.txt#L3441-L3447
 # https://github.com/libsdl-org/SDL/blob/release-3.4.16/cmake/sdlchecks.cmake#L1090-L1101
 _LINUX_SRCS = glob([
     "src/audio/alsa/*.c",
@@ -298,7 +296,6 @@ _MACOS_SRCS = glob([
 ]
 
 # https://github.com/libsdl-org/SDL/blob/release-3.4.16/CMakeLists.txt#L2165-L2488
-# https://github.com/libsdl-org/SDL/blob/release-3.4.16/CMakeLists.txt#L3451-L3453
 # https://github.com/libsdl-org/SDL/blob/release-3.4.16/CMakeLists.txt#L3465-L3471
 _WINDOWS_SRCS = glob(
     [

@@ -4,7 +4,7 @@
     "strip_prefix": "SDL3-3.4.16",
     "overlay": {
         ".bazelignore": "sha256-tqmIyjy2h0kXazydPXeAK07a/vp8NLabWHBWDDNHTi4=",
-        "BUILD.bazel": "sha256-szZcV6PYZYY1yHoV+LNeScir1emoS8IOSOWKE5vqP2s=",
+        "BUILD.bazel": "sha256-U68FdWeodVrA9fLsb6E7elhofIGiBxRtfvLjbUch6k4=",
         "MODULE.bazel": "sha256-fuzbAEE0pymSaOk604Fta7YeszAVO+1rERCyIOkUhAc=",
         "cc_headers_only.bzl": "sha256-fip+Dx+mGt0umN73NLyYsiYo4DhD0M9AeALNZoduI+E=",
         "objc_wrappers.bzl": "sha256-dl59Pk35Xxe47r4zQmQpTXHjgu7VbuEmqWU1NTECMTk=",

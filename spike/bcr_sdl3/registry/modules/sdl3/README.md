@@ -29,9 +29,9 @@ headers that SDL supplies in `include/build_config/`. On Linux, the module
 generates that header with rules_cc_autoconf, from the checks in
 `sdl3_config_checks.bzl`, which copy SDL's own CMake checks.
 
-On Linux the module enables the ALSA audio driver, the X11 and Wayland video
-drivers, OpenGL through EGL, OpenGL ES 2, Vulkan, the V4L2 camera driver, and
-the evdev joystick and haptic drivers.
+On Linux the module enables the ALSA audio driver and the X11 and Wayland
+video drivers. It also enables OpenGL through EGL, OpenGL ES 2, Vulkan, the
+V4L2 camera driver, and the evdev joystick and haptic drivers.
 
 The module disables each backend that has no Bazel module: PulseAudio,
 PipeWire, JACK, sndio, OSS, KMSDRM, libdecor, D-Bus, libudev, libusb,
