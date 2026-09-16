@@ -63,10 +63,11 @@ jobs:
     - name: Install a toolchain and bazelisk
       run: |
         export DEBIAN_FRONTEND=noninteractive
-        # Debian 11 has left the main mirrors, so its packages come from the
-        # archive, whose release files are past their valid-until date.
+        # Debian 11 has left the main mirrors. The archive carries one suite,
+        # with no security or updates component, and its release file is past
+        # its valid-until date.
         if grep -q bullseye /etc/apt/sources.list 2>/dev/null; then
-          sed -i 's|http://deb.debian.org|http://archive.debian.org|g; s|http://security.debian.org|http://archive.debian.org|g' /etc/apt/sources.list
+          echo 'deb http://archive.debian.org/debian bullseye main' > /etc/apt/sources.list
           echo 'Acquire::Check-Valid-Until "false";' > /etc/apt/apt.conf.d/99no-check-valid-until
         fi
         apt-get update
