@@ -43,9 +43,11 @@ jobs:
           exit 1
         fi
 
-  # The two oldest images BCR presubmit uses. Their toolchains are GCC 9 and
-  # GCC 10, and the whole Linux build config comes from link probes, so the
-  # compiler decides what the module compiles.
+  # The oldest image BCR presubmit uses, whose toolchain is of the GCC 9 era.
+  # The whole Linux build config comes from link probes, so the compiler
+  # decides what the module compiles. debian11 is not reproduced here: that
+  # release has left Debian's mirrors, and what remains on the archive
+  # conflicts with the packages its image ships. BCR runs its own image.
   old-images:
     name: ${{ matrix.label }}
     runs-on: ubuntu-latest
@@ -58,18 +60,10 @@ jobs:
       matrix:
         include:
           - { image: "ubuntu:20.04", label: "ubuntu2004 container" }
-          - { image: "debian:11",    label: "debian11 container" }
     steps:
     - name: Install a toolchain and bazelisk
       run: |
         export DEBIAN_FRONTEND=noninteractive
-        # Debian 11 has left the main mirrors. The archive carries one suite,
-        # with no security or updates component, and its release file is past
-        # its valid-until date.
-        if grep -q bullseye /etc/apt/sources.list 2>/dev/null; then
-          echo 'deb http://archive.debian.org/debian bullseye main' > /etc/apt/sources.list
-          echo 'Acquire::Check-Valid-Until "false";' > /etc/apt/apt.conf.d/99no-check-valid-until
-        fi
         apt-get update
         apt-get install -y --no-install-recommends \
           build-essential ca-certificates curl git python3 unzip zip
