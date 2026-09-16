@@ -5,7 +5,7 @@
     "overlay": {
         ".bazelignore": "sha256-tqmIyjy2h0kXazydPXeAK07a/vp8NLabWHBWDDNHTi4=",
         "BUILD.bazel": "sha256-szZcV6PYZYY1yHoV+LNeScir1emoS8IOSOWKE5vqP2s=",
-        "MODULE.bazel": "sha256-HzSLNFubrH64H8i9e2MFbFQ8MZJzHnsPwesmWqOWWWs=",
+        "MODULE.bazel": "sha256-fuzbAEE0pymSaOk604Fta7YeszAVO+1rERCyIOkUhAc=",
         "cc_headers_only.bzl": "sha256-fip+Dx+mGt0umN73NLyYsiYo4DhD0M9AeALNZoduI+E=",
         "objc_wrappers.bzl": "sha256-dl59Pk35Xxe47r4zQmQpTXHjgu7VbuEmqWU1NTECMTk=",
         "sdl3_config_checks.bzl": "sha256-tviS3XLxJHfgZP4Y9Uv0TVia04+fj39dK1xeRSH1FbU=",
