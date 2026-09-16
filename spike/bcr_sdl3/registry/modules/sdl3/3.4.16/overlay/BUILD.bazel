@@ -437,9 +437,10 @@ _MACOS_LINKOPTS = [
 # apple_support's C++ toolchain, the only one that enables objc-compile, and
 # that toolchain loses to rules_cc's or toolchains_llvm's whenever either
 # registers first. Instead each .m file gets a one-line .c file that includes
-# it by its path from the repository root, a quote-include directory, compiled
-# as Objective-C with ARC by whichever C toolchain targets macOS. The .m file's
-# own relative includes still resolve next to it.
+# it by its path from the repository root, which is a quote-include directory
+# here. The wrappers compile as Objective-C with ARC under whichever C
+# toolchain targets macOS, and each .m file's own relative includes still
+# resolve next to it.
 # https://github.com/libsdl-org/SDL/blob/release-3.4.16/CMakeLists.txt#L2493-L2750
 # https://github.com/libsdl-org/SDL/blob/release-3.4.16/CMakeLists.txt#L3864-L3871
 _OBJC_SRCS = glob([
@@ -485,8 +486,9 @@ cc_library(
 )
 
 # The Linux libraries SDL loads at runtime by soname, as upstream does by
-# default. SDL compiles against their headers and links none of them, so
-# nothing of theirs is built.
+# default. Only their headers and include paths reach SDL's compile line, so
+# none of them is compiled for the target or linked. The wayland module's
+# scanner is still built, for the host, to generate the protocol code.
 # https://github.com/libsdl-org/SDL/blob/release-3.4.16/CMakeLists.txt#L234
 cc_headers_only(
     name = "linux_runtime_loaded_headers",
@@ -572,8 +574,9 @@ cc_library(
 )
 
 # What SDL's own tests (test/testautomation*.c, test/testevdev.c) read from
-# inside the tree: the build config and private headers, which they include
-# as "../src/..." and resolve through the include/ directory.
+# inside the tree: the private headers, which they include by relative path
+# such as "../src/SDL_internal.h", and the build config, which they include
+# by bare name through the include path this target carries.
 cc_library(
     name = "test_internals",
     testonly = True,

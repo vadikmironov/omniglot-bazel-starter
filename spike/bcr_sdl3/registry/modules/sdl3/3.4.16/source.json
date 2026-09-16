@@ -4,11 +4,11 @@
     "strip_prefix": "SDL3-3.4.16",
     "overlay": {
         ".bazelignore": "sha256-tqmIyjy2h0kXazydPXeAK07a/vp8NLabWHBWDDNHTi4=",
-        "BUILD.bazel": "sha256-OeDGhbHvzMiHfpvX0SYtUp0bRpxbOxkLoax5/ZKpOAM=",
+        "BUILD.bazel": "sha256-pRwUpcJtdXWL45VmSovmvDNcVM5b/gvdW40/iOdYy4U=",
         "MODULE.bazel": "sha256-HzSLNFubrH64H8i9e2MFbFQ8MZJzHnsPwesmWqOWWWs=",
         "cc_headers_only.bzl": "sha256-kJ1l+luYGkmch7Aj6o9IBgaQgnmcTCm57RdiXvXFtpg=",
         "objc_wrappers.bzl": "sha256-kN/HNl33I8lqWJ5krDCmjB+rlPDZIjmknUOQghNCtz0=",
-        "sdl3_config_checks.bzl": "sha256-2HNqJmZ0moHwFa9YDYy8CIBtYCv9oBD68lpjFBhi1Qo=",
+        "sdl3_config_checks.bzl": "sha256-blAWkHAzAHYGE/ok1Oz4Bj2+ttZiYWxNTq9nHwHIHSQ=",
         "test/BUILD.bazel": "sha256-3v5ucKArjHC/Lb6CFORKonwqFVTjO7RYO14F8vZ2bIk=",
         "test/bazel_testprocess_main.cc": "sha256-rW86pHC36q68OcIXl6zWUYoWZWETRMtj4OJv56xd2q4=",
         "test_module/BUILD.bazel": "sha256-/cxnYMV4oKJVCVpWyvs47Wor27GVJCMvf1Q2um6SDjs=",

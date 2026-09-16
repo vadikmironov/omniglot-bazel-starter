@@ -13,8 +13,11 @@ Two kinds of entries:
   * fixed AC_DEFINEs where CMake's answer follows from a build option, or
     from a dependency in MODULE.bazel. The X11, Wayland, xkbcommon and ALSA
     headers come from Bazel modules, which autoconf probes cannot see, so
-    their feature levels are written against the version floors there, which
-    a consumer can only resolve to or above.
+    those feature levels are fixed here. They describe the headers SDL
+    compiles against, not the libraries it loads on the user's machine. Where
+    a macro decides which symbols SDL then demands at runtime, as the
+    xkbcommon version macros in BUILD.bazel do, the safe value is the oldest
+    library SDL supports, not the floor in MODULE.bazel.
 
 A template entry with no check renders as `/* #undef NAME */`; a check with
 no template entry is dropped. README.md has the procedure for a version bump.
@@ -307,7 +310,8 @@ SDL3_CONFIG_CHECKS_LIBC = [
         define = "HAVE_ST_MTIM",
         includes = _includes(["sys/stat.h"]),
     ),
-    # CMake sets SDL_DISABLE_ALLOCA only under MSVC.
+    # alloca.h as CMake probes it. SDL_DISABLE_ALLOCA is MSVC-only, so it is
+    # never set here.
     # https://github.com/libsdl-org/SDL/blob/release-3.4.16/CMakeLists.txt#L1025-L1040
     _header("alloca.h"),
 ]
@@ -540,7 +544,10 @@ _LINUX_FIXED = [
 # MODULE.bazel. The feature checks CMake runs against the headers
 # (XGenericEventCookie, XIScrollClassInfo, XITouchClassInfo,
 # XIGesturePinchEvent, BarrierEventID) all hold from libx11 1.8, libxi 1.8
-# and xorgproto 2024.1 on. Xscrnsaver and XTest have no Bazel module.
+# and xorgproto 2024.1 on. Each also makes SDL demand the matching symbols
+# from the library it loads at runtime, as the xkbcommon macros do; these are
+# old enough that any libX11 or libXi in use has them, XInput2 since 2009.
+# Xscrnsaver and XTest have no Bazel module.
 # https://github.com/libsdl-org/SDL/blob/release-3.4.16/cmake/sdlchecks.cmake#L273-L564
 _X11_FIXED = [
     checks.AC_DEFINE("SDL_VIDEO_DRIVER_X11", "1"),
