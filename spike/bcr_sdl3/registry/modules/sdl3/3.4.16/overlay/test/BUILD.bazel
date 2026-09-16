@@ -2,16 +2,10 @@ load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library", "cc_test")
 
 # SDL's non-interactive test programs, run the way SDL's ctest runs them:
 # headless on the dummy video and audio drivers, with assertions fatal.
-# https://github.com/libsdl-org/SDL/blob/release-3.4.16/test/CMakeLists.txt#L596-L608
-#
-# Every program test/CMakeLists.txt marks NONINTERACTIVE is here, including
-# the ones it marks so only when the dummy drivers are on. The one left out is
-# pretest, which upstream builds for 32-bit Windows only.
-# https://github.com/libsdl-org/SDL/blob/release-3.4.16/test/CMakeLists.txt#L409-L411
+# Every program test/CMakeLists.txt marks NONINTERACTIVE is here; the one
+# left out is pretest, which upstream builds for 32-bit Windows only.
+# SDL_TESTS_QUICK=1 as SDL's CI sets it for the whole ctest run.
 # https://github.com/libsdl-org/SDL/blob/release-3.4.16/test/CMakeLists.txt#L497-L505
-#
-# SDL_TESTS_QUICK=1 as SDL's CI sets it for the whole ctest run: testatomic,
-# testerror, testthread and testtimer skip their slow, timing-sensitive parts.
 # https://github.com/libsdl-org/SDL/blob/release-3.4.16/.github/workflows/generic.yml#L244-L245
 _ENV = {
     "SDL_ASSERT": "abort",
@@ -28,9 +22,7 @@ _ENV_NO_SIMD = dict(
     SDL_CPU_FEATURE_MASK = "-all",
 )
 
-# Upstream compiles every test with HAVE_BUILD_CONFIG, which some of them read
-# to include SDL's build config or SDL_internal.h; without it testevdev passes
-# without testing anything.
+# Without HAVE_BUILD_CONFIG testevdev passes without testing anything.
 # https://github.com/libsdl-org/SDL/blob/release-3.4.16/test/CMakeLists.txt#L144
 _DEFINES = ["HAVE_BUILD_CONFIG"]
 
@@ -40,10 +32,8 @@ _DEPS = [
     "@sdl3//:test_internals",
 ]
 
-# SDL's tests include its private headers by relative path ("../src/...") and
-# get the build config through test_internals, which exports nothing of its
-# own, so layering_check is off for them. A consumer depending on @sdl3 alone
-# passes it.
+# SDL's tests include SDL's private headers by relative path, so
+# layering_check cannot work for them.
 _FEATURES = ["-layering_check"]
 
 # testver is C90 upstream.
@@ -54,9 +44,8 @@ _C90 = select({
     "//conditions:default": [],
 })
 
-# The automated suite. Its main() comes from testautomation.c through
-# SDL_main.h, hence alwayslink; the library lets the two runs below share the
-# objects.
+# main() comes from testautomation.c through SDL_main.h, hence alwayslink;
+# the library lets the two runs below share the objects.
 # https://github.com/libsdl-org/SDL/blob/release-3.4.16/test/CMakeLists.txt#L324-L325
 cc_library(
     name = "testautomation_lib",
@@ -71,9 +60,8 @@ cc_library(
     alwayslink = True,
 )
 
-# ctest runs these two one at a time, because testautomation writes temporary
-# files into the working directory. Under Bazel each test has its own
-# TEST_TMPDIR and its own runfiles tree, so they can run together.
+# ctest runs these two serially for temporary files in the working directory;
+# under Bazel each test has its own TEST_TMPDIR and runfiles tree.
 # https://github.com/libsdl-org/SDL/blob/release-3.4.16/test/CMakeLists.txt#L687-L688
 cc_test(
     name = "testautomation",
@@ -101,8 +89,7 @@ cc_test(
     deps = _DEPS,
 )
 
-# One target per NONINTERACTIVE program that needs no arguments, with the
-# timeout ctest gives it where that is above the default.
+# With the timeout ctest gives each, where that is above the default.
 # https://github.com/libsdl-org/SDL/blob/release-3.4.16/test/CMakeLists.txt#L321-L444
 [
     cc_test(
@@ -160,9 +147,8 @@ cc_test(
     deps = _DEPS,
 )
 
-# ctest runs testyuv with --automated alone: the automated check generates its
-# own images. Given a file name as well, the program frees that argv string on
-# exit and crashes.
+# --automated generates its own images. Given a file name as well, the
+# program frees that argv string on exit and crashes.
 # https://github.com/libsdl-org/SDL/blob/release-3.4.16/test/CMakeLists.txt#L435
 cc_test(
     name = "testyuv",
@@ -181,15 +167,9 @@ cc_test(
     deps = _DEPS,
 )
 
-# testprocess starts childprocess through SDL's process API and checks
-# arguments, environment, exit codes, signals and pipes. ctest passes it the
-# absolute path of childprocess; bazel_testprocess_main.cc resolves both
-# programs from the runfiles instead, which on Windows are a manifest rather
-# than a directory. patches/0001-testprocess-bounded-EOF-search.patch is
-# upstream's fix for an out-of-bounds read in this test that crashes it on
-# Windows ARM64.
+# ctest passes childprocess by absolute path; bazel_testprocess_main.cc finds
+# both programs in the runfiles, which on Windows are a manifest, not a tree.
 # https://github.com/libsdl-org/SDL/blob/release-3.4.16/test/CMakeLists.txt#L456-L463
-# https://github.com/libsdl-org/SDL/commit/32c19b9dc8c229e239434fedc94541c6abb3f84a
 cc_binary(
     name = "childprocess",
     testonly = True,
@@ -225,15 +205,10 @@ cc_test(
     deps = ["@rules_cc//cc/runfiles"],
 )
 
-# testsem asserts that a 2 s SDL_WaitSemaphoreTimeout ends within 2050 ms.
-# macOS timer leeway puts it 12 to 150 ms late, on SDL's own CI as on
-# GitHub-hosted runners here. SDL's CI builds RelWithDebInfo, where assert
-# level 1 compiles that check out of the whole suite; it is set here for macOS
-# alone, where the measurement is unreliable. Linux and Windows measure 1999 to
-# 2000 ms and keep the check. SDL_assert_release later in the file survives at
-# level 1 either way.
+# SDL_ASSERT_LEVEL=1 compiles out testsem's 2050 ms deadline check, as SDL's
+# own RelWithDebInfo CI does for the whole suite. macOS timer leeway misses it
+# by 12 to 150 ms; Linux and Windows measure 1999 to 2000 ms and keep it.
 # https://github.com/libsdl-org/SDL/blob/release-3.4.16/test/testsem.c#L106-L126
-# https://github.com/libsdl-org/SDL/blob/release-3.4.16/include/SDL3/SDL_assert.h#L96-L104
 cc_test(
     name = "testsem",
     size = "small",
@@ -249,8 +224,6 @@ cc_test(
     deps = _DEPS,
 )
 
-# testtimer's 1 ms delay loop is skipped under SDL_TESTS_QUICK, as in SDL's CI.
-# https://github.com/libsdl-org/SDL/blob/release-3.4.16/test/testtimer.c
 cc_test(
     name = "testtimer",
     size = "small",

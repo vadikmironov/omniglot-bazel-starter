@@ -1,4 +1,4 @@
-"""Forwards the headers of C and C++ dependencies without their libraries."""
+"""This file gives a rule that forwards headers without their libraries."""
 
 load("@rules_cc//cc/common:cc_common.bzl", "cc_common")
 load("@rules_cc//cc/common:cc_info.bzl", "CcInfo")
@@ -30,17 +30,14 @@ cc_headers_only = rule(
         ),
     },
     doc = """\
-Provides the headers and include paths of `deps` and nothing to link.
+This rule gives the headers and include paths of `deps`, and nothing to link.
 
-A cc_library dependency, `implementation_deps` included, also puts the
-dependency's archives on every downstream link line, so Bazel builds them.
-SDL loads these libraries at runtime by soname and only compiles against
-their headers, which is all this forwards.
+A cc_library dependency puts the archives of that dependency on every
+downstream link line. SDL loads these libraries at runtime by soname, and
+compiles only against their headers.
 
-The defines of `deps` are dropped. They belong to those libraries' own builds
-(libX11 exports its `XCMSDIR` and `XLOCALELIBDIR` paths, for one), and a
-dependency that starts exporting a `HAVE_*` name would silently change which
-features SDL compiles. Include paths are kept, as `-isystem` entries searched
-after the headers of the target being built.
+This rule also drops the defines of `deps`. Those defines belong to the builds
+of those libraries. If a dependency starts to export a `HAVE_*` name, that name
+changes the features that SDL compiles, and gives no warning.
 """,
 )

@@ -1,11 +1,7 @@
-// bazel_testprocess_main.cc -- runs testprocess with childprocess found in the runfiles.
-//
-// Not upstream. testprocess takes the path of the childprocess executable as
-// its only argument and starts it with SDL_CreateProcess. ctest passes an
-// absolute path. A Bazel test only has runfiles, and on Windows those are a
-// manifest, not a directory tree, so a relative path does not exist there.
-// This launcher resolves both executables through the runfiles library, then
-// runs testprocess with the resolved childprocess path and returns its exit code.
+// Not upstream. testprocess takes childprocess's path and starts it with
+// SDL_CreateProcess; ctest passes an absolute path. A Bazel test has only
+// runfiles, which on Windows are a manifest, not a directory tree, so this
+// launcher resolves both executables through the runfiles library.
 
 #include <cerrno>
 #include <cstdio>

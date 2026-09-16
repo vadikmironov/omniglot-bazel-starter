@@ -1,26 +1,48 @@
-"""Feature checks for SDL's Linux build config, mirroring SDL's CMake probes.
+"""Feature checks for SDL's Linux build configuration header.
 
-SDL ships hand-written build configs for Windows and Apple platforms and
-generates the Linux one with CMake: CMakeLists.txt and cmake/sdlchecks.cmake
-fill in include/build_config/SDL_build_config.h.cmake. The checks below
-reproduce that generation with rules_cc_autoconf, against the toolchain and
-sysroot Bazel builds with. Each group links the CMake lines it mirrors.
+SDL supplies hand-written headers for Windows and Apple platforms, and
+generates the Linux header with CMake. These checks do the same work with
+rules_cc_autoconf, against the toolchain and the sysroot that Bazel uses.
+Each group links to the CMake lines that it copies.
 
-Two kinds of entries:
+The file has two kinds of entry:
 
-  * probes wherever CMake probes the system. CMake's check_symbol_exists and
-    check_c_source_compiles build and link an executable, so these do too;
-  * fixed AC_DEFINEs where CMake's answer follows from a build option, or
-    from a dependency in MODULE.bazel. The X11, Wayland, xkbcommon and ALSA
-    headers come from Bazel modules, which autoconf probes cannot see, so
-    those feature levels are fixed here. They describe the headers SDL
-    compiles against, not the libraries it loads on the user's machine. Where
-    a macro decides which symbols SDL then demands at runtime, as the
-    xkbcommon version macros in BUILD.bazel do, the safe value is the oldest
-    library SDL supports, not the floor in MODULE.bazel.
+  * checks, wherever CMake examines the system. CMake's check_symbol_exists
+    and check_c_source_compiles build and link an executable, and these
+    checks do the same;
+  * fixed AC_DEFINEs, where CMake's answer follows from a build option or
+    from a dependency in MODULE.bazel. The checks cannot see the X11,
+    Wayland, xkbcommon and ALSA modules, so this file sets those values.
+    Where a macro decides which symbols SDL demands at runtime, use the
+    oldest library version that SDL supports, not the minimum version in
+    MODULE.bazel.
 
-A template entry with no check renders as `/* #undef NAME */`; a check with
-no template entry is dropped. README.md has the procedure for a version bump.
+A template entry with no check becomes `/* #undef NAME */`, and autoconf_hdr
+drops a check that has no template entry. Neither case gives a warning.
+
+To compare the generated header with SDL's own configure step, use a Linux
+machine that has the X11, Wayland, xkbcommon, ALSA, GL and EGL development
+packages:
+
+    cmake -S SDL3-<version> -B build -DCMAKE_BUILD_TYPE=Release \
+      -DSDL_SHARED=OFF -DSDL_STATIC=ON -DSDL_TESTS=OFF -DSDL_EXAMPLES=OFF \
+      -DSDL_TEST_LIBRARY=OFF -DSDL_INSTALL=OFF \
+      -DSDL_ALSA=ON -DSDL_PULSEAUDIO=OFF -DSDL_PIPEWIRE=OFF -DSDL_JACK=OFF \
+      -DSDL_SNDIO=OFF -DSDL_OSS=OFF -DSDL_X11=ON -DSDL_X11_XSCRNSAVER=OFF \
+      -DSDL_X11_XTEST=OFF -DSDL_FRIBIDI=OFF -DSDL_LIBTHAI=OFF -DSDL_WAYLAND=ON \
+      -DSDL_WAYLAND_LIBDECOR=OFF -DSDL_KMSDRM=OFF -DSDL_OPENVR=OFF -DSDL_RPI=OFF \
+      -DSDL_ROCKCHIP=OFF -DSDL_VIVANTE=OFF -DSDL_OPENGL=ON -DSDL_OPENGLES=ON \
+      -DSDL_VULKAN=ON -DSDL_DBUS=OFF -DSDL_IBUS=OFF -DSDL_LIBUDEV=OFF \
+      -DSDL_LIBURING=OFF -DSDL_HIDAPI_LIBUSB=OFF
+    diff <(grep '^#define' build/include-config-release/build_config/SDL_build_config.h | sort) \
+         <(grep '^#define' "$(bazel cquery --output=files @sdl3//:config_h)" | sort)
+
+Three differences are expected. CMake finds Mesa's `GL/glx.h` and sets
+`SDL_VIDEO_OPENGL_GLX`; this module has no GLX. CMake sets the
+`SDL_DISABLE_<intrinsics>` lines for the CPU of the machine that runs it;
+this module leaves them to `SDL_intrin.h`. CMake reads the packages on the
+machine for the xkbcommon and libdecor version macros; this file sets a
+minimum runtime version.
 """
 
 load("@rules_cc_autoconf//autoconf:checks.bzl", "checks")
@@ -51,9 +73,8 @@ def _includes(headers):
     return ["#include <%s>" % header for header in headers]
 
 def _builds(define, code, copts = [], linkopts = [], requires = None):
-    # A compile-and-link probe that defines `define` only when it succeeds:
-    # SDL reads these macros with #ifdef, so a `#define HAVE_X 0` on failure
-    # would count as present.
+    # Defines `define` only on success: SDL reads these with #ifdef, so a
+    # `#define HAVE_X 0` on failure would count as present.
     return checks.AC_TRY_LINK(
         code = code,
         copts = _PROBE_COPTS + copts,
@@ -107,9 +128,8 @@ _LIBC_HEADERS = [
     "wchar.h",
 ]
 
-# CMake probes each symbol against every header found above. Here each one
-# is probed with the header that declares it; the MSVC-only names
-# (itoa, _i64toa, _ltoa) are kept so a Windows port of this list is a diff.
+# CMake probes each symbol against every header found above; here each one is
+# probed with the header that declares it. The MSVC names are upstream's list.
 # https://github.com/libsdl-org/SDL/blob/release-3.4.16/CMakeLists.txt#L1078-L1119
 _LIBC_SYMBOLS = {
     "math.h": [
@@ -310,8 +330,7 @@ SDL3_CONFIG_CHECKS_LIBC = [
         define = "HAVE_ST_MTIM",
         includes = _includes(["sys/stat.h"]),
     ),
-    # alloca.h as CMake probes it. SDL_DISABLE_ALLOCA is MSVC-only, so it is
-    # never set here.
+    # SDL_DISABLE_ALLOCA is MSVC-only, so it is never set here.
     # https://github.com/libsdl-org/SDL/blob/release-3.4.16/CMakeLists.txt#L1025-L1040
     _header("alloca.h"),
 ]
@@ -540,13 +559,9 @@ _LINUX_FIXED = [
     checks.AC_DEFINE("SDL_VIDEO_RENDER_GPU", "1"),
 ]
 
-# X11, loaded at runtime by soname; the headers are the BCR modules in
-# MODULE.bazel. The feature checks CMake runs against the headers
-# (XGenericEventCookie, XIScrollClassInfo, XITouchClassInfo,
-# XIGesturePinchEvent, BarrierEventID) all hold from libx11 1.8, libxi 1.8
-# and xorgproto 2024.1 on. Each also makes SDL demand the matching symbols
-# from the library it loads at runtime, as the xkbcommon macros do; these are
-# old enough that any libX11 or libXi in use has them, XInput2 since 2009.
+# X11, loaded at runtime by soname; the headers are the modules in
+# MODULE.bazel. Each of these makes SDL demand the matching symbols from the
+# libX11 it dlopens; all are old enough (XInput2 since 2009) to be safe.
 # Xscrnsaver and XTest have no Bazel module.
 # https://github.com/libsdl-org/SDL/blob/release-3.4.16/cmake/sdlchecks.cmake#L273-L564
 _X11_FIXED = [

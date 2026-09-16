@@ -1,7 +1,4 @@
-"""SDL3 built from source with rules_cc.
-
-@sdl3 is the library, linked statically; @sdl3//:sdl3_test is SDL3_test.
-"""
+"""SDL3 built from source with rules_cc, linked statically."""
 
 load("@rules_cc//cc:defs.bzl", "cc_library")
 load("@rules_cc_autoconf//autoconf:autoconf.bzl", "autoconf")
@@ -32,25 +29,20 @@ _VERSION_DEFINES = [
 _LOCAL_DEFINES = ["SDL_STATIC_LIB"] + _VERSION_DEFINES
 
 # CMake enables the Steam storage backend on Windows and macOS; the build
-# configs SDL ships for them do not. Both halves of the macOS build take it.
+# configs SDL ships for them do not.
 # https://github.com/libsdl-org/SDL/blob/release-3.4.16/CMakeLists.txt#L2382-L2386
-# https://github.com/libsdl-org/SDL/blob/release-3.4.16/CMakeLists.txt#L2648-L2654
 _STEAM_DEFINES = ["SDL_STORAGE_STEAM=1"]
 
-# layering_check: SDL's own sources include X11 headers from modules they do
-# not depend on directly, such as X11/keysym.h from xorgproto.
-# parse_headers: src/ holds Objective-C headers, which a C compiler cannot
-# parse on its own; they are only ever included from the macOS sources.
+# layering_check: SDL includes X11 headers from modules it does not depend on
+# directly (X11/keysym.h from xorgproto). parse_headers: a C compiler cannot
+# parse the Objective-C headers under src/.
 _FEATURES = [
     "-layering_check",
     "-parse_headers",
 ]
 
-# SDL is built here as a dependency inside other projects' builds, where its
-# warnings are noise; upstream otherwise asks for its own -W list and /wd
-# suppressions. The split is by argument syntax, which puts clang-cl with MSVC.
-# -fno-strict-aliasing is not about warnings: upstream turns strict aliasing
-# off on every GCC-like compiler, and SDL's code relies on that.
+# -w: SDL builds as someone else's dependency here, where its warnings are noise.
+# -fno-strict-aliasing is correctness, not warnings: SDL's code relies on it.
 # https://github.com/libsdl-org/SDL/blob/release-3.4.16/cmake/sdlcompilers.cmake#L80-L83
 _COPTS = select({
     "@rules_cc//cc/compiler:clang-cl": ["/w"],
@@ -73,8 +65,7 @@ _DEBUG_DEFINES = select({
     "//conditions:default": [],
 })
 
-# Large files and a 64-bit time_t on 32-bit Linux, the only case upstream
-# sets them for (it checks for 32-bit glibc).
+# Large files and a 64-bit time_t, which upstream sets on 32-bit Linux only.
 # https://github.com/libsdl-org/SDL/blob/release-3.4.16/CMakeLists.txt#L512-L519
 [
     config_setting(
@@ -102,8 +93,6 @@ _LARGE_FILE_DEFINES = select({
     "//conditions:default": [],
 })
 
-# The platforms this module builds for. Elsewhere @sdl3 is incompatible, so a
-# wildcard build skips it instead of failing analysis.
 _SUPPORTED_OS = select({
     "@platforms//os:linux": [],
     "@platforms//os:macos": [],
@@ -118,22 +107,15 @@ cc_library(
     visibility = ["//visibility:public"],
 )
 
-# =============================================================================
-# Build config
-# =============================================================================
-
-# SDL_internal.h includes "SDL_build_config.h". Windows and Apple platforms
-# ship theirs under include/build_config/, where SDL_build_config.h picks the
-# platform's file.
+# SDL_internal.h includes "SDL_build_config.h"; the shipped one under
+# include/build_config/ dispatches to the Windows and Apple configs.
 cc_library(
     name = "build_config_shipped",
     hdrs = glob(["include/build_config/*.h"]),
     strip_include_prefix = "include/build_config",
 )
 
-# Linux gets the one SDL's CMake configure would generate, from the same
-# probes run against Bazel's toolchain; sdl3_config_checks.bzl mirrors them.
-# The chain is Linux-only so that `...` does not run the probes elsewhere.
+# Linux-only, so a wildcard build does not run the probes elsewhere.
 _LINUX_ONLY = ["@platforms//os:linux"]
 
 autoconf(
@@ -142,10 +124,8 @@ autoconf(
     target_compatible_with = _LINUX_ONLY,
 )
 
-# The tarball's own template, so a later release's entries come from
-# upstream. autoconf_hdr fills autoheader-style `#undef NAME` lines, which is
-# what CMake's `#cmakedefine NAME ...` becomes here; the `@VAR@` lines that
-# remain are substituted below.
+# autoconf_hdr fills autoheader-style `#undef NAME` lines, which is what
+# CMake's `#cmakedefine NAME ...` becomes here; `@VAR@` is substituted below.
 genrule(
     name = "build_config_h_in",
     srcs = ["include/build_config/SDL_build_config.h.cmake"],
@@ -154,22 +134,13 @@ genrule(
     target_compatible_with = _LINUX_ONLY,
 )
 
-# An entry with no matching check renders as `/* #undef NAME */`; a check
-# with no template entry is dropped. README.md has the check for both.
 autoconf_hdr(
     name = "config_h",
     out = "bazel/linux/SDL_build_config.h",
     substitutions = {
-        # Not the version of the headers SDL compiles against. SDL turns these
-        # into the symbols it demands from the libxkbcommon it dlopens on the
-        # user's machine, and a missing one disables the Wayland driver at
-        # runtime with no diagnostic: 1.0 makes xkb_keymap_key_get_mods_for_level
-        # mandatory, 1.10 makes xkb_keymap_mod_get_mask mandatory. 0.5.0 is the
-        # floor SDL's pkg-config spec asks for and what upstream falls back to
-        # when it cannot read a version, so raise these only to raise the
-        # runtime requirement on purpose. There is no libdecor.
-        # https://github.com/libsdl-org/SDL/blob/release-3.4.16/cmake/sdlchecks.cmake#L645
-        # https://github.com/libsdl-org/SDL/blob/release-3.4.16/cmake/sdlchecks.cmake#L712-L719
+        # Not the headers' version: these decide which libxkbcommon symbols SDL
+        # demands from the library it dlopens, and a missing one disables the
+        # Wayland driver at runtime with no diagnostic. 0.5.0 is SDL's floor.
         # https://github.com/libsdl-org/SDL/blob/release-3.4.16/src/video/wayland/SDL_waylandsym.h#L164-L174
         "@SDL_XKBCOMMON_VERSION_MAJOR@": "0",
         "@SDL_XKBCOMMON_VERSION_MINOR@": "5",
@@ -192,9 +163,8 @@ cc_library(
     target_compatible_with = _LINUX_ONLY,
 )
 
-# The EGL, GLES and Vulkan headers SDL vendors and builds against on every
-# platform. Upstream adds them with -idirafter, so installed system copies win
-# there; here the vendored copies always win, independent of the host.
+# The EGL, GLES and Vulkan headers SDL vendors. Upstream adds them with
+# -idirafter, so installed system copies win there; here they always win.
 # https://github.com/libsdl-org/SDL/blob/release-3.4.16/CMakeLists.txt#L554-L558
 cc_library(
     name = "khronos_headers",
@@ -202,8 +172,7 @@ cc_library(
     strip_include_prefix = "src/video/khronos",
 )
 
-# SDL's sources include "SDL_internal.h" and each other by bare name and by
-# paths relative to src/, so src/ is an include directory, for the build only.
+# SDL's sources include each other by bare name and by paths relative to src/.
 cc_library(
     name = "private_headers",
     hdrs = glob(
@@ -224,11 +193,9 @@ cc_library(
     deps = [":sdl3_headers"],
 )
 
-# Compiled on every platform. Backend files under these directories select
-# themselves with the SDL_* macros of the build config; SDL's CMake build
-# relies on the same (it globs src/render/*/*.c unconditionally, for one).
+# Compiled everywhere: the backend files under these directories select
+# themselves with the build config's SDL_* macros, as SDL's CMake globs do.
 # https://github.com/libsdl-org/SDL/blob/release-3.4.16/CMakeLists.txt#L1235-L1294
-# https://github.com/libsdl-org/SDL/blob/release-3.4.16/CMakeLists.txt#L1333-L1414
 # https://github.com/libsdl-org/SDL/blob/release-3.4.16/CMakeLists.txt#L3524-L3567
 _COMMON_SRCS = glob([
     "src/*.c",
@@ -367,9 +334,7 @@ _WINDOWS_SRCS = glob(
     "src/thread/generic/SDL_sysrwlock.c",
 ]
 
-# libm, dlopen and pthreads, as upstream links them.
 # https://github.com/libsdl-org/SDL/blob/release-3.4.16/CMakeLists.txt#L1107-L1112
-# https://github.com/libsdl-org/SDL/blob/release-3.4.16/cmake/sdlchecks.cmake#L52-L66
 # https://github.com/libsdl-org/SDL/blob/release-3.4.16/cmake/sdlchecks.cmake#L967-L969
 _LINUX_LINKOPTS = [
     "-ldl",
@@ -433,16 +398,8 @@ _MACOS_LINKOPTS = [
     ]
 ]
 
-# The Objective-C sources. objc_library would tie every macOS consumer to
-# apple_support's C++ toolchain, the only one that enables objc-compile, and
-# that toolchain loses to rules_cc's or toolchains_llvm's whenever either
-# registers first. Instead each .m file gets a one-line .c file that includes
-# it by its path from the repository root, which is a quote-include directory
-# here. The wrappers compile as Objective-C with ARC under whichever C
-# toolchain targets macOS, and each .m file's own relative includes still
-# resolve next to it.
+# The Objective-C sources; objc_wrappers.bzl explains the wrapping.
 # https://github.com/libsdl-org/SDL/blob/release-3.4.16/CMakeLists.txt#L2493-L2750
-# https://github.com/libsdl-org/SDL/blob/release-3.4.16/CMakeLists.txt#L3864-L3871
 _OBJC_SRCS = glob([
     "src/audio/coreaudio/*.m",
     "src/camera/coremedia/*.m",
@@ -466,13 +423,12 @@ objc_wrappers(
 cc_library(
     name = "sdl3_macos_objc",
     srcs = [":macos_objc_wrappers"],
-    # ARC as upstream compiles every Apple source with. -fobjc-weak is what
-    # upstream names for its MFi joystick sources and is inert under ARC.
+    # ARC as upstream compiles every Apple source with, and requires.
+    # https://github.com/libsdl-org/SDL/blob/release-3.4.16/CMakeLists.txt#L3866-L3871
     copts = _COPTS + [
         "-x",
         "objective-c",
         "-fobjc-arc",
-        "-fobjc-weak",
     ],
     features = _FEATURES,
     # The same defines as the C half: both compile SDL's private headers.
@@ -485,10 +441,7 @@ cc_library(
     ],
 )
 
-# The Linux libraries SDL loads at runtime by soname, as upstream does by
-# default. Only their headers and include paths reach SDL's compile line, so
-# none of them is compiled for the target or linked. The wayland module's
-# scanner is still built, for the host, to generate the protocol code.
+# The Linux libraries SDL loads at runtime by soname, as upstream does.
 # https://github.com/libsdl-org/SDL/blob/release-3.4.16/CMakeLists.txt#L234
 cc_headers_only(
     name = "linux_runtime_loaded_headers",
@@ -516,8 +469,7 @@ cc_library(
         "@platforms//os:windows": _WINDOWS_SRCS,
         "//conditions:default": [],
     }),
-    # The public headers are on this target too, so a consumer that depends on
-    # @sdl3 alone passes layering_check.
+    # On this target too, so a consumer depending on @sdl3 alone passes layering_check.
     hdrs = glob(["include/SDL3/*.h"]),
     copts = _COPTS,
     features = _FEATURES,
@@ -544,9 +496,8 @@ cc_library(
         "//conditions:default": [],
     }),
     local_defines = _LOCAL_DEFINES + _DEBUG_DEFINES + _LARGE_FILE_DEFINES + select({
-        # _REENTRANT as upstream compiles with on Linux. USING_GENERATED_CONFIG_H
-        # makes SDL's shipped dispatch header #error if it were ever picked up
-        # instead of the generated one.
+        # USING_GENERATED_CONFIG_H makes SDL's shipped dispatch header #error if
+        # it were ever picked up instead of the generated one.
         # https://github.com/libsdl-org/SDL/blob/release-3.4.16/cmake/sdlchecks.cmake#L967-L969
         "@platforms//os:linux": [
             "_REENTRANT",
@@ -573,10 +524,8 @@ cc_library(
     deps = [":sdl3"],
 )
 
-# What SDL's own tests (test/testautomation*.c, test/testevdev.c) read from
-# inside the tree: the private headers, which they include by relative path
-# such as "../src/SDL_internal.h", and the build config, which they include
-# by bare name through the include path this target carries.
+# What SDL's own tests read from inside the tree: the private headers, by
+# relative path, and the build config, by bare name.
 cc_library(
     name = "test_internals",
     testonly = True,

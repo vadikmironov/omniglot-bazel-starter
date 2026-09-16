@@ -1,9 +1,9 @@
-"""Writes one C file per Objective-C source, each including it."""
+"""This file gives a rule that wraps Objective-C sources for cc_library."""
 
 visibility("private")
 
 def _src_path(src):
-    """The source's path from the repository root, as its label spells it."""
+    """Returns the path of the source from the repository root."""
     label = src.owner
     return label.package + "/" + label.name if label.package else label.name
 
@@ -29,10 +29,10 @@ objc_wrappers = rule(
         ),
     },
     doc = """\
-For each source, a C file that includes it by its path from the repository
-root. A cc_library compiles those with `-x objective-c`, which lets any C
-toolchain that targets macOS build them; objc_library would accept the `.m`
-files directly but only with apple_support's toolchain. Each wrapper is its own
-translation unit, and `__FILE__` and the debug line table still name the `.m`.
+This rule writes one C file for each source. Each C file includes its source
+by the path from the repository root. A cc_library compiles those C files with
+`-x objective-c`, so any C toolchain that targets macOS can build them.
+objc_library accepts `.m` files directly, but works only with apple_support's
+toolchain. `__FILE__` and the debug line table still name the `.m` file.
 """,
 )
