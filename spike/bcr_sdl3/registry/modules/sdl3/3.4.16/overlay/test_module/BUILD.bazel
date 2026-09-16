@@ -1,0 +1,13 @@
+load("@rules_cc//cc:defs.bzl", "cc_test")
+
+# A consumer from outside the module, which is what an in-module test cannot
+# be: it takes the public headers and the library through @sdl3's visibility,
+# links the archives the library pulls in, and on macOS proves the
+# Objective-C half and its frameworks reach a consumer's link line.
+# C++ also proves the public headers work through their extern "C" guards.
+cc_test(
+    name = "smoke_test",
+    size = "small",
+    srcs = ["smoke.cc"],
+    deps = ["@sdl3"],
+)

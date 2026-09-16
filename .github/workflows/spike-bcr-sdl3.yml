@@ -43,6 +43,43 @@ jobs:
           exit 1
         fi
 
+  # The two oldest images BCR presubmit uses. Their toolchains are GCC 9 and
+  # GCC 10, and the whole Linux build config comes from link probes, so the
+  # compiler decides what the module compiles.
+  old-images:
+    name: ${{ matrix.label }}
+    runs-on: ubuntu-latest
+    container: ${{ matrix.image }}
+    timeout-minutes: 90
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { image: "ubuntu:20.04", label: "ubuntu2004 container" }
+          - { image: "debian:11",    label: "debian11 container" }
+    steps:
+    - name: Install a toolchain and bazelisk
+      run: |
+        export DEBIAN_FRONTEND=noninteractive
+        apt-get update
+        apt-get install -y --no-install-recommends \
+          build-essential ca-certificates curl git python3 unzip zip
+        curl -fsSL -o /usr/local/bin/bazel \
+          https://github.com/bazelbuild/bazelisk/releases/download/v1.27.0/bazelisk-linux-amd64
+        chmod +x /usr/local/bin/bazel
+    - uses: actions/checkout@v7
+    - name: Build and test the module
+      shell: bash
+      working-directory: spike/bcr_sdl3/consumer
+      run: |
+        registry="file://$(cd .. && pwd)/registry"
+        bazel version
+        bazel test --verbose_failures --test_output=errors \
+          --registry="$registry" --registry=https://bcr.bazel.build \
+          @sdl3//...
+
   build:
     name: ${{ matrix.label }}
     runs-on: ${{ matrix.runner }}
@@ -133,3 +170,32 @@ jobs:
         bazel $startup test --verbose_failures --test_output=errors \
           --registry="$registry" --registry=https://bcr.bazel.build \
           $targets
+
+    # What BCR presubmit runs as bcr_test_module: a separate module that links
+    # @sdl3. BCR points it at the extracted source with local_path_override;
+    # here the module comes from the staged registry instead.
+    - name: Build and test the test module
+      shell: bash
+      working-directory: spike/bcr_sdl3
+      env:
+        USE_BAZEL_VERSION: ${{ matrix.bazel }}
+      run: |
+        [[ -z "$USE_BAZEL_VERSION" ]] && unset USE_BAZEL_VERSION
+        if [[ "$RUNNER_OS" == Windows ]]; then
+          startup="--output_base=C:/bazel_test_module"
+          registry="file:///$(pwd -W)/registry"
+        else
+          startup="${{ matrix.rc }}"
+          registry="file://$(pwd)/registry"
+        fi
+        scratch="$(mktemp -d)"
+        cp registry/modules/sdl3/3.4.16/overlay/test_module/BUILD.bazel \
+           registry/modules/sdl3/3.4.16/overlay/test_module/smoke.cc "$scratch"/
+        cat > "$scratch/MODULE.bazel" <<'EOF'
+        bazel_dep(name = "rules_cc", version = "0.2.16")
+        bazel_dep(name = "sdl3", version = "3.4.16")
+        EOF
+        cd "$scratch"
+        bazel $startup test --verbose_failures --test_output=all \
+          --registry="$registry" --registry=https://bcr.bazel.build \
+          //...

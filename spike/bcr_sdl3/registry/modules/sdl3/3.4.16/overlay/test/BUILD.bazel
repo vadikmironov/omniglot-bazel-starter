@@ -71,6 +71,10 @@ cc_library(
     alwayslink = True,
 )
 
+# ctest runs these two one at a time, because testautomation writes temporary
+# files into the working directory. Under Bazel each test has its own
+# TEST_TMPDIR and its own runfiles tree, so they can run together.
+# https://github.com/libsdl-org/SDL/blob/release-3.4.16/test/CMakeLists.txt#L687-L688
 cc_test(
     name = "testautomation",
     size = "medium",
@@ -223,9 +227,11 @@ cc_test(
 
 # testsem asserts that a 2 s SDL_WaitSemaphoreTimeout ends within 2050 ms.
 # macOS timer leeway puts it 12 to 150 ms late, on SDL's own CI as on
-# GitHub-hosted runners here. SDL's CI builds RelWithDebInfo, where SDL_assert
-# defaults to level 1 and the check only logs; the same level is set here,
-# for testsem alone, so the rest of the suite keeps its asserts.
+# GitHub-hosted runners here. SDL's CI builds RelWithDebInfo, where assert
+# level 1 compiles that check out of the whole suite; it is set here for macOS
+# alone, where the measurement is unreliable. Linux and Windows measure 1999 to
+# 2000 ms and keep the check. SDL_assert_release later in the file survives at
+# level 1 either way.
 # https://github.com/libsdl-org/SDL/blob/release-3.4.16/test/testsem.c#L106-L126
 # https://github.com/libsdl-org/SDL/blob/release-3.4.16/include/SDL3/SDL_assert.h#L96-L104
 cc_test(
@@ -236,7 +242,10 @@ cc_test(
     args = ["10"],
     env = _ENV,
     features = _FEATURES,
-    local_defines = _DEFINES + ["SDL_ASSERT_LEVEL=1"],
+    local_defines = _DEFINES + select({
+        "@platforms//os:macos": ["SDL_ASSERT_LEVEL=1"],
+        "//conditions:default": [],
+    }),
     deps = _DEPS,
 )
 

@@ -7,6 +7,7 @@ load("@rules_cc//cc:defs.bzl", "cc_library")
 load("@rules_cc_autoconf//autoconf:autoconf.bzl", "autoconf")
 load("@rules_cc_autoconf//autoconf:autoconf_hdr.bzl", "autoconf_hdr")
 load(":cc_headers_only.bzl", "cc_headers_only")
+load(":objc_wrappers.bzl", "objc_wrappers")
 load(
     ":sdl3_config_checks.bzl",
     "SDL3_CONFIG_CHECKS_COMPILER",
@@ -29,6 +30,21 @@ _VERSION_DEFINES = [
 ] if len(_VERSION) >= 3 else []
 
 _LOCAL_DEFINES = ["SDL_STATIC_LIB"] + _VERSION_DEFINES
+
+# CMake enables the Steam storage backend on Windows and macOS; the build
+# configs SDL ships for them do not. Both halves of the macOS build take it.
+# https://github.com/libsdl-org/SDL/blob/release-3.4.16/CMakeLists.txt#L2382-L2386
+# https://github.com/libsdl-org/SDL/blob/release-3.4.16/CMakeLists.txt#L2648-L2654
+_STEAM_DEFINES = ["SDL_STORAGE_STEAM=1"]
+
+# layering_check: SDL's own sources include X11 headers from modules they do
+# not depend on directly, such as X11/keysym.h from xorgproto.
+# parse_headers: src/ holds Objective-C headers, which a C compiler cannot
+# parse on its own; they are only ever included from the macOS sources.
+_FEATURES = [
+    "-layering_check",
+    "-parse_headers",
+]
 
 # SDL is built here as a dependency inside other projects' builds, where its
 # warnings are noise; upstream otherwise asks for its own -W list and /wd
@@ -144,13 +160,20 @@ autoconf_hdr(
     name = "config_h",
     out = "bazel/linux/SDL_build_config.h",
     substitutions = {
-        # The xkbcommon floor from MODULE.bazel; keep the two in step. SDL
-        # gates optional xkbcommon symbols on this version, and a consumer can
-        # only ever resolve the floor or newer, so the floor is always safe.
-        # There is no libdecor.
-        "@SDL_XKBCOMMON_VERSION_MAJOR@": "1",
-        "@SDL_XKBCOMMON_VERSION_MINOR@": "9",
-        "@SDL_XKBCOMMON_VERSION_PATCH@": "2",
+        # Not the version of the headers SDL compiles against. SDL turns these
+        # into the symbols it demands from the libxkbcommon it dlopens on the
+        # user's machine, and a missing one disables the Wayland driver at
+        # runtime with no diagnostic: 1.0 makes xkb_keymap_key_get_mods_for_level
+        # mandatory, 1.10 makes xkb_keymap_mod_get_mask mandatory. 0.5.0 is the
+        # floor SDL's pkg-config spec asks for and what upstream falls back to
+        # when it cannot read a version, so raise these only to raise the
+        # runtime requirement on purpose. There is no libdecor.
+        # https://github.com/libsdl-org/SDL/blob/release-3.4.16/cmake/sdlchecks.cmake#L645
+        # https://github.com/libsdl-org/SDL/blob/release-3.4.16/cmake/sdlchecks.cmake#L712-L719
+        # https://github.com/libsdl-org/SDL/blob/release-3.4.16/src/video/wayland/SDL_waylandsym.h#L164-L174
+        "@SDL_XKBCOMMON_VERSION_MAJOR@": "0",
+        "@SDL_XKBCOMMON_VERSION_MINOR@": "5",
+        "@SDL_XKBCOMMON_VERSION_PATCH@": "0",
         "@SDL_LIBDECOR_VERSION_MAJOR@": "0",
         "@SDL_LIBDECOR_VERSION_MINOR@": "0",
         "@SDL_LIBDECOR_VERSION_PATCH@": "0",
@@ -187,6 +210,7 @@ cc_library(
         ["src/**/*.h"],
         exclude = ["src/video/khronos/**"],
     ),
+    features = _FEATURES,
     strip_include_prefix = "src",
     # .c files SDL includes textually (test/testevdev.c includes the first),
     # and the Objective-C sources, which sdl3_macos_objc's wrappers include.
@@ -432,28 +456,26 @@ _OBJC_SRCS = glob([
     "src/video/cocoa/*.m",
 ])
 
-[
-    genrule(
-        name = "objc_" + src.replace("/", "_").replace(".", "_"),
-        outs = ["objc/" + src + ".c"],
-        cmd = "echo '#include \"%s\"' > $@" % src,
-        target_compatible_with = ["@platforms//os:macos"],
-    )
-    for src in _OBJC_SRCS
-]
+objc_wrappers(
+    name = "macos_objc_wrappers",
+    srcs = _OBJC_SRCS,
+    target_compatible_with = ["@platforms//os:macos"],
+)
 
 cc_library(
     name = "sdl3_macos_objc",
-    srcs = ["objc/" + src + ".c" for src in _OBJC_SRCS],
-    # -fobjc-weak as upstream gives the joystick sources; harmless elsewhere.
+    srcs = [":macos_objc_wrappers"],
+    # ARC as upstream compiles every Apple source with. -fobjc-weak is what
+    # upstream names for its MFi joystick sources and is inert under ARC.
     copts = _COPTS + [
         "-x",
         "objective-c",
         "-fobjc-arc",
         "-fobjc-weak",
     ],
-    features = ["-layering_check"],
-    local_defines = _LOCAL_DEFINES + _DEBUG_DEFINES,
+    features = _FEATURES,
+    # The same defines as the C half: both compile SDL's private headers.
+    local_defines = _LOCAL_DEFINES + _DEBUG_DEFINES + _STEAM_DEFINES,
     target_compatible_with = ["@platforms//os:macos"],
     deps = [
         ":build_config_shipped",
@@ -496,9 +518,7 @@ cc_library(
     # @sdl3 alone passes layering_check.
     hdrs = glob(["include/SDL3/*.h"]),
     copts = _COPTS,
-    # SDL's own sources include X11 headers from modules they do not depend on
-    # directly, such as X11/keysym.h from xorgproto.
-    features = ["-layering_check"],
+    features = _FEATURES,
     implementation_deps = [
         ":khronos_headers",
         ":private_headers",
@@ -530,12 +550,8 @@ cc_library(
             "_REENTRANT",
             "USING_GENERATED_CONFIG_H",
         ],
-        # CMake enables the Steam storage backend on Windows and macOS; the
-        # build configs SDL ships for them do not.
-        # https://github.com/libsdl-org/SDL/blob/release-3.4.16/CMakeLists.txt#L2382-L2386
-        # https://github.com/libsdl-org/SDL/blob/release-3.4.16/CMakeLists.txt#L2648-L2654
-        "@platforms//os:macos": ["SDL_STORAGE_STEAM=1"],
-        "@platforms//os:windows": ["SDL_STORAGE_STEAM=1"],
+        "@platforms//os:macos": _STEAM_DEFINES,
+        "@platforms//os:windows": _STEAM_DEFINES,
         "//conditions:default": [],
     }),
     target_compatible_with = _SUPPORTED_OS,
