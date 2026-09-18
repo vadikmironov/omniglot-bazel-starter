@@ -13,7 +13,7 @@
         "test/bazel_testprocess_main.cc": "sha256-lz5e9wxNp9DvSPkpLRoW0mQzGb5p1scDQ+WHqO5jnLY=",
         "test_module/BUILD.bazel": "sha256-DzprLosejPElRAChb1ocT889giQBFVStYt7vRwV+k6I=",
         "test_module/MODULE.bazel": "sha256-ZEb/WWU411T0S6WCZmqauB1yJ+ncNy64R9KYc9deqLA=",
-        "test_module/smoke.cc": "sha256-U4JtRaKepd/4Q8xwSwxBh0mjr5QwkH6ajqWsXDQHaNA=",
+        "test_module/smoke.cc": "sha256-vtHFLqg6/4bbT2NeFIdoM/7ZH9865XgFU0dPChjSNds=",
         "wayland_protocols.bzl": "sha256-aQKTL74aE8DGPFbbcYTKSdxVtgQGUQMwnd3oarNoloM="
     },
     "patch_strip": 1,
