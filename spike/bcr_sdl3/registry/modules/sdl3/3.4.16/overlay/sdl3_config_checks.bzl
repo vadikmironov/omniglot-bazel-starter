@@ -560,10 +560,12 @@ _LINUX_FIXED = [
 ]
 
 # X11, loaded at runtime by soname; the headers are the modules in
-# MODULE.bazel. Each of these makes SDL demand the matching symbols from the
-# libX11 it dlopens; all are old enough (XInput2 since 2009) to be safe.
-# Xscrnsaver and XTest have no Bazel module.
+# MODULE.bazel. Each extension macro makes SDL load that extension's symbols
+# from the system library. The newest are from libXi 1.7 (2013), and a missing
+# one turns off that extension only, not the X11 driver. Xscrnsaver and XTest
+# have no Bazel module.
 # https://github.com/libsdl-org/SDL/blob/release-3.4.16/cmake/sdlchecks.cmake#L273-L564
+# https://github.com/libsdl-org/SDL/blob/release-3.4.16/src/video/x11/SDL_x11sym.h#L177-L184
 _X11_FIXED = [
     checks.AC_DEFINE("SDL_VIDEO_DRIVER_X11", "1"),
     checks.AC_DEFINE("SDL_VIDEO_DRIVER_X11_DYNAMIC", '"libX11.so.6"'),

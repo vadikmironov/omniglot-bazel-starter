@@ -24,10 +24,10 @@ On macOS, `cc_library` compiles SDL's Objective-C sources. A consumer needs no
 
 ## What the module builds
 
-On Windows and Apple platforms, the module uses the build configuration
-headers that SDL supplies in `include/build_config/`. On Linux, the module
-generates that header with rules_cc_autoconf, from the checks in
-`sdl3_config_checks.bzl`, which copy SDL's own CMake checks.
+On Windows and macOS, the module uses the build configuration headers that
+SDL supplies in `include/build_config/`. On Linux, the module generates that
+header with rules_cc_autoconf, from the checks in `sdl3_config_checks.bzl`,
+which copy SDL's own CMake checks.
 
 On Linux the module enables the ALSA audio driver and the X11 and Wayland
 video drivers. It also enables OpenGL through EGL, OpenGL ES 2, Vulkan, the
@@ -53,17 +53,17 @@ machine that runs the program:
 
 The module applies one patch, upstream commit
 [32c19b9dc](https://github.com/libsdl-org/SDL/commit/32c19b9dc8c229e239434fedc94541c6abb3f84a).
-That commit limits a read after the end of a buffer in `test/testprocess.c`.
+That commit stops a read past the end of a buffer in `test/testprocess.c`.
 No 3.4.x release contains it. Delete `patches/` and the `patches` entry in
 `source.json` when a release contains it.
 
 ## Tests
 
-`@sdl3//test` runs the non-interactive programs of `test/CMakeLists.txt`
-headless, on the dummy video driver and the dummy audio driver. The one
-program left out is pretest, which upstream builds for 32-bit Windows only.
-The presubmit matrix also builds `overlay/test_module`, which links `@sdl3` as
-a consumer links it.
+The `@sdl3//test` package runs the non-interactive programs of
+`test/CMakeLists.txt` headless, on the dummy video driver and the dummy audio
+driver. The one program left out is pretest, which upstream builds for 32-bit
+Windows only. The presubmit matrix also builds `overlay/test_module`, which
+links `@sdl3` as a consumer links it.
 
 ## Upgrading
 
@@ -75,7 +75,11 @@ a consumer links it.
    backend directory. testsymbols fails to link if a source file is absent.
 3. Examine `test/testprocess.c` in the new release. If that file limits the
    EOF search with `SDL_strnstr`, delete the patch as above.
-4. Update the hashes with `bazel run //tools:update_integrity -- sdl3
+4. Set the new version in `MODULE.bazel` and in `overlay/MODULE.bazel`. Keep
+   the two files identical, because `bcr_validation` compares them.
+5. Change the `release-3.4.16` links in `overlay/` to the new release tag.
+   Correct each line anchor that moved.
+6. Update the hashes with `bazel run //tools:update_integrity -- sdl3
    --version=<new>`. Then start the presubmit matrix.
 
 `sdl3_config_checks.bzl` gives the procedure to compare the generated Linux

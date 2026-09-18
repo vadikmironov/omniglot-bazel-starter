@@ -31,6 +31,7 @@ _LOCAL_DEFINES = ["SDL_STATIC_LIB"] + _VERSION_DEFINES
 # CMake enables the Steam storage backend on Windows and macOS; the build
 # configs SDL ships for them do not.
 # https://github.com/libsdl-org/SDL/blob/release-3.4.16/CMakeLists.txt#L2382-L2386
+# https://github.com/libsdl-org/SDL/blob/release-3.4.16/CMakeLists.txt#L2648-L2654
 _STEAM_DEFINES = ["SDL_STORAGE_STEAM=1"]
 
 # layering_check: SDL includes X11 headers from modules it does not depend on
@@ -493,9 +494,11 @@ cc_library(
         "//conditions:default": [],
     }),
     local_defines = _LOCAL_DEFINES + _DEBUG_DEFINES + _LARGE_FILE_DEFINES + select({
-        # USING_GENERATED_CONFIG_H makes SDL's shipped dispatch header #error if
-        # it were ever picked up instead of the generated one.
+        # _REENTRANT as upstream's pthread check adds it. USING_GENERATED_CONFIG_H
+        # makes SDL's shipped dispatch header #error if it were ever picked up
+        # instead of the generated one.
         # https://github.com/libsdl-org/SDL/blob/release-3.4.16/cmake/sdlchecks.cmake#L967-L969
+        # https://github.com/libsdl-org/SDL/blob/release-3.4.16/CMakeLists.txt#L547
         "@platforms//os:linux": [
             "_REENTRANT",
             "USING_GENERATED_CONFIG_H",
