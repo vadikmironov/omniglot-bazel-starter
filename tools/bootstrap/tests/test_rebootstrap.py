@@ -29,11 +29,13 @@ from bootstrap.manifest import (
     read_bootstrap_orphans,
     resolve_files,
     starter_revision,
+    unignored_files,
     write_bootstrap_marker,
 )
 from bootstrap.processor import has_user_region
 from bootstrap.scaffolder import (
     ScaffoldResult,
+    _make_ignore,
     feature_remover_commands,
     prunable_orphans,
     prune_orphans,
@@ -673,6 +675,50 @@ class TestOrphans(_ScaffoldHarness):
         self.assertEqual(removed, ["tools/python/old.bzl", "tools/python/patches/deep/old.patch"])
         self.assertFalse((target / "tools/python/patches").exists(), "emptied directories should go")
         self.assertTrue((target / "tools/python/pyproject.toml").is_file(), "a directory with content stays")
+
+
+class TestIgnoredFilesStayBehind(_ScaffoldHarness):
+    """A directory copy ships what git does not ignore, not the checkout's debris."""
+
+    def _git_checkout(self) -> Path:
+        repo = self._fresh_target()
+        for args in (["init", "-q"], ["config", "user.email", "t@example.invalid"], ["config", "user.name", "t"]):
+            subprocess.run(["git", "-C", str(repo), *args], check=True, capture_output=True)  # noqa: S603, S607
+        (repo / ".gitignore").write_text("__pycache__/\n*.pyc\n")
+        (repo / "tools/x/tests/__pycache__").mkdir(parents=True)
+        (repo / "tools/x/tracked.py").write_text("tracked\n")
+        (repo / "tools/x/tests/test_x.py").write_text("tracked\n")
+        (repo / "tools/x/tests/__pycache__/test_x.cpython-314.pyc").write_text("debris\n")
+        (repo / "tools/x/stray.pyc").write_text("debris\n")
+        subprocess.run(["git", "-C", str(repo), "add", "-A"], check=True, capture_output=True)  # noqa: S603, S607
+        subprocess.run(["git", "-C", str(repo), "commit", "-q", "-m", "init"], check=True, capture_output=True)  # noqa: S603, S607
+        (repo / "tools/x/work_in_progress.py").write_text("untracked, not ignored\n")
+        return repo
+
+    def test_unignored_files_are_tracked_plus_unignored_untracked(self) -> None:
+        repo = self._git_checkout()
+        self.assertEqual(
+            unignored_files(repo, "tools/x"),
+            {"tools/x/tracked.py", "tools/x/tests/test_x.py", "tools/x/work_in_progress.py"},
+        )
+
+    def test_outside_a_git_checkout_nothing_is_filtered(self) -> None:
+        self.assertIsNone(unignored_files(self._fresh_target(), "tools/x"))
+
+    def test_directory_copy_leaves_ignored_files_behind(self) -> None:
+        repo = self._git_checkout()
+        kept = unignored_files(repo, "tools/x") or set()
+        dst = self._fresh_target() / "x"
+        shutil.copytree(repo / "tools/x", dst, ignore=_make_ignore(set(), {repo / rel for rel in kept}))
+        copied = {path.relative_to(dst).as_posix() for path in dst.rglob("*") if path.is_file()}
+        self.assertEqual(copied, {"tracked.py", "tests/test_x.py", "work_in_progress.py"})
+        self.assertFalse((dst / "tests/__pycache__").exists(), "a directory with only debris should not be created")
+
+    def test_without_a_keep_set_everything_is_copied(self) -> None:
+        repo = self._git_checkout()
+        dst = self._fresh_target() / "x"
+        shutil.copytree(repo / "tools/x", dst, ignore=_make_ignore(set()))
+        self.assertTrue((dst / "stray.pyc").is_file())
 
 
 class TestFeatureRemovers(_ScaffoldHarness):

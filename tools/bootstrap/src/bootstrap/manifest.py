@@ -309,6 +309,20 @@ def _git(source_root: Path, *args: str) -> str | None:
     return result.stdout.strip()
 
 
+def unignored_files(source_root: Path, rel_dir: str) -> set[str] | None:
+    """Files under *rel_dir* that git does not ignore, relative to *source_root*.
+
+    Tracked files plus untracked ones no ignore rule matches, so work in
+    progress still ships while build debris (``__pycache__``, editor backups)
+    does not. None when *source_root* is not a git checkout: a tarball has no
+    debris to filter, and everything in it ships.
+    """
+    listing = _git(source_root, "ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", rel_dir)
+    if listing is None:
+        return None
+    return {rel for rel in listing.split("\0") if rel}
+
+
 def starter_revision(source_root: Path) -> str | None:
     """The starter checkout's HEAD, ``-dirty`` when it has uncommitted changes.
 

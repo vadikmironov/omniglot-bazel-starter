@@ -19,7 +19,11 @@ subset of this repo into the target, rewrites the module name, `git init`s, and
   user-managed region splicing (`splice_user_region`).
 - `src/bootstrap/scaffolder.py` — orchestrates copy → filter → render-README →
   substitute → git, then lock-file refresh and `_FEATURE_FINALIZERS` (e.g.
-  `publish_gen`, `lint_gen`). `_render_readme` filters `templates/README.md` for the
+  `publish_gen`, `lint_gen`). A directory copy ships only what git does not ignore
+  in the starter checkout (`manifest.unignored_files`: tracked files plus
+  untracked ones no ignore rule matches), so `__pycache__` and the like stay
+  behind while uncommitted work still ships. Outside a git checkout it ships
+  everything. `_render_readme` filters `templates/README.md` for the
   selection, swaps the `{{code_dir}}` token, and writes `README.md` through the same
   managed-overwrite path as composite files (user-managed intro preserved on re-bootstrap).
 - `templates/README.md` — section-markered template for the *generated* repo README.
