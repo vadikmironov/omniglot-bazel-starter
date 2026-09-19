@@ -837,8 +837,8 @@ class TestScaffolder(unittest.TestCase):
         """MODULE-file labels resolve under feature selections too.
 
         The 31 language subsets run featureless, so a file referenced only from
-        a ``feature:`` section (the aspect_rules_lint patch, the publish and
-        coverage segments) is exercised here: every feature at once, each
+        a ``feature:`` section (the publish and coverage segments) is
+        exercised here: every feature at once, each
         feature that gates a MODULE reference alone, and the empty selection.
         """
         selections: list[tuple[set[str], set[str]]] = [
@@ -855,10 +855,12 @@ class TestScaffolder(unittest.TestCase):
                 target = self._scaffold(languages, features=features)
                 self._assert_no_markers(target)
                 self._assert_module_labels_resolve(target)
-                # The lint feature's cpp-only files (the clang-tidy patch and its
-                # BUILD): present with cpp AND lint, absent otherwise.
-                for rel in self.manifest.features["lint"].language_files["cpp"]:
-                    self.assertEqual((target / rel).is_file(), "cpp" in languages and "lint" in features, rel)
+                # The lint feature's per-language files: present with one of their
+                # languages AND lint, absent otherwise.
+                for tag, rels in self.manifest.features["lint"].language_files.items():
+                    tags = {t.strip() for t in tag.split(",")}
+                    for rel in rels:
+                        self.assertEqual((target / rel).is_file(), bool(tags & languages) and "lint" in features, rel)
 
 
 # ── Dynamic test generation for all 31 non-empty subsets ─────────────

@@ -126,16 +126,8 @@ composite_files = [
 # language (pruned on re-bootstrap when either is dropped):
 #   rust: clippy_assert_empty.sh, the clippy gate's assertion script, referenced
 #         by tools/lint/BUILD (exports_files) and linters.bzl (clippy_test).
-#   cpp:  the aspect_rules_lint clang-tidy patch and its exporting BUILD,
-#         referenced by the single_version_override in MODULE.bazel's
-#         `feature:lint lang:cpp` block. tools/lint is not a directory copy, so
-#         a patch under it must be listed here to ship.
 [features.lint.language_files]
 rust = ["tools/lint/clippy_assert_empty.sh"]
-cpp = [
-    "tools/lint/patches/BUILD",
-    "tools/lint/patches/aspect_rules_lint_2.9.0_clang_tidy_header_filter.patch",
-]
 
 # Single-language gazelle generators: shipped only when the lint feature AND the
 # named language are both selected, so an omitted language's generator file is
