@@ -19,7 +19,11 @@ subset of this repo into the target, rewrites the module name, `git init`s, and
   user-managed region splicing (`splice_user_region`).
 - `src/bootstrap/scaffolder.py` — orchestrates copy → filter → render-README →
   substitute → git, then lock-file refresh and `_FEATURE_FINALIZERS` (e.g.
-  `publish_gen`, `lint_gen`). A directory copy ships only what git does not ignore
+  `publish_gen`, `lint_gen`). Composite files and the README are renamed
+  (`_renamed`) *before* they are compared with the file on disk, which already
+  carries the new name; otherwise `--review` reports every mention of the repo as
+  a change back to the starter's name. The substitute step then covers the raw
+  copies. A directory copy ships only what git does not ignore
   in the starter checkout (`manifest.unignored_files`: tracked files plus
   untracked ones no ignore rule matches), so `__pycache__` and the like stay
   behind while uncommitted work still ships. Outside a git checkout it ships
