@@ -13,7 +13,13 @@ from pathlib import Path
 import questionary
 
 from bootstrap.detect import DetectedRepo, detect_repo
-from bootstrap.manifest import BootstrapManifest, compute_prune_set, load_manifest, resolve_files
+from bootstrap.manifest import (
+    BootstrapManifest,
+    compute_prune_set,
+    load_manifest,
+    resolve_files,
+    write_bootstrap_marker,
+)
 from bootstrap.scaffolder import (
     feature_finalizer_commands,
     feature_remover_commands,
@@ -203,7 +209,7 @@ def run(argv: list[str] | None = None) -> None:
     # ── Scaffold ──────────────────────────────────────────────────────
     print()
     print("  Scaffolding repository...")
-    scaffold_repo(
+    managed_files = scaffold_repo(
         source_root=source_root,
         target_path=target_path,
         repo_name=repo_name,
@@ -252,6 +258,14 @@ def run(argv: list[str] | None = None) -> None:
     print()
     print("  Formatting generated files...")
     format_results = run_formatters(target_path=target_path)
+
+    # ── File inventory ────────────────────────────────────────────────
+    # The lock refresh, finalizers and formatters above rewrite managed files,
+    # so re-record the marker: its fingerprints must describe the files as this
+    # run leaves them.
+    write_bootstrap_marker(
+        target_path, module_dir, selected_languages, selected_features, source_root, files=managed_files
+    )
 
     # ── Summary ───────────────────────────────────────────────────────
     print()

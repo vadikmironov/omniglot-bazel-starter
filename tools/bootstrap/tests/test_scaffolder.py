@@ -19,10 +19,13 @@ import unittest
 from pathlib import Path
 
 from bootstrap.manifest import (
+    BOOTSTRAP_MARKER_FILE,
     BootstrapManifest,
     effective_excluded_files,
     effective_languages,
+    file_fingerprint,
     load_manifest,
+    read_bootstrap_inventory,
     resolve_files,
 )
 from bootstrap.processor import has_user_region
@@ -859,6 +862,31 @@ class TestScaffolder(unittest.TestCase):
                 # BUILD): present with cpp AND lint, absent otherwise.
                 for rel in self.manifest.features["lint"].language_files["cpp"]:
                     self.assertEqual((target / rel).is_file(), "cpp" in languages and "lint" in features, rel)
+
+    def test_inventory_is_every_file_the_scaffold_leaves(self) -> None:
+        """The marker's inventory is exactly the files on disk after a fresh
+        scaffold, outside the module dir, ``.git`` and the marker itself — so a
+        new write that bypasses the inventory fails here."""
+        selections: list[tuple[set[str], set[str]]] = [
+            (set(LANGUAGES), set(self.manifest.features)),
+            ({"python"}, set()),
+        ]
+        for selected, features in selections:
+            with self.subTest(languages=sorted(selected), features=sorted(features)):
+                languages = effective_languages(self.manifest, selected, features)
+                target = self._scaffold(languages, features=features)
+                inventory = read_bootstrap_inventory(target)
+                self.assertIsNotNone(inventory)
+                on_disk = {
+                    path.relative_to(target).as_posix()
+                    for path in target.rglob("*")
+                    if (path.is_file() or path.is_symlink())
+                    and path.relative_to(target).parts[0] not in {".git", TEST_MODULE_DIR}
+                }
+                on_disk.discard(BOOTSTRAP_MARKER_FILE)
+                self.assertEqual(set(inventory or {}), on_disk)
+                for rel, fingerprint in (inventory or {}).items():
+                    self.assertEqual(fingerprint, file_fingerprint(target / rel), rel)
 
 
 # ── Dynamic test generation for all 31 non-empty subsets ─────────────

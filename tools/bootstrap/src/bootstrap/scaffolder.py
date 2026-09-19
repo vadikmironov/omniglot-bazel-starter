@@ -52,8 +52,13 @@ def scaffold_repo(
     resolved: ResolvedFiles,
     selected_features: set[str] | None = None,
     confirm: ConfirmOverwrite | None = None,
-) -> None:
+) -> list[str]:
     """Generate (or re-bootstrap) a Bazel repository at *target_path*.
+
+    Returns the sorted relative paths of every file this run manages: the
+    copies, each file of a copied directory, the composite files (one kept on
+    disk under ``--review`` is still managed) and the README. The marker
+    records them as the repo's file inventory.
 
     *module_dir* is the name of the top-level directory that will hold the
     repo's code (placeholder created empty during scaffolding). Any
@@ -82,13 +87,21 @@ def scaffold_repo(
     excluded_abs = {source_root / f for f in effective_excluded_files(manifest, selected_features)}
     skip_abs = composite_abs | excluded_abs
 
+    managed: set[str] = set()
+
     # 1. Direct file copies (core + language + language_files)
     print("  Copying files...")
     for rel in resolved.copy:
         _copy_file(source_root / rel, target_path / rel)
+        managed.add(rel)
 
     # 2. Directory copies (language tool directories)
     print("  Copying tool directories...")
+
+    def _copy_and_record(src: str, dst: str) -> str:
+        managed.add(Path(dst).relative_to(target_path).as_posix())
+        return shutil.copy2(src, dst)
+
     for rel_dir in resolved.directories:
         src_dir = source_root / rel_dir
         dst_dir = target_path / rel_dir
@@ -96,6 +109,7 @@ def scaffold_repo(
             src_dir,
             dst_dir,
             ignore=_make_ignore(skip_abs),
+            copy_function=_copy_and_record,
             dirs_exist_ok=True,
         )
 
@@ -120,6 +134,7 @@ def scaffold_repo(
                     f"--per_file_copt={module_dir}/",
                 )
         dst = target_path / rel
+        managed.add(rel)
         to_write = _resolve_managed(filtered, dst, confirm=confirm)
         if to_write is None:
             print(f"    kept existing {rel}")
@@ -143,6 +158,7 @@ def scaffold_repo(
         selected_features=selected_features,
         confirm=confirm,
     )
+    managed.add(_README_OUTPUT)
 
     # 5. Name substitutions across all text files
     print("  Applying name substitutions...")
@@ -151,13 +167,16 @@ def scaffold_repo(
     # 6. Create empty placeholder module directory
     (target_path / module_dir).mkdir(exist_ok=True)
 
-    # 7. Record the selection so a re-bootstrap recovers it exactly. Written
-    #    after substitutions (its content carries no original_name to rewrite).
-    write_bootstrap_marker(target_path, module_dir, selected_languages, selected_features, source_root)
+    # 7. Record the selection and the file inventory so a re-bootstrap recovers
+    #    them exactly. Written after substitutions: its content carries no
+    #    original_name to rewrite, and the hashes must be of the final bytes.
+    files = sorted(managed)
+    write_bootstrap_marker(target_path, module_dir, selected_languages, selected_features, source_root, files=files)
 
     # 8. Git init
     print("  Initializing git repository...")
     subprocess.run(["git", "init", "-b", "main"], cwd=target_path, check=True, capture_output=True)  # noqa: S607
+    return files
 
 
 def prune_paths(target_path: Path, rel_paths: Iterable[str]) -> list[str]:

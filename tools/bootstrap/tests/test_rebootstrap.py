@@ -6,6 +6,7 @@ verifies the edit survived while the starter baseline stayed intact.
 """
 
 import contextlib
+import hashlib
 import io
 import shutil
 import subprocess
@@ -20,7 +21,9 @@ from bootstrap.manifest import (
     BOOTSTRAP_MARKER_FILE,
     BootstrapManifest,
     compute_prune_set,
+    file_fingerprint,
     load_manifest,
+    read_bootstrap_inventory,
     read_bootstrap_marker,
     resolve_files,
     starter_revision,
@@ -506,6 +509,53 @@ class TestBootstrapMarker(_ScaffoldHarness):
         self.assertIsNone(read_bootstrap_marker(target, self.manifest))
         (target / BOOTSTRAP_MARKER_FILE).write_text("this is not valid toml = = =")
         self.assertIsNone(read_bootstrap_marker(target, self.manifest))
+
+    def test_inventory_round_trips(self) -> None:
+        """Files, a symlink and a path that needs quoting all come back; a
+        listed path that is not on disk is left out."""
+        target = self._fresh_target()
+        (target / "tools").mkdir()
+        (target / "tools" / "a.txt").write_text("alpha\n")
+        (target / 'odd "name".txt').write_text("quoted\n")
+        (target / "link").symlink_to("tools/a.txt")
+        rels = ["tools/a.txt", 'odd "name".txt', "link", "never/written.txt"]
+        write_bootstrap_marker(target, "modules", {"python"}, set(), files=rels)
+
+        inventory = read_bootstrap_inventory(target)
+        self.assertEqual(
+            inventory,
+            {
+                "tools/a.txt": "sha256:" + hashlib.sha256(b"alpha\n").hexdigest(),
+                'odd "name".txt': "sha256:" + hashlib.sha256(b"quoted\n").hexdigest(),
+                "link": "symlink:tools/a.txt",
+            },
+        )
+        # The selection still reads back beside the new table.
+        self.assertEqual(read_bootstrap_marker(target, self.manifest), ({"python"}, set(), "modules"))
+
+    def test_inventory_absent_from_an_older_marker_is_none(self) -> None:
+        """None means "nothing recorded", which an empty table does not."""
+        target = self._fresh_target()
+        self.assertIsNone(read_bootstrap_inventory(target))
+        write_bootstrap_marker(target, "modules", {"python"}, set())
+        self.assertIsNone(read_bootstrap_inventory(target))
+        write_bootstrap_marker(target, "modules", {"python"}, set(), files=[])
+        self.assertEqual(read_bootstrap_inventory(target), {})
+
+    def test_rebootstrap_refreshes_the_inventory(self) -> None:
+        """A re-bootstrap re-records fingerprints, so an edit inside a
+        user-managed region shows up as that file's new fingerprint."""
+        target = self._fresh_target()
+        self._scaffold_into(target, {"python"})
+        before = read_bootstrap_inventory(target) or {}
+        bi = target / ".bazelignore"
+        bi.write_text(bi.read_text().replace("# --- END user-managed ---", "data\n# --- END user-managed ---", 1))
+
+        self._scaffold_into(target, {"python"})
+        after = read_bootstrap_inventory(target) or {}
+        self.assertEqual(set(after), set(before))
+        self.assertNotEqual(after[".bazelignore"], before[".bazelignore"])
+        self.assertEqual(after[".bazelignore"], file_fingerprint(bi))
 
 
 class TestFeatureRemovers(_ScaffoldHarness):
