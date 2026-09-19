@@ -35,6 +35,7 @@ from bootstrap.manifest import (
 )
 from bootstrap.processor import has_user_region
 from bootstrap.scaffolder import (
+    ConfirmOverwrite,
     ScaffoldResult,
     _make_ignore,
     feature_remover_commands,
@@ -80,10 +81,12 @@ class _ScaffoldHarness(unittest.TestCase):
         selected: set[str],
         features: set[str] | None = None,
         module_dir: str = "modules",
+        confirm: ConfirmOverwrite | None = None,
     ) -> ScaffoldResult:
         features = features or set()
         resolved = resolve_files(self.manifest, selected, features)
         return scaffold_repo(
+            confirm=confirm,
             source_root=self.source_root,
             target_path=target,
             repo_name=TEST_REPO_NAME,
@@ -270,6 +273,44 @@ class TestRebootstrap(_ScaffoldHarness):
         self._scaffold_into(target, {"go"})
         gomod = (target / "go.mod").read_text()
         self.assertFalse(has_user_region(gomod), "go.mod should not be a managed file")
+
+
+class TestReviewComparesLikeWithLike(_ScaffoldHarness):
+    """``--review`` compares the rendered file after the repo rename, as the
+    file on disk already is."""
+
+    def _recording_confirm(self) -> tuple[list[tuple[str, str, str]], ConfirmOverwrite]:
+        calls: list[tuple[str, str, str]] = []
+
+        def confirm(dst: Path, existing: str, new_content: str) -> bool:
+            calls.append((dst.name, existing, new_content))
+            return True
+
+        return calls, confirm
+
+    def test_an_unedited_repo_is_not_asked_about(self) -> None:
+        """The rename alone is no difference: nothing to review."""
+        target = self._fresh_target()
+        self._scaffold_into(target, {"python"})
+        self.assertIn(TEST_REPO_NAME, (target / "MODULE.bazel").read_text())
+
+        calls, confirm = self._recording_confirm()
+        self._scaffold_into(target, {"python"}, confirm=confirm)
+        self.assertEqual([name for name, _, _ in calls], [])
+
+    def test_a_real_edit_is_shown_without_the_rename(self) -> None:
+        target = self._fresh_target()
+        self._scaffold_into(target, {"python"})
+        module = target / "MODULE.bazel"
+        module.write_text(module.read_text() + "# a local edit outside any user-managed region\n")
+
+        calls, confirm = self._recording_confirm()
+        self._scaffold_into(target, {"python"}, confirm=confirm)
+        self.assertEqual([name for name, _, _ in calls], ["MODULE.bazel"])
+        _, existing, new_content = calls[0]
+        self.assertNotIn(self.manifest.original_name, new_content, "the starter's name must not be offered")
+        changed = set(existing.splitlines()) ^ set(new_content.splitlines())
+        self.assertEqual(changed, {"# a local edit outside any user-managed region"})
 
 
 class TestDetect(_ScaffoldHarness):

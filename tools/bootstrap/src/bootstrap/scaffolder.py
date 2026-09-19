@@ -162,6 +162,7 @@ def scaffold_repo(
                 )
         dst = target_path / rel
         managed.add(rel)
+        filtered = _renamed(filtered, dst, manifest.original_name, repo_name)
         to_write = _resolve_managed(filtered, dst, confirm=confirm)
         if to_write is None:
             print(f"    kept existing {rel}")
@@ -174,8 +175,7 @@ def scaffold_repo(
 
     # 4. Generated starter README — rendered from the bootstrap template,
     #    section-filtered for the selection, with the user-managed intro carried
-    #    forward on re-bootstrap. Done before substitutions so its module-name
-    #    tokens are rewritten alongside everything else.
+    #    forward on re-bootstrap.
     print("  Rendering README...")
     _render_readme(
         source_root=source_root,
@@ -183,11 +183,14 @@ def scaffold_repo(
         module_dir=module_dir,
         selected_languages=selected_languages,
         selected_features=selected_features,
+        original_name=manifest.original_name,
+        repo_name=repo_name,
         confirm=confirm,
     )
     managed.add(_README_OUTPUT)
 
-    # 5. Name substitutions across all text files
+    # 5. Name substitutions across all text files. Composite files and the
+    #    README arrive already renamed (see _renamed); this covers the copies.
     print("  Applying name substitutions...")
     _apply_substitutions(target_path, manifest.original_name, repo_name)
 
@@ -349,6 +352,8 @@ def _render_readme(
     module_dir: str,
     selected_languages: set[str],
     selected_features: set[str],
+    original_name: str,
+    repo_name: str,
     confirm: ConfirmOverwrite | None,
 ) -> None:
     """Render the starter README from the bootstrap template into the repo root.
@@ -366,6 +371,7 @@ def _render_readme(
     rendered = filter_sections(src.read_text(), selected_languages, selected_features, filename=_README_OUTPUT)
     rendered = rendered.replace(_CODE_DIR_PLACEHOLDER, module_dir)
     dst = target_path / _README_OUTPUT
+    rendered = _renamed(rendered, dst, original_name, repo_name)
     to_write = _resolve_managed(rendered, dst, confirm=confirm)
     if to_write is None:
         print(f"    kept existing {_README_OUTPUT}")
@@ -767,6 +773,18 @@ def formatter_commands(labels: Iterable[str]) -> list[str]:
     """Return the formatted commands for *labels*, for the `Next steps` block."""
     wanted = set(labels)
     return [_format_cmd(list(cmd), {}) for label, _desc, cmd in _FORMAT_CMDS if label in wanted]
+
+
+def _renamed(content: str, dst: Path, original_name: str, new_name: str) -> str:
+    """*content* with the repo name substituted, as step 5 would leave *dst*.
+
+    Done before a rendered file is compared with the one on disk, which already
+    carries the new name. Otherwise ``--review`` shows every line that mentions
+    the repo as a change back to the starter's name, and asks about files that
+    would not change at all. Same text-file rule as :func:`_apply_substitutions`,
+    so the two never disagree.
+    """
+    return content.replace(original_name, new_name) if _is_text_file(dst) else content
 
 
 def _apply_substitutions(target_path: Path, original_name: str, new_name: str) -> None:
