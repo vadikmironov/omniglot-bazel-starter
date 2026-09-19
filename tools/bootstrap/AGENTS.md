@@ -73,7 +73,7 @@ is not under the module dir. That covers a file the starter dropped or renamed
 owner's files the user declined to prune. They are written to `[orphans]` with the
 fingerprint last *recorded*, not the current one: the next `[files]` no longer
 lists them, so without the table an orphan would be forgotten one run later, and
-the recorded fingerprint is what `orphan_is_modified` compares against. An entry
+the recorded fingerprint is what `orphan_status` compares against. An entry
 leaves when the file is deleted, leaves the disk, or ships again.
 
 The CLI lists orphans on every run and deletes only under `--prune`
@@ -81,8 +81,17 @@ The CLI lists orphans on every run and deletes only under `--prune`
 the lock refresh and formatters so they run on the tree the repo keeps.
 `--prune` takes modified orphans too — the repo is under version control — but
 never a path the user declined in the deselected-owner prompt of the same run
-(`scaffolder.prunable_orphans`). A marker that predates the inventory reports
-nothing.
+(`scaffolder.prunable_orphans`).
+
+A marker that predates the inventory has nothing to compare against, so that one
+run infers from the filesystem instead (`manifest.infer_orphans`): any file under
+a directory the scaffold writes into — the first two components of the managed
+paths, so each `tools/<name>` and never the repo root or the module dir — that
+the scaffold does not write and the target's `.gitignore` does not cover. A file
+the user added there looks the same as one the starter dropped, so each is
+recorded as `unverified` instead of with a fingerprint, listed under its own
+heading, and excluded from `--prune` unless `--review` lets the user decide file
+by file. The run writes an inventory, so inference never happens twice.
 
 On a detected repo, `_reuse_detected` reuses the detected languages/features by
 default, but offers to **change** them: it re-presents both checkboxes

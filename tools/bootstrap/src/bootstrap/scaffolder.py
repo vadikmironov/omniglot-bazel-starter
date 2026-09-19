@@ -16,11 +16,14 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from bootstrap.manifest import (
+    BOOTSTRAP_MARKER_FILE,
+    UNVERIFIED,
     BootstrapManifest,
     ResolvedFiles,
     all_composite_files,
     compute_orphans,
     effective_excluded_files,
+    infer_orphans,
     read_bootstrap_inventory,
     read_bootstrap_orphans,
     unignored_files,
@@ -92,9 +95,11 @@ def scaffold_repo(
     selected_features = selected_features or set()
     target_path.mkdir(parents=True, exist_ok=True)
 
-    # Read the earlier run's tables now: step 7 overwrites the marker.
-    old_files = read_bootstrap_inventory(target_path) or {}
+    # Read the earlier run's tables now: step 7 overwrites the marker. A marker
+    # with no inventory is a repo bootstrapped before the inventory existed.
+    old_files = read_bootstrap_inventory(target_path)
     old_orphans = read_bootstrap_orphans(target_path)
+    predates_inventory = old_files is None and (target_path / BOOTSTRAP_MARKER_FILE).is_file()
 
     # Build lookup of files to skip during directory copies. Feature-conditional
     # excludes (e.g. tools/cpp/toolchains/ when custom_toolchains is off) are
@@ -193,7 +198,11 @@ def scaffold_repo(
     #    them exactly. Written after substitutions: its content carries no
     #    original_name to rewrite, and the hashes must be of the final bytes.
     files = sorted(managed)
-    orphans = compute_orphans(target_path, module_dir, old_files, old_orphans, files)
+    orphans = compute_orphans(target_path, module_dir, old_files or {}, old_orphans, files)
+    if predates_inventory:
+        # Nothing was recorded, so infer once from the filesystem. From the next
+        # run on the inventory this run writes makes the answer exact.
+        orphans = {**infer_orphans(target_path, module_dir, files), **orphans}
     write_bootstrap_marker(
         target_path, module_dir, selected_languages, selected_features, source_root, files=files, orphans=orphans
     )
@@ -228,15 +237,21 @@ def prune_paths(target_path: Path, rel_paths: Iterable[str]) -> list[str]:
     return removed
 
 
-def prunable_orphans(orphans: Iterable[str], declined: Iterable[str]) -> list[str]:
+def prunable_orphans(orphans: dict[str, str], declined: Iterable[str], *, include_unverified: bool) -> list[str]:
     """The orphans ``--prune`` may delete, sorted.
 
-    All of them, except a path the user just declined to delete in the
-    deselected-owner prompt (*declined*), or anything under one: the flag must
-    not overrule an answer given a moment ago. Those stay listed as orphans.
+    Not a path the user just declined to delete in the deselected-owner prompt
+    (*declined*), nor anything under one: the flag must not overrule an answer
+    given a moment ago. And not an unverified one, which may be a file the user
+    added, unless *include_unverified*: the caller sets it when the user picks
+    file by file. Whatever is left out stays listed as an orphan.
     """
     kept = list(declined)
-    return sorted(rel for rel in orphans if not any(rel == d or rel.startswith(f"{d}/") for d in kept))
+    return sorted(
+        rel
+        for rel, recorded in orphans.items()
+        if (include_unverified or recorded != UNVERIFIED) and not any(rel == d or rel.startswith(f"{d}/") for d in kept)
+    )
 
 
 def prune_orphans(target_path: Path, rel_paths: Iterable[str]) -> list[str]:

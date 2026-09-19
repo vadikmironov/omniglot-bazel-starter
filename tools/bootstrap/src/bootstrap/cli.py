@@ -14,10 +14,11 @@ import questionary
 
 from bootstrap.detect import DetectedRepo, detect_repo
 from bootstrap.manifest import (
+    UNVERIFIED,
     BootstrapManifest,
     compute_prune_set,
     load_manifest,
-    orphan_is_modified,
+    orphan_status,
     resolve_files,
     write_bootstrap_marker,
 )
@@ -542,18 +543,26 @@ def _handle_orphans(
     if not orphans:
         return {}
 
-    print()
-    print(f"  Files the starter no longer ships ({len(orphans)}):")
-    width = max(len(rel) for rel in orphans)
-    for rel, recorded in sorted(orphans.items()):
-        state = "modified locally" if orphan_is_modified(target_path, rel, recorded) else "unmodified"
-        print(f"    - {rel.ljust(width)}  {state}")
+    verified = sorted(rel for rel, recorded in orphans.items() if recorded != UNVERIFIED)
+    unverified = sorted(rel for rel, recorded in orphans.items() if recorded == UNVERIFIED)
+    if verified:
+        print()
+        print(f"  Files the starter no longer ships ({len(verified)}):")
+        width = max(len(rel) for rel in verified)
+        for rel in verified:
+            print(f"    - {rel.ljust(width)}  {orphan_status(target_path, rel, orphans[rel])}")
+    if unverified:
+        print()
+        print(f"  Possibly left over ({len(unverified)}) - in a tool directory, but this repo predates the")
+        print("  file inventory, so each may be a file of yours. Deleted only with --prune --review:")
+        for rel in unverified:
+            print(f"    - {rel}")
 
     if not prune:
-        print("  Re-run with --prune to delete them.")
+        print(f"  Re-run with {'--prune' if verified else '--prune --review'} to delete them.")
         return orphans
 
-    candidates = prunable_orphans(orphans, declined)
+    candidates = prunable_orphans(orphans, declined, include_unverified=review)
     to_delete = _review_prune(candidates, target_path) if review else candidates
     removed = prune_orphans(target_path, to_delete)
     print()
