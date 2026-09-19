@@ -19,6 +19,9 @@ import tomllib
 # inferring them from the filesystem.
 BOOTSTRAP_MARKER_FILE = ".omniglot_bootstrap.toml"
 
+# What [orphans] records for a file no run ever fingerprinted: see infer_orphans.
+UNVERIFIED = "unverified"
+
 
 @dataclass
 class LanguageConfig:
@@ -447,7 +450,7 @@ def compute_orphans(
     """Files an earlier run managed that this run does not, still on disk.
 
     Maps each path to the fingerprint it was last recorded with, so
-    :func:`orphan_is_modified` can tell whether it changed since. Covers both a
+    :func:`orphan_status` can tell whether it changed since. Covers both a
     file the starter stopped shipping (or renamed) and one a deselected owner
     left behind. *old_orphans* are carried forward until they are deleted, leave
     the disk, or ship again. Nothing under *module_dir* is ever reported: that
@@ -464,13 +467,44 @@ def compute_orphans(
     return orphans
 
 
-def orphan_is_modified(target_path: Path, rel: str, recorded: str) -> bool:
-    """True when *rel* no longer matches the fingerprint the tool recorded.
+def infer_orphans(target_path: Path, module_dir: str, new_files: Iterable[str]) -> dict[str, str]:
+    """Orphan candidates for a repo whose marker predates the inventory.
+
+    With nothing recorded, the filesystem is the only evidence: any file under a
+    directory this run writes into, that this run does not itself write. The
+    directories are the first two components of the managed paths (in practice
+    each ``tools/<name>``), never the repo root and never *module_dir*, and
+    files the target's own ``.gitignore`` covers are skipped.
+
+    A file the user added there looks the same as one the starter dropped, so
+    every candidate is recorded as :data:`UNVERIFIED` rather than with a
+    fingerprint, and is only ever deleted file by file.
+    """
+    shipped = set(new_files)
+    roots = {"/".join(parts[:2]) for rel in shipped if len(parts := rel.split("/")) > 2}
+    candidates: dict[str, str] = {}
+    for root in sorted(roots):
+        if root == module_dir or root.startswith(f"{module_dir}/"):
+            continue
+        listed = unignored_files(target_path, root)
+        if listed is None:
+            base = target_path / root
+            listed = {p.relative_to(target_path).as_posix() for p in base.rglob("*") if p.is_file() or p.is_symlink()}
+        for rel in listed:
+            if rel not in shipped and file_fingerprint(target_path / rel) is not None:
+                candidates[rel] = UNVERIFIED
+    return candidates
+
+
+def orphan_status(target_path: Path, rel: str, recorded: str) -> str:
+    """How an orphan is listed: ``unverified``, ``unmodified`` or ``modified locally``.
 
     "Modified" means "differs from what the bootstrap left", which a formatter
     or a dependency bot causes as readily as a hand edit.
     """
-    return file_fingerprint(target_path / rel) != recorded
+    if recorded == UNVERIFIED:
+        return UNVERIFIED
+    return "unmodified" if file_fingerprint(target_path / rel) == recorded else "modified locally"
 
 
 def read_bootstrap_marker(

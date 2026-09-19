@@ -19,11 +19,12 @@ from pathlib import Path
 from bootstrap.detect import detect_repo
 from bootstrap.manifest import (
     BOOTSTRAP_MARKER_FILE,
+    UNVERIFIED,
     BootstrapManifest,
     compute_prune_set,
     file_fingerprint,
     load_manifest,
-    orphan_is_modified,
+    orphan_status,
     read_bootstrap_inventory,
     read_bootstrap_marker,
     read_bootstrap_orphans,
@@ -620,10 +621,10 @@ class TestOrphans(_ScaffoldHarness):
         self._plant(target, "tools/python/old.bzl", "as the tool left it\n")
         orphans = self._scaffold_into(target, {"python"}).orphans
         recorded = orphans["tools/python/old.bzl"]
-        self.assertFalse(orphan_is_modified(target, "tools/python/old.bzl", recorded))
+        self.assertEqual(orphan_status(target, "tools/python/old.bzl", recorded), "unmodified")
 
         (target / "tools/python/old.bzl").write_text("edited since\n")
-        self.assertTrue(orphan_is_modified(target, "tools/python/old.bzl", recorded))
+        self.assertEqual(orphan_status(target, "tools/python/old.bzl", recorded), "modified locally")
         # A later run keeps the fingerprint the tool recorded, not the edited one.
         self.assertEqual(self._scaffold_into(target, {"python"}).orphans["tools/python/old.bzl"], recorded)
 
@@ -652,18 +653,14 @@ class TestOrphans(_ScaffoldHarness):
         self.assertIn("tools/rust/Cargo.toml", orphans)
         self.assertFalse(any(rel.startswith("tools/python/") for rel in orphans))
 
-    def test_marker_without_an_inventory_reports_nothing(self) -> None:
-        target = self._fresh_target()
-        self._scaffold_into(target, {"python"})
-        (target / "tools/python/stray.bzl").write_text("never recorded\n")
-        write_bootstrap_marker(target, "modules", {"python"}, set())  # an older marker: no [files]
-        self.assertEqual(self._scaffold_into(target, {"python"}).orphans, {})
-
     def test_prune_spares_what_the_user_just_declined_to_delete(self) -> None:
-        orphans = ["tools/rust/Cargo.toml", "tools/rust/sub/x.bzl", "tools/rusty.bzl", ".rustfmt.toml", "old.patch"]
+        paths = ["tools/rust/Cargo.toml", "tools/rust/sub/x.bzl", "tools/rusty.bzl", ".rustfmt.toml", "old.patch"]
+        orphans = dict.fromkeys(paths, "sha256:0")
         declined = ["tools/rust", ".rustfmt.toml"]
-        self.assertEqual(prunable_orphans(orphans, declined), ["old.patch", "tools/rusty.bzl"])
-        self.assertEqual(prunable_orphans(orphans, []), sorted(orphans))
+        self.assertEqual(
+            prunable_orphans(orphans, declined, include_unverified=False), ["old.patch", "tools/rusty.bzl"]
+        )
+        self.assertEqual(prunable_orphans(orphans, [], include_unverified=False), sorted(paths))
 
     def test_prune_orphans_removes_the_directories_it_empties(self) -> None:
         target = self._fresh_target()
@@ -675,6 +672,65 @@ class TestOrphans(_ScaffoldHarness):
         self.assertEqual(removed, ["tools/python/old.bzl", "tools/python/patches/deep/old.patch"])
         self.assertFalse((target / "tools/python/patches").exists(), "emptied directories should go")
         self.assertTrue((target / "tools/python/pyproject.toml").is_file(), "a directory with content stays")
+
+
+class TestFirstRunInference(_ScaffoldHarness):
+    """A repo bootstrapped before the inventory existed: infer once, from disk."""
+
+    def _predating_repo(self) -> Path:
+        """A scaffolded repo whose marker has no [files], as older ones do."""
+        target = self._fresh_target()
+        self._scaffold_into(target, {"python"})
+        write_bootstrap_marker(target, "modules", {"python"}, set())
+        return target
+
+    def test_stray_file_in_a_tool_directory_is_an_unverified_orphan(self) -> None:
+        target = self._predating_repo()
+        (target / "tools/python/patches").mkdir()
+        (target / "tools/python/patches/old.patch").write_text("dropped by the starter, or the user's\n")
+
+        result = self._scaffold_into(target, {"python"})
+        self.assertEqual(result.orphans, {"tools/python/patches/old.patch": UNVERIFIED})
+        self.assertEqual(read_bootstrap_orphans(target), result.orphans)
+        self.assertEqual(orphan_status(target, "tools/python/patches/old.patch", UNVERIFIED), UNVERIFIED)
+
+    def test_only_directories_the_scaffold_writes_into_are_examined(self) -> None:
+        target = self._predating_repo()
+        for rel in ("stray_at_root.txt", "modules/app/BUILD", "tools/mytool/run.sh", "tools/rust/Cargo.toml"):
+            (target / rel).parent.mkdir(parents=True, exist_ok=True)
+            (target / rel).write_text("not the tool's business\n")
+        self.assertEqual(self._scaffold_into(target, {"python"}).orphans, {})
+
+    def test_files_the_repo_ignores_are_not_candidates(self) -> None:
+        target = self._predating_repo()
+        (target / "tools/python/__pycache__").mkdir()
+        (target / "tools/python/__pycache__/x.cpython-314.pyc").write_text("debris\n")
+        self.assertEqual(self._scaffold_into(target, {"python"}).orphans, {})
+
+    def test_inference_happens_once(self) -> None:
+        """The first run records an inventory; after that the answer is exact."""
+        target = self._predating_repo()
+        self._scaffold_into(target, {"python"})
+        (target / "tools/python/added_later.py").write_text("the user's\n")
+        self.assertEqual(self._scaffold_into(target, {"python"}).orphans, {})
+
+    def test_an_unverified_orphan_is_carried_like_any_other(self) -> None:
+        target = self._predating_repo()
+        (target / "tools/python/old.bzl").write_text("x\n")
+        self._scaffold_into(target, {"python"})
+        self.assertEqual(self._scaffold_into(target, {"python"}).orphans, {"tools/python/old.bzl": UNVERIFIED})
+
+    def test_a_fresh_target_infers_nothing(self) -> None:
+        """No marker means not a bootstrapped repo: whatever is there is the user's."""
+        target = self._fresh_target()
+        (target / "tools/python").mkdir(parents=True)
+        (target / "tools/python/mine.py").write_text("x\n")
+        self.assertEqual(self._scaffold_into(target, {"python"}).orphans, {})
+
+    def test_prune_takes_unverified_orphans_only_file_by_file(self) -> None:
+        orphans = {"tools/python/old.bzl": UNVERIFIED, "tools/python/dropped.patch": "sha256:0"}
+        self.assertEqual(prunable_orphans(orphans, [], include_unverified=False), ["tools/python/dropped.patch"])
+        self.assertEqual(prunable_orphans(orphans, [], include_unverified=True), sorted(orphans))
 
 
 class TestIgnoredFilesStayBehind(_ScaffoldHarness):
