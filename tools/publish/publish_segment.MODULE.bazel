@@ -21,7 +21,7 @@ bazel_dep(name = "rules_pkg", version = "1.3.0")
 # Please find documentation here:
 # https://github.com/bazel-contrib/tar.bzl/releases
 #
-bazel_dep(name = "tar.bzl", version = "0.10.8")
+bazel_dep(name = "tar.bzl", version = "0.10.9")
 
 #
 # rules_oci block
@@ -79,28 +79,28 @@ oci = use_extension("@rules_oci//oci:extensions.bzl", "oci")
 #   - static/cc carry no version suffix — they encode flavor, not version.
 oci.pull(
     name = "gcr_io_distroless_java17",
-    digest = "sha256:cc22e72aa8540b9b87f056a30319c62fa6ebd98d6463f364b162ef9723e1e695",
+    digest = "sha256:6457ce026c1733d9693b65a4dbb45459d71ec1f5e48676f9d3877c99c63c35cc",
     image = "gcr.io/distroless/java17-debian13",
     platforms = ["linux/amd64"],
     tag = "nonroot",
 )
 oci.pull(
     name = "gcr_io_distroless_python3",
-    digest = "sha256:f3d5ddc6c64a019fe520e7f005f2880be21e6afc461b10a3c15ef2e4edc71e33",
+    digest = "sha256:8ee214843129f43e2ebf5e0ca9f2e4e6d8292143d1b8a6787f169b5898578884",
     image = "gcr.io/distroless/python3-debian13",
     platforms = ["linux/amd64"],
     tag = "nonroot",
 )
 oci.pull(
     name = "gcr_io_distroless_static",
-    digest = "sha256:1c2c046bc09ed40fad370b599a0b1ae7987f55b01e247cf27a7c27cd97e5bbc7",
+    digest = "sha256:e2e927ec666bae08560abb3c55d0659eceabb657f56b6782ab500a9fc7f555e3",
     image = "gcr.io/distroless/static-debian13",
     platforms = ["linux/amd64"],
     tag = "nonroot",
 )
 oci.pull(
     name = "gcr_io_distroless_cc",
-    digest = "sha256:c31ff9abcb1910f3ab25c7957bdaf0bfe12a01eb546e8df2282f1c8f682b606c",
+    digest = "sha256:54df941ed0d06a1bd95ef5e0ce391fd8d9f94b64782dc9a60062727849ee3f97",
     image = "gcr.io/distroless/cc-debian13",
     platforms = ["linux/amd64"],
     tag = "nonroot",
