@@ -23,6 +23,7 @@ from bootstrap.manifest import (
     effective_excluded_files,
     read_bootstrap_inventory,
     read_bootstrap_orphans,
+    unignored_files,
     write_bootstrap_marker,
 )
 from bootstrap.processor import filter_sections, has_user_region, splice_user_region
@@ -124,10 +125,12 @@ def scaffold_repo(
     for rel_dir in resolved.directories:
         src_dir = source_root / rel_dir
         dst_dir = target_path / rel_dir
+        kept = unignored_files(source_root, rel_dir)
+        keep_abs = {source_root / rel for rel in kept} if kept is not None else None
         shutil.copytree(
             src_dir,
             dst_dir,
-            ignore=_make_ignore(skip_abs),
+            ignore=_make_ignore(skip_abs, keep_abs),
             copy_function=_copy_and_record,
             dirs_exist_ok=True,
         )
@@ -267,13 +270,24 @@ def _copy_file(src: Path, dst: Path) -> None:
         shutil.copy2(src, dst)
 
 
-def _make_ignore(skip_abs: set[Path]):
-    """Return an ignore callable for shutil.copytree that skips files
-    present in *skip_abs* (composite or excluded files)."""
+def _make_ignore(skip_abs: set[Path], keep_abs: set[Path] | None = None):
+    """Return an ignore callable for shutil.copytree.
+
+    It skips the files in *skip_abs* (composite or excluded files) and, when
+    *keep_abs* is given, every file not in it: the starter checkout's
+    git-ignored debris, which would otherwise ship and later be reported as an
+    orphan. A directory is kept only while it leads to a kept file.
+    """
+    keep_dirs = {parent for path in keep_abs for parent in path.parents} if keep_abs is not None else set()
 
     def _ignore(directory: str, names: list[str]) -> set[str]:
         dir_path = Path(directory)
-        return {name for name in names if dir_path / name in skip_abs}
+        ignored = set()
+        for name in names:
+            path = dir_path / name
+            if path in skip_abs or (keep_abs is not None and path not in keep_abs and path not in keep_dirs):
+                ignored.add(name)
+        return ignored
 
     return _ignore
 
