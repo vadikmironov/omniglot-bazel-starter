@@ -107,12 +107,11 @@
          ]
       },
       {
-         "description": "These four carry patches in tools/*/patches (see #9) and each needs the patch re-checked, or dropped, when it moves. Keeping them out of the bazel modules group stops one patched dependency blocking every other module bump — every PR for them so far has needed individual handling.",
+         "description": "Each of these needs a hand edit when it moves, so it stays out of the bazel modules group and cannot block every other module bump. rules_foreign_cc and gcc_toolchain carry patches in tools/*/patches (see #9) that must be re-checked or dropped. aspect_rules_lint sets the ruff version, so the ruff pre-commit hook has to move in the same PR.",
          "matchManagers": [
             "bazel-module"
          ],
          "matchPackageNames": [
-            "toolchains_llvm",
             "aspect_rules_lint",
             "rules_foreign_cc",
             "gcc_toolchain"
