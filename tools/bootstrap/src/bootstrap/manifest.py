@@ -339,6 +339,7 @@ def write_bootstrap_marker(
     features: set[str],
     source_root: Path | None = None,
     files: Iterable[str] | None = None,
+    orphans: dict[str, str] | None = None,
 ) -> None:
     """Record the scaffolded selection in ``BOOTSTRAP_MARKER_FILE``.
 
@@ -357,6 +358,11 @@ def write_bootstrap_marker(
     goes into a ``[files]`` table with its :func:`file_fingerprint` as of this
     call, so a later run can tell which files the starter stopped shipping and
     whether one changed since. Omitted, no table is written.
+
+    *orphans* (see :func:`compute_orphans`) go into an ``[orphans]`` table with
+    the fingerprint they were last recorded with, not their current one. The
+    marker has to carry them: the next run's ``[files]`` no longer lists them,
+    so an orphan left on disk would otherwise be forgotten one run later.
     """
     langs = ", ".join(f'"{x}"' for x in sorted(languages))
     feats = ", ".join(f'"{x}"' for x in sorted(features))
@@ -381,7 +387,26 @@ def write_bootstrap_marker(
             if fingerprint:
                 # JSON string escapes are TOML basic-string escapes too.
                 content += f"{json.dumps(rel, ensure_ascii=False)} = {json.dumps(fingerprint, ensure_ascii=False)}\n"
+    if orphans:
+        content += "\n# Files the starter no longer ships that are still on disk.\n[orphans]\n"
+        for rel, fingerprint in sorted(orphans.items()):
+            content += f"{json.dumps(rel, ensure_ascii=False)} = {json.dumps(fingerprint, ensure_ascii=False)}\n"
     (target_path / BOOTSTRAP_MARKER_FILE).write_text(content)
+
+
+def _read_marker_table(target_path: Path, table: str) -> dict[str, str] | None:
+    """A path -> fingerprint table of the marker, or None when the marker is
+    absent, unparseable, or has no such table."""
+    path = target_path / BOOTSTRAP_MARKER_FILE
+    if not path.is_file():
+        return None
+    try:
+        entries = tomllib.loads(path.read_text()).get(table)
+    except (tomllib.TOMLDecodeError, OSError):
+        return None
+    if not isinstance(entries, dict):
+        return None
+    return {rel: fp for rel, fp in entries.items() if isinstance(fp, str)}
 
 
 def read_bootstrap_inventory(target_path: Path) -> dict[str, str] | None:
@@ -390,16 +415,48 @@ def read_bootstrap_inventory(target_path: Path) -> dict[str, str] | None:
     None when the marker is absent, unparseable, or predates the inventory, so
     a caller can tell "nothing recorded yet" from "recorded, and empty".
     """
-    path = target_path / BOOTSTRAP_MARKER_FILE
-    if not path.is_file():
-        return None
-    try:
-        files = tomllib.loads(path.read_text()).get("files")
-    except (tomllib.TOMLDecodeError, OSError):
-        return None
-    if not isinstance(files, dict):
-        return None
-    return {rel: fp for rel, fp in files.items() if isinstance(fp, str)}
+    return _read_marker_table(target_path, "files")
+
+
+def read_bootstrap_orphans(target_path: Path) -> dict[str, str]:
+    """The marker's ``[orphans]`` table (path -> last recorded fingerprint)."""
+    return _read_marker_table(target_path, "orphans") or {}
+
+
+def compute_orphans(
+    target_path: Path,
+    module_dir: str,
+    old_files: dict[str, str],
+    old_orphans: dict[str, str],
+    new_files: Iterable[str],
+) -> dict[str, str]:
+    """Files an earlier run managed that this run does not, still on disk.
+
+    Maps each path to the fingerprint it was last recorded with, so
+    :func:`orphan_is_modified` can tell whether it changed since. Covers both a
+    file the starter stopped shipping (or renamed) and one a deselected owner
+    left behind. *old_orphans* are carried forward until they are deleted, leave
+    the disk, or ship again. Nothing under *module_dir* is ever reported: that
+    tree is the user's.
+    """
+    shipped = set(new_files)
+    orphans: dict[str, str] = {}
+    for rel, fingerprint in {**old_orphans, **old_files}.items():
+        if rel in shipped or rel == module_dir or rel.startswith(f"{module_dir}/"):
+            continue
+        if file_fingerprint(target_path / rel) is None:
+            continue
+        orphans[rel] = fingerprint
+    return orphans
+
+
+def orphan_is_modified(target_path: Path, rel: str, recorded: str) -> bool:
+    """True when *rel* no longer matches the fingerprint the tool recorded.
+
+    "Modified" means "differs from what the bootstrap left", which a formatter
+    or a dependency bot causes as readily as a hand edit.
+    """
+    return file_fingerprint(target_path / rel) != recorded
 
 
 def read_bootstrap_marker(

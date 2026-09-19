@@ -61,6 +61,25 @@ predates the inventory, which is not the same as an empty table. A write added
 to `scaffold_repo` must add its path to the returned list —
 `test_inventory_is_every_file_the_scaffold_leaves` fails otherwise.
 
+**Orphans** are what the inventory is for. `scaffold_repo` reads the old `[files]`
+and `[orphans]` before it overwrites the marker, and `manifest.compute_orphans`
+returns every path in either that this run does not manage, is still on disk, and
+is not under the module dir. That covers a file the starter dropped or renamed
+(nine tool directories are copied wholesale, so this is common) and a deselected
+owner's files the user declined to prune. They are written to `[orphans]` with the
+fingerprint last *recorded*, not the current one: the next `[files]` no longer
+lists them, so without the table an orphan would be forgotten one run later, and
+the recorded fingerprint is what `orphan_is_modified` compares against. An entry
+leaves when the file is deleted, leaves the disk, or ships again.
+
+The CLI lists orphans on every run and deletes only under `--prune`
+(`scaffolder.prune_orphans`, which also removes directories it empties), before
+the lock refresh and formatters so they run on the tree the repo keeps.
+`--prune` takes modified orphans too — the repo is under version control — but
+never a path the user declined in the deselected-owner prompt of the same run
+(`scaffolder.prunable_orphans`). A marker that predates the inventory reports
+nothing.
+
 On a detected repo, `_reuse_detected` reuses the detected languages/features by
 default, but offers to **change** them: it re-presents both checkboxes
 pre-checked with the detected set (uncheck = remove, check = add), then
