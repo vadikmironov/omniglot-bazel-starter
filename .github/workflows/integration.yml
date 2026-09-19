@@ -18,18 +18,13 @@ jobs:
     permissions:
       contents: read
 
+    env:
+      # Read by .github/scripts/bazel.sh; empty on fork PRs, which get no secrets.
+      BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
+
     steps:
     - uses: actions/checkout@v7
     - uses: ./.github/actions/setup_linux
-    - name: Configure remote cache
-      env:
-        BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
-      run: |
-        if [ -n "$BUILDBUDDY_API_KEY" ]; then
-          echo "build:remote-cache --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" > user.bazelrc
-          echo "build --config=remote-cache" >> user.bazelrc
-          echo "Remote cache enabled for integration tests"
-        fi
     - name: Run integration tests
       # The suite is tagged manual, which a `...` wildcard drops before any tag
       # filter is applied, so it must be named explicitly.
@@ -38,7 +33,7 @@ jobs:
       # ("eternal") default. The remote cache above cuts this substantially when
       # BUILDBUDDY_API_KEY is set.
       run: >
-        bazel test
+        bash .github/scripts/bazel.sh test
         --test_timeout=5400
         //tools/bootstrap/tests:test_integration
 
@@ -90,19 +85,15 @@ jobs:
     permissions:
       contents: read
 
+    env:
+      # Read by .github/scripts/bazel.sh; empty on fork PRs, which get no secrets.
+      BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
+
     steps:
     - uses: actions/checkout@v7
     - uses: ./.github/actions/setup_linux
-    - name: Configure remote cache
-      env:
-        BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
-      run: |
-        if [ -n "$BUILDBUDDY_API_KEY" ]; then
-          echo "build:remote-cache --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" > user.bazelrc
-          echo "build --config=remote-cache" >> user.bazelrc
-        fi
     - name: Run every profiling workload
-      run: bazel run //tools/profile -- --all
+      run: bash .github/scripts/bazel.sh run //tools/profile -- --all
 
   # A weekly job nobody is waiting on gets ignored when it goes red, so funnel
   # failures into one issue instead of the Actions tab.
