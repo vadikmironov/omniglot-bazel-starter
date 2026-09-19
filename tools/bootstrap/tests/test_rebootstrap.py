@@ -23,14 +23,23 @@ from bootstrap.manifest import (
     compute_prune_set,
     file_fingerprint,
     load_manifest,
+    orphan_is_modified,
     read_bootstrap_inventory,
     read_bootstrap_marker,
+    read_bootstrap_orphans,
     resolve_files,
     starter_revision,
     write_bootstrap_marker,
 )
 from bootstrap.processor import has_user_region
-from bootstrap.scaffolder import feature_remover_commands, prune_paths, scaffold_repo
+from bootstrap.scaffolder import (
+    ScaffoldResult,
+    feature_remover_commands,
+    prunable_orphans,
+    prune_orphans,
+    prune_paths,
+    scaffold_repo,
+)
 
 TEST_REPO_NAME = "rebootstrap_test"
 
@@ -68,10 +77,10 @@ class _ScaffoldHarness(unittest.TestCase):
         selected: set[str],
         features: set[str] | None = None,
         module_dir: str = "modules",
-    ) -> None:
+    ) -> ScaffoldResult:
         features = features or set()
         resolved = resolve_files(self.manifest, selected, features)
-        scaffold_repo(
+        return scaffold_repo(
             source_root=self.source_root,
             target_path=target,
             repo_name=TEST_REPO_NAME,
@@ -556,6 +565,114 @@ class TestBootstrapMarker(_ScaffoldHarness):
         self.assertEqual(set(after), set(before))
         self.assertNotEqual(after[".bazelignore"], before[".bazelignore"])
         self.assertEqual(after[".bazelignore"], file_fingerprint(bi))
+
+
+class TestOrphans(_ScaffoldHarness):
+    """Files an earlier run recorded that the starter no longer ships."""
+
+    def _plant(self, target: Path, rel: str, content: str = "left behind\n") -> None:
+        """Make *rel* look like a file the previous run managed: on disk, and in
+        the recorded inventory — which is all a dropped starter file is."""
+        path = target / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content)
+        inventory = read_bootstrap_inventory(target) or {}
+        write_bootstrap_marker(
+            target, "modules", {"python"}, set(), files=[*inventory, rel], orphans=read_bootstrap_orphans(target)
+        )
+
+    def test_clean_rebootstrap_has_no_orphans(self) -> None:
+        target = self._fresh_target()
+        self.assertEqual(self._scaffold_into(target, {"python"}).orphans, {})
+        self.assertEqual(self._scaffold_into(target, {"python"}).orphans, {})
+        self.assertEqual(read_bootstrap_orphans(target), {})
+
+    def test_dropped_file_is_reported_and_recorded(self) -> None:
+        target = self._fresh_target()
+        self._scaffold_into(target, {"python"})
+        self._plant(target, "tools/python/patches/old.patch")
+
+        result = self._scaffold_into(target, {"python"})
+        self.assertEqual(set(result.orphans), {"tools/python/patches/old.patch"})
+        self.assertNotIn("tools/python/patches/old.patch", result.files)
+        self.assertEqual(read_bootstrap_orphans(target), result.orphans)
+        self.assertNotIn("tools/python/patches/old.patch", read_bootstrap_inventory(target) or {})
+
+    def test_orphan_is_carried_until_it_is_dealt_with(self) -> None:
+        """The second run's [files] no longer lists it; [orphans] must."""
+        target = self._fresh_target()
+        self._scaffold_into(target, {"python"})
+        self._plant(target, "tools/python/old.bzl")
+        self._scaffold_into(target, {"python"})
+
+        again = self._scaffold_into(target, {"python"})
+        self.assertEqual(set(again.orphans), {"tools/python/old.bzl"})
+
+        (target / "tools/python/old.bzl").unlink()  # the user removed it by hand
+        self.assertEqual(self._scaffold_into(target, {"python"}).orphans, {})
+        self.assertEqual(read_bootstrap_orphans(target), {})
+
+    def test_modified_is_judged_against_the_recorded_fingerprint(self) -> None:
+        target = self._fresh_target()
+        self._scaffold_into(target, {"python"})
+        self._plant(target, "tools/python/old.bzl", "as the tool left it\n")
+        orphans = self._scaffold_into(target, {"python"}).orphans
+        recorded = orphans["tools/python/old.bzl"]
+        self.assertFalse(orphan_is_modified(target, "tools/python/old.bzl", recorded))
+
+        (target / "tools/python/old.bzl").write_text("edited since\n")
+        self.assertTrue(orphan_is_modified(target, "tools/python/old.bzl", recorded))
+        # A later run keeps the fingerprint the tool recorded, not the edited one.
+        self.assertEqual(self._scaffold_into(target, {"python"}).orphans["tools/python/old.bzl"], recorded)
+
+    def test_a_file_that_ships_again_stops_being_an_orphan(self) -> None:
+        target = self._fresh_target()
+        self._scaffold_into(target, {"python"})
+        shipped = "tools/python/pyproject.toml"
+        inventory = read_bootstrap_inventory(target) or {}
+        write_bootstrap_marker(
+            target, "modules", {"python"}, set(), files=list(inventory), orphans={shipped: inventory[shipped]}
+        )
+        self.assertEqual(self._scaffold_into(target, {"python"}).orphans, {})
+
+    def test_module_dir_is_never_reported(self) -> None:
+        target = self._fresh_target()
+        self._scaffold_into(target, {"python"})
+        self._plant(target, "modules/app/BUILD")
+        self.assertEqual(self._scaffold_into(target, {"python"}).orphans, {})
+
+    def test_deselected_owner_files_left_on_disk_are_orphans(self) -> None:
+        """Declining the deselected-owner prompt leaves them behind; they are
+        still files the tool wrote and no longer manages."""
+        target = self._fresh_target()
+        self._scaffold_into(target, {"python", "rust"})
+        orphans = self._scaffold_into(target, {"python"}).orphans  # rust dropped, nothing pruned
+        self.assertIn("tools/rust/Cargo.toml", orphans)
+        self.assertFalse(any(rel.startswith("tools/python/") for rel in orphans))
+
+    def test_marker_without_an_inventory_reports_nothing(self) -> None:
+        target = self._fresh_target()
+        self._scaffold_into(target, {"python"})
+        (target / "tools/python/stray.bzl").write_text("never recorded\n")
+        write_bootstrap_marker(target, "modules", {"python"}, set())  # an older marker: no [files]
+        self.assertEqual(self._scaffold_into(target, {"python"}).orphans, {})
+
+    def test_prune_spares_what_the_user_just_declined_to_delete(self) -> None:
+        orphans = ["tools/rust/Cargo.toml", "tools/rust/sub/x.bzl", "tools/rusty.bzl", ".rustfmt.toml", "old.patch"]
+        declined = ["tools/rust", ".rustfmt.toml"]
+        self.assertEqual(prunable_orphans(orphans, declined), ["old.patch", "tools/rusty.bzl"])
+        self.assertEqual(prunable_orphans(orphans, []), sorted(orphans))
+
+    def test_prune_orphans_removes_the_directories_it_empties(self) -> None:
+        target = self._fresh_target()
+        self._scaffold_into(target, {"python"})
+        self._plant(target, "tools/python/patches/deep/old.patch")
+        self._plant(target, "tools/python/old.bzl")
+
+        removed = prune_orphans(target, ["tools/python/patches/deep/old.patch", "tools/python/old.bzl", "gone.txt"])
+        self.assertEqual(removed, ["tools/python/old.bzl", "tools/python/patches/deep/old.patch"])
+        self.assertFalse((target / "tools/python/patches").exists(), "emptied directories should go")
+        self.assertTrue((target / "tools/python/pyproject.toml").is_file(), "a directory with content stays")
 
 
 class TestFeatureRemovers(_ScaffoldHarness):

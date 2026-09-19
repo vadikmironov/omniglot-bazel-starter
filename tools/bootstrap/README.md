@@ -48,6 +48,8 @@ Point the tool at a directory it previously scaffolded and it detects the earlie
 - **Refresh** the starter baseline in place — edits you made inside `BEGIN/END user-managed` regions are carried forward, or
 - **Change** the selection — checking a language/feature adds it, unchecking removes it. Files owned solely by a removed language/feature are pruned after an explicit confirmation (or, with `--review`, a per-path selector). A removed `lint` or `publish` feature also has its generated rules torn down across your BUILD files first.
 
+The starter itself also changes: a file it shipped last time can be gone or renamed now. Every re-bootstrap lists such orphans, each marked `unmodified` or `modified locally` (it differs from what the tool last wrote, which a formatter or a dependency bot causes as readily as a hand edit). Nothing is deleted unless you pass `--prune`; add `--review` to choose per file. Your code directory is never examined. To keep an orphan and stop the report, delete its line from the `[orphans]` table in `.omniglot_bootstrap.toml`.
+
 ## Internals
 
 The manifest format, the section-marker filtering engine, and how to add a language or feature are documented in [AGENTS.md](AGENTS.md).

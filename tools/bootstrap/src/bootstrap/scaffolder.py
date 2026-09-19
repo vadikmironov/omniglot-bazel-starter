@@ -12,13 +12,17 @@ import stat
 import subprocess
 import sys
 from collections.abc import Callable, Iterable
+from dataclasses import dataclass
 from pathlib import Path
 
 from bootstrap.manifest import (
     BootstrapManifest,
     ResolvedFiles,
     all_composite_files,
+    compute_orphans,
     effective_excluded_files,
+    read_bootstrap_inventory,
+    read_bootstrap_orphans,
     write_bootstrap_marker,
 )
 from bootstrap.processor import filter_sections, has_user_region, splice_user_region
@@ -41,6 +45,16 @@ _CODE_DIR_PLACEHOLDER = "{{code_dir}}"
 ConfirmOverwrite = Callable[[Path, str, str], bool]
 
 
+@dataclass
+class ScaffoldResult:
+    """What a scaffold run manages, and what earlier runs left behind."""
+
+    # Sorted relative paths of every file this run manages.
+    files: list[str]
+    # Path -> last recorded fingerprint, per manifest.compute_orphans.
+    orphans: dict[str, str]
+
+
 def scaffold_repo(
     *,
     source_root: Path,
@@ -52,13 +66,14 @@ def scaffold_repo(
     resolved: ResolvedFiles,
     selected_features: set[str] | None = None,
     confirm: ConfirmOverwrite | None = None,
-) -> list[str]:
+) -> ScaffoldResult:
     """Generate (or re-bootstrap) a Bazel repository at *target_path*.
 
-    Returns the sorted relative paths of every file this run manages: the
-    copies, each file of a copied directory, the composite files (one kept on
-    disk under ``--review`` is still managed) and the README. The marker
-    records them as the repo's file inventory.
+    The result lists every file this run manages: the copies, each file of a
+    copied directory, the composite files (one kept on disk under ``--review``
+    is still managed) and the README. The marker records them as the repo's
+    file inventory. It also lists the orphans: files an earlier run's inventory
+    recorded that this run no longer manages.
 
     *module_dir* is the name of the top-level directory that will hold the
     repo's code (placeholder created empty during scaffolding). Any
@@ -75,6 +90,10 @@ def scaffold_repo(
     """
     selected_features = selected_features or set()
     target_path.mkdir(parents=True, exist_ok=True)
+
+    # Read the earlier run's tables now: step 7 overwrites the marker.
+    old_files = read_bootstrap_inventory(target_path) or {}
+    old_orphans = read_bootstrap_orphans(target_path)
 
     # Build lookup of files to skip during directory copies. Feature-conditional
     # excludes (e.g. tools/cpp/toolchains/ when custom_toolchains is off) are
@@ -171,12 +190,15 @@ def scaffold_repo(
     #    them exactly. Written after substitutions: its content carries no
     #    original_name to rewrite, and the hashes must be of the final bytes.
     files = sorted(managed)
-    write_bootstrap_marker(target_path, module_dir, selected_languages, selected_features, source_root, files=files)
+    orphans = compute_orphans(target_path, module_dir, old_files, old_orphans, files)
+    write_bootstrap_marker(
+        target_path, module_dir, selected_languages, selected_features, source_root, files=files, orphans=orphans
+    )
 
     # 8. Git init
     print("  Initializing git repository...")
     subprocess.run(["git", "init", "-b", "main"], cwd=target_path, check=True, capture_output=True)  # noqa: S607
-    return files
+    return ScaffoldResult(files=files, orphans=orphans)
 
 
 def prune_paths(target_path: Path, rel_paths: Iterable[str]) -> list[str]:
@@ -200,6 +222,33 @@ def prune_paths(target_path: Path, rel_paths: Iterable[str]) -> list[str]:
         elif path.exists() or path.is_symlink():
             path.unlink()
             removed.append(rel)
+    return removed
+
+
+def prunable_orphans(orphans: Iterable[str], declined: Iterable[str]) -> list[str]:
+    """The orphans ``--prune`` may delete, sorted.
+
+    All of them, except a path the user just declined to delete in the
+    deselected-owner prompt (*declined*), or anything under one: the flag must
+    not overrule an answer given a moment ago. Those stay listed as orphans.
+    """
+    kept = list(declined)
+    return sorted(rel for rel in orphans if not any(rel == d or rel.startswith(f"{d}/") for d in kept))
+
+
+def prune_orphans(target_path: Path, rel_paths: Iterable[str]) -> list[str]:
+    """Delete orphaned files, then every directory that leaves empty.
+
+    Returns the files removed. Empty parents go too, up to but never including
+    *target_path*: a directory that only ever held dropped files (a patches
+    dir, say) would otherwise linger as an empty shell.
+    """
+    removed = prune_paths(target_path, rel_paths)
+    for rel in removed:
+        parent = (target_path / rel).parent
+        while parent != target_path and parent.is_dir() and not any(parent.iterdir()):
+            parent.rmdir()
+            parent = parent.parent
     return removed
 
 
