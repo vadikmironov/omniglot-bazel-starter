@@ -4,15 +4,19 @@ Parses bootstrap_manifest.toml and resolves the set of files to include
 in a new repository based on the user's language selection.
 """
 
+import hashlib
+import json
 import subprocess
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 
 import tomllib
 
-# Marker file written into every scaffolded repo, recording the selection so a
-# re-bootstrap recovers it exactly instead of inferring it from the filesystem.
+# Marker file written into every scaffolded repo, recording the selection and
+# the file inventory so a re-bootstrap recovers them exactly instead of
+# inferring them from the filesystem.
 BOOTSTRAP_MARKER_FILE = ".omniglot_bootstrap.toml"
 
 
@@ -318,12 +322,23 @@ def starter_revision(source_root: Path) -> str | None:
     return f"{head}-dirty" if _git(source_root, "status", "--porcelain") else head
 
 
+def file_fingerprint(path: Path) -> str | None:
+    """What the inventory records for *path*: ``sha256:<hex>`` of a file's
+    bytes, ``symlink:<target>`` for a symlink, None when it is neither."""
+    if path.is_symlink():
+        return f"symlink:{path.readlink()}"
+    if not path.is_file():
+        return None
+    return f"sha256:{hashlib.sha256(path.read_bytes()).hexdigest()}"
+
+
 def write_bootstrap_marker(
     target_path: Path,
     module_dir: str,
     languages: set[str],
     features: set[str],
     source_root: Path | None = None,
+    files: Iterable[str] | None = None,
 ) -> None:
     """Record the scaffolded selection in ``BOOTSTRAP_MARKER_FILE``.
 
@@ -337,6 +352,11 @@ def write_bootstrap_marker(
     answer "how far behind the starter is this repo?" when a generated file
     turns out to predate a starter change. ``starter_revision`` is omitted when
     *source_root* is absent or is not a git checkout.
+
+    *files* are the relative paths this run manages. Each one present on disk
+    goes into a ``[files]`` table with its :func:`file_fingerprint` as of this
+    call, so a later run can tell which files the starter stopped shipping and
+    whether one changed since. Omitted, no table is written.
     """
     langs = ", ".join(f'"{x}"' for x in sorted(languages))
     feats = ", ".join(f'"{x}"' for x in sorted(features))
@@ -354,7 +374,32 @@ def write_bootstrap_marker(
     )
     if revision:
         content += f'starter_revision = "{revision}"\n'
+    if files is not None:
+        content += "\n# Every file the bootstrap tool manages, as it left them.\n[files]\n"
+        for rel in sorted(set(files)):
+            fingerprint = file_fingerprint(target_path / rel)
+            if fingerprint:
+                # JSON string escapes are TOML basic-string escapes too.
+                content += f"{json.dumps(rel, ensure_ascii=False)} = {json.dumps(fingerprint, ensure_ascii=False)}\n"
     (target_path / BOOTSTRAP_MARKER_FILE).write_text(content)
+
+
+def read_bootstrap_inventory(target_path: Path) -> dict[str, str] | None:
+    """The marker's ``[files]`` table (path -> fingerprint), or None.
+
+    None when the marker is absent, unparseable, or predates the inventory, so
+    a caller can tell "nothing recorded yet" from "recorded, and empty".
+    """
+    path = target_path / BOOTSTRAP_MARKER_FILE
+    if not path.is_file():
+        return None
+    try:
+        files = tomllib.loads(path.read_text()).get("files")
+    except (tomllib.TOMLDecodeError, OSError):
+        return None
+    if not isinstance(files, dict):
+        return None
+    return {rel: fp for rel, fp in files.items() if isinstance(fp, str)}
 
 
 def read_bootstrap_marker(

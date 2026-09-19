@@ -49,6 +49,18 @@ unpacked tarball is legitimate, so it records nothing rather than a guess.
 `git -C <starter> diff <starter_revision>..HEAD -- <path>` then answers "what
 changed in this file since that scaffold?" directly.
 
+The marker also carries a `[files]` table: the **file inventory**, one entry per
+file the tool manages (`scaffold_repo` returns the list — copies, each file of a
+copied directory, composite files, the README), mapped to
+`manifest.file_fingerprint`: `sha256:<hex>`, or `symlink:<target>`. The CLI
+rewrites the marker at the very end of the run, because the lock refresh,
+finalizers and formatters rewrite managed files after the scaffold step, and a
+fingerprint must describe the file as the run left it.
+`manifest.read_bootstrap_inventory` reads the table back; `None` means the marker
+predates the inventory, which is not the same as an empty table. A write added
+to `scaffold_repo` must add its path to the returned list —
+`test_inventory_is_every_file_the_scaffold_leaves` fails otherwise.
+
 On a detected repo, `_reuse_detected` reuses the detected languages/features by
 default, but offers to **change** them: it re-presents both checkboxes
 pre-checked with the detected set (uncheck = remove, check = add), then
