@@ -219,9 +219,14 @@ def _resolve_managed(rendered: str, dst: Path, *, confirm: ConfirmOverwrite | No
     survive a re-bootstrap while the starter baseline is refreshed. When
     *confirm* is supplied (``--review``) and the result differs from what's on
     disk, the user is asked before the file is overwritten.
+
+    A target that predates its file's user-managed region has nothing to
+    splice, so it is replaced like any other file; a note says so, because any
+    local edits now belong inside the new region.
     """
     existing = dst.read_text() if dst.exists() else None
     new_content = rendered
+    gained_region = existing is not None and has_user_region(rendered) and not has_user_region(existing)
     if existing is not None and has_user_region(rendered) and has_user_region(existing):
         new_content = splice_user_region(rendered, existing)
     if (
@@ -231,6 +236,9 @@ def _resolve_managed(rendered: str, dst: Path, *, confirm: ConfirmOverwrite | No
         and not confirm(dst, existing, new_content)
     ):
         return None
+    if gained_region and existing != new_content:
+        print(f"    note: {dst} had no user-managed region and was replaced.")
+        print("          Recover local edits from version control and put them inside the region.")
     return new_content
 
 

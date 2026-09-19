@@ -5,6 +5,8 @@ of a managed dependency file, then scaffolds again into the same dir and
 verifies the edit survived while the starter baseline stayed intact.
 """
 
+import contextlib
+import io
 import shutil
 import subprocess
 import tempfile
@@ -33,6 +35,7 @@ TEST_REPO_NAME = "rebootstrap_test"
 MANAGED_SOURCE_FILES = [
     ".gitignore",
     ".bazelignore",
+    "bazel_downloader.cfg",
     ".clang-tidy",
     "tools/python/pyproject.toml",
     "tools/rust/Cargo.toml",
@@ -181,6 +184,39 @@ class TestRebootstrap(_ScaffoldHarness):
         self.assertIn("services/postgres/data", result, "user bazelignore entry lost on re-bootstrap")
         # The bazel-* symlink ignores prove the baseline was refreshed alongside.
         self.assertIn("bazel-out", result, "starter baseline lost on re-bootstrap")
+
+    def test_downloader_cfg_user_rule_survives(self) -> None:
+        target = self._fresh_target()
+        self._scaffold_into(target, {"python"})
+        cfg = target / "bazel_downloader.cfg"
+
+        # User adds a proxy rewrite inside the user-managed region.
+        rule = "rewrite github.com/(.*) proxy.example.com/github/$1"
+        cfg.write_text(cfg.read_text().replace("# --- END user-managed ---", f"{rule}\n# --- END user-managed ---", 1))
+
+        self._scaffold_into(target, {"python"})  # re-bootstrap
+        result = cfg.read_text()
+        self.assertIn(rule, result, "user downloader rule lost on re-bootstrap")
+        self.assertIn("Bazel downloader configuration", result, "starter baseline lost on re-bootstrap")
+
+    def test_file_predating_its_user_region_is_replaced_with_a_note(self) -> None:
+        """A target written before its file gained a region has nothing to
+        splice: it is replaced, and the run says so."""
+        target = self._fresh_target()
+        self._scaffold_into(target, {"python"})
+        cfg = target / "bazel_downloader.cfg"
+        cfg.write_text("rewrite github.com/(.*) proxy.example.com/github/$1\n")  # no region
+
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            self._scaffold_into(target, {"python"})  # re-bootstrap
+        self.assertTrue(has_user_region(cfg.read_text()), "replaced file should carry the region")
+        self.assertIn("had no user-managed region and was replaced", out.getvalue())
+
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            self._scaffold_into(target, {"python"})  # region present now: no note
+        self.assertNotIn("had no user-managed region", out.getvalue())
 
     def test_clang_tidy_user_edit_stays_inside_checks(self) -> None:
         target = self._fresh_target()

@@ -29,7 +29,6 @@ files = [
     ".bazelversion",
     "WORKSPACE.bazel",
     ".bazeliskrc",
-    "bazel_downloader.cfg",
 ]
 # tools/setup holds the Bazelisk installer — every repo needs Bazel, so it
 # ships regardless of which languages or features are selected.
@@ -259,6 +258,9 @@ files = [
     # same mechanism pyproject.toml / .gitignore use. A plain core copy would
     # clobber a repo's project-specific ignore paths on every re-bootstrap.
     ".bazelignore",
+    # Same reason: its user-managed region holds a repo's own downloader rules
+    # (proxy rewrites, blocks).
+    "bazel_downloader.cfg",
     "tools/format/BUILD",
     "user.bazelrc.template",
 ]
