@@ -113,18 +113,20 @@ def scaffold_repo(
     skip_abs = composite_abs | excluded_abs
 
     managed: set[str] = set()
+    # The subset written verbatim from the starter, which step 5 renames.
+    copied: set[str] = set()
 
     # 1. Direct file copies (core + language + language_files)
     print("  Copying files...")
     for rel in resolved.copy:
         _copy_file(source_root / rel, target_path / rel)
-        managed.add(rel)
+        copied.add(rel)
 
     # 2. Directory copies (language tool directories)
     print("  Copying tool directories...")
 
     def _copy_and_record(src: str, dst: str) -> str:
-        managed.add(Path(dst).relative_to(target_path).as_posix())
+        copied.add(Path(dst).relative_to(target_path).as_posix())
         return shutil.copy2(src, dst)
 
     for rel_dir in resolved.directories:
@@ -189,10 +191,14 @@ def scaffold_repo(
     )
     managed.add(_README_OUTPUT)
 
-    # 5. Name substitutions across all text files. Composite files and the
-    #    README arrive already renamed (see _renamed); this covers the copies.
+    # 5. Name substitutions in the files copied verbatim, and only those.
+    #    Composite files and the README arrive already renamed (see _renamed),
+    #    with their user-managed regions left as the user wrote them. Nothing
+    #    else under the target is the tool's to rewrite: the user's code and
+    #    documents may well mention the starter by name.
     print("  Applying name substitutions...")
-    _apply_substitutions(target_path, manifest.original_name, repo_name)
+    _apply_substitutions(target_path, copied, manifest.original_name, repo_name)
+    managed |= copied
 
     # 6. Create empty placeholder module directory
     (target_path / module_dir).mkdir(exist_ok=True)
@@ -787,10 +793,16 @@ def _renamed(content: str, dst: Path, original_name: str, new_name: str) -> str:
     return content.replace(original_name, new_name) if _is_text_file(dst) else content
 
 
-def _apply_substitutions(target_path: Path, original_name: str, new_name: str) -> None:
-    """Replace original_name with new_name in all text files under target_path."""
-    for path in target_path.rglob("*"):
-        if path.is_file() and _is_text_file(path):
+def _apply_substitutions(target_path: Path, rel_paths: Iterable[str], original_name: str, new_name: str) -> None:
+    """Replace original_name with new_name in the text files among *rel_paths*.
+
+    Only the files named: a walk of the whole target would also rewrite the
+    user's own code and documents. A symlink is skipped, so nothing is written
+    through it into a file that is not in the list.
+    """
+    for rel in rel_paths:
+        path = target_path / rel
+        if path.is_file() and not path.is_symlink() and _is_text_file(path):
             try:
                 content = path.read_text()
             except (UnicodeDecodeError, PermissionError):

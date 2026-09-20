@@ -313,6 +313,69 @@ class TestReviewComparesLikeWithLike(_ScaffoldHarness):
         self.assertEqual(changed, {"# a local edit outside any user-managed region"})
 
 
+class TestRenameTouchesOnlyWhatTheToolWrote(_ScaffoldHarness):
+    """The repo rename applies to the starter's text, never to the user's."""
+
+    STARTER = "omniglot-bazel-starter"
+    MENTION = "Bootstrapped from omniglot-bazel-starter; see its README.\n"
+
+    def _write(self, target: Path, rel: str) -> Path:
+        path = target / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(self.MENTION)
+        return path
+
+    def test_user_files_keep_their_mention_of_the_starter(self) -> None:
+        """Documents and code the tool never wrote: untouched by a re-bootstrap."""
+        target = self._fresh_target()
+        self._scaffold_into(target, {"python"})
+        theirs = [
+            self._write(target, rel)
+            for rel in ("docs/bootstrap.md", "NOTES.md", "modules/app/README.md", "modules/app/main.py")
+        ]
+        self._scaffold_into(target, {"python"})
+        for path in theirs:
+            self.assertEqual(path.read_text(), self.MENTION, path.relative_to(target))
+
+    def test_existing_files_survive_a_first_bootstrap_into_their_directory(self) -> None:
+        target = self._fresh_target()
+        theirs = [self._write(target, rel) for rel in ("docs/design.md", "src/legacy/tool.py")]
+        self._scaffold_into(target, {"python"})
+        for path in theirs:
+            self.assertEqual(path.read_text(), self.MENTION, path.relative_to(target))
+
+    def test_a_user_managed_region_is_left_as_the_user_wrote_it(self) -> None:
+        target = self._fresh_target()
+        self._scaffold_into(target, {"python"})
+        ignore = target / ".gitignore"
+        ignore.write_text(
+            ignore.read_text().replace(
+                "# --- END user-managed ---", "# kept from omniglot-bazel-starter\n# --- END user-managed ---", 1
+            )
+        )
+        self._scaffold_into(target, {"python"})
+        self.assertIn("# kept from omniglot-bazel-starter", ignore.read_text())
+
+    def test_orphans_are_not_rewritten(self) -> None:
+        target = self._fresh_target()
+        self._scaffold_into(target, {"python"})
+        orphan = self._write(target, "tools/python/dropped.md")
+        inventory = read_bootstrap_inventory(target) or {}
+        write_bootstrap_marker(target, "modules", {"python"}, set(), files=[*inventory, "tools/python/dropped.md"])
+        result = self._scaffold_into(target, {"python"})
+        self.assertIn("tools/python/dropped.md", result.orphans)
+        self.assertEqual(orphan.read_text(), self.MENTION)
+
+    def test_the_starters_own_files_are_still_renamed(self) -> None:
+        """Verbatim copies and rendered files alike."""
+        target = self._fresh_target()
+        self._scaffold_into(target, {"python", "go"}, features={"publish"})
+        for rel in ("tools/publish/gazelle/lang.go", "tools/publish/lang/python_publish_defs.bzl", "MODULE.bazel"):
+            content = (target / rel).read_text()
+            self.assertNotIn(self.STARTER, content, rel)
+            self.assertIn(TEST_REPO_NAME, content, rel)
+
+
 class TestDetect(_ScaffoldHarness):
     """detect_repo reads a scaffolded repo's name, languages, and features."""
 
