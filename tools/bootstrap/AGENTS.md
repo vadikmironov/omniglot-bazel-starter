@@ -22,8 +22,10 @@ subset of this repo into the target, rewrites the module name, `git init`s, and
   `publish_gen`, `lint_gen`). Composite files and the README are renamed
   (`_renamed`) *before* they are compared with the file on disk, which already
   carries the new name; otherwise `--review` reports every mention of the repo as
-  a change back to the starter's name. The substitute step then covers the raw
-  copies. A directory copy ships only what git does not ignore
+  a change back to the starter's name. The substitute step then renames the
+  files copied verbatim in this run, and nothing else: it never walks the
+  target, so the user's code, documents and orphans keep any mention of the
+  starter, and so does the content of a user-managed region. A directory copy ships only what git does not ignore
   in the starter checkout (`manifest.unignored_files`: tracked files plus
   untracked ones no ignore rule matches), so `__pycache__` and the like stay
   behind while uncommitted work still ships. Outside a git checkout it ships
