@@ -37,7 +37,7 @@ bazel_dep(name = "rules_shell", version = "0.8.0")
 # for starlark files.
 # https://github.com/keith/buildifier-prebuilt/releases
 #
-bazel_dep(name = "buildifier_prebuilt", version = "10.0.1", dev_dependency = True)
+bazel_dep(name = "buildifier_prebuilt", version = "10.1.0", dev_dependency = True)
 
 #
 # aspect_rules_lint block
