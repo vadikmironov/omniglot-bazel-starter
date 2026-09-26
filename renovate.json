@@ -76,7 +76,7 @@
          "groupName": "bazel modules"
       },
       {
-         "description": "maven_install.json is repinned as a whole by @<project>_maven_dependencies//:pin, so the maven.install artifacts get their own branch: in branch mode the tasks come from the branch's first upgrade, and a group mixed with bazel_dep bumps would run the repin only when a Maven name happens to sort first. PMD is the clearest case for grouping: pmd-core, pmd-java and pmd-cli ship from one release and resolve together. REPIN=1 skips the stale-pin check; the module lock is refreshed after the repin.",
+         "description": "maven_install.json is repinned as a whole by @<project>_maven_dependencies//:pin, so the maven.install artifacts get their own branch: in branch mode the tasks come from the branch's first upgrade, and a group mixed with bazel_dep bumps would run the repin only when a Maven name happens to sort first. PMD is the clearest case for grouping: pmd-core, pmd-java and pmd-cli ship from one release and resolve together. REPIN=1 skips the stale-pin check; the module lock is refreshed after the repin. The Renovate image sets ANDROID_HOME to an SDK with no API levels, which rules_android refuses, so the repin blanks it.",
          "matchManagers": [
             "bazel-module"
          ],
@@ -86,7 +86,7 @@
          "groupName": "maven artifacts",
          "postUpgradeTasks": {
             "commands": [
-               "bazel run --repo_env=REPIN=1 @omniglot-bazel-starter_maven_dependencies//:pin",
+               "bazel run --repo_env=REPIN=1 --repo_env=ANDROID_HOME= @omniglot-bazel-starter_maven_dependencies//:pin",
                "bazel mod deps --lockfile_mode=update"
             ],
             "executionMode": "branch",
