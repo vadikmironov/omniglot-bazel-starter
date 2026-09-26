@@ -56,6 +56,8 @@ jobs:
   # The same m4, but the way omniglot builds it: through rules_foreign_cc as an
   # exec-config tool for a cmake() target, with omniglot's own flags.
   omniglot:
+    # Answered by run 36240194419; re-run by hand only.
+    if: github.event_name == 'workflow_dispatch'
     strategy:
       fail-fast: false
       matrix:
@@ -84,4 +86,39 @@ jobs:
         grep -A3 'Compiling .*m4+.* failed' build.log | grep -o -E '/std:[a-z0-9+]+|/Zc:[A-Za-z_]+|/experimental:[a-z0-9]+' | sort | uniq -c
         echo "--- m4 compiles that ran"
         grep -o -E 'Compiling external/m4\+/lib/(regex|spawn[a-z_]*)\.c \[for tool\]' build.log | sort -u | head -5
+        exit "$status"
+
+  # rules_cc 0.2.19 added `default_c_std` (/std:c17 for MSVC C). With C17,
+  # __STDC_VERSION__ makes gnulib put `restrict` inside array brackets, which
+  # MSVC rejects. Pin rules_cc to 0.2.25 and try two ways out.
+  cstd:
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [ "rules_cc_0.2.25", "define_restrict_arr", "no_default_c_std" ]
+    runs-on: windows-latest
+    name: m4 bcr.4 + ${{ matrix.variant }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: spike/m4_msvc_restrict/ws
+    steps:
+    - uses: actions/checkout@v7
+    - uses: bazel-contrib/setup-bazel@0.19.0
+      with:
+        bazelisk-cache: true
+    - name: Build @m4//:m4
+      run: |
+        printf 'bazel_dep(name = "m4", version = "1.4.21.bcr.4")\nbazel_dep(name = "rules_cc", version = "0.2.25")\n' > MODULE.bazel
+        case "${{ matrix.variant }}" in
+          define_restrict_arr) extra=(--copt=/D__restrict_arr=) ;;
+          no_default_c_std) extra=(--features=-default_c_std) ;;
+          *) extra=() ;;
+        esac
+        set +e
+        bazel --output_base=C:/b build --keep_going --lockfile_mode=off "${extra[@]}" @m4//:m4 2>&1 | tee build.log
+        status=${PIPESTATUS[0]}
+        echo "::notice title=C2143 count::$(grep -c 'C2143' build.log)"
+        grep -E 'error C[0-9]+' build.log | sort -u | head -12
+        bazel --output_base=C:/b mod graph --lockfile_mode=off 2>/dev/null | grep -o -m1 'rules_cc@[0-9.]*'
         exit "$status"
