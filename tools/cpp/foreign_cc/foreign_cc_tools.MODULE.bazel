@@ -19,7 +19,7 @@
 # (regex.h and spawn.h fail to compile on both Windows x64 and ARM64). This is
 # the opt-out the release documents, and it is what every earlier version did.
 tools = use_extension("@rules_foreign_cc//foreign_cc:extensions.bzl", "tools")
-tools.m4(mode = "system")
+# tools.m4(mode = "system")  # spike: removed to see whether m4 still fails in omniglot
 
 http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 

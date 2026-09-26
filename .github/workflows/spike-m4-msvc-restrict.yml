@@ -12,6 +12,8 @@ permissions:
 
 jobs:
   m4:
+    # Already answered by run 36238528754; re-run by hand only.
+    if: github.event_name == 'workflow_dispatch'
     strategy:
       fail-fast: false
       matrix:
@@ -49,4 +51,37 @@ jobs:
         echo "--- restrict in the generated config.h"
         find "$(bazel --output_base=C:/b info execution_root 2>/dev/null)/bazel-out" \
           -path '*m4+/lib/config.h' -exec grep -n -E '#\s*(undef|define) restrict\b' {} + || true
+        exit "$status"
+
+  # The same m4, but the way omniglot builds it: through rules_foreign_cc as an
+  # exec-config tool for a cmake() target, with omniglot's own flags.
+  omniglot:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ windows-latest, windows-11-arm ]
+    runs-on: ${{ matrix.os }}
+    name: omniglot cmake module on ${{ matrix.os }}
+    env:
+      BAZEL_STARTUP_OPTS: "--output_base=C:/bazel_build"
+    defaults:
+      run:
+        shell: bash
+    steps:
+    - uses: actions/checkout@v7
+    - uses: ./.github/actions/setup_windows
+      with:
+        bazel_startup_opts: ${{ env.BAZEL_STARTUP_OPTS }}
+    - name: Build the cmake module with source-built m4
+      run: |
+        set +e
+        bazel $BAZEL_STARTUP_OPTS build --lockfile_mode=off --keep_going --verbose_failures \
+          //modules/cpp_app_with_cmake_dep/... 2>&1 | tee build.log
+        status=${PIPESTATUS[0]}
+        echo "::notice title=C2143 count::$(grep -c 'C2143' build.log)"
+        grep -E 'error C[0-9]+' build.log | sort -u | head -12
+        echo "--- C language flags on failing m4 compiles"
+        grep -A3 'Compiling .*m4+.* failed' build.log | grep -o -E '/std:[a-z0-9+]+|/Zc:[A-Za-z_]+|/experimental:[a-z0-9]+' | sort | uniq -c
+        echo "--- m4 compiles that ran"
+        grep -o -E 'Compiling external/m4\+/lib/(regex|spawn[a-z_]*)\.c \[for tool\]' build.log | sort -u | head -5
         exit "$status"
