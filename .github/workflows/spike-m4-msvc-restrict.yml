@@ -1,0 +1,52 @@
+# Throwaway probe, not for main: does m4 from BCR still fail on MSVC with C2143
+# on `restrict`, and does adding AC_C_RESTRICT (local m4@1.4.21.bcr.5) fix it?
+name: Spike - m4 MSVC restrict
+
+on:
+  push:
+    branches: [ "spike/m4-msvc-restrict" ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  m4:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ windows-latest, windows-11-arm ]
+        m4: [ "1.4.21.bcr.4", "1.4.21.bcr.5" ]
+    runs-on: ${{ matrix.os }}
+    name: m4 ${{ matrix.m4 }} on ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: spike/m4_msvc_restrict/ws
+    steps:
+    - uses: actions/checkout@v7
+    - uses: bazel-contrib/setup-bazel@0.19.0
+      with:
+        bazelisk-cache: true
+    - name: Print MSVC toolset
+      shell: pwsh
+      working-directory: .
+      run: |
+        $vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath
+        Write-Host "VS install: $vs"
+        Get-ChildItem "$vs\VC\Tools\MSVC" -Name | ForEach-Object { Write-Host "  installed: $_" }
+    - name: Build @m4//:m4
+      run: |
+        printf 'bazel_dep(name = "m4", version = "%s")\n' "${{ matrix.m4 }}" > MODULE.bazel
+        registry="file:///$(cygpath -m "$GITHUB_WORKSPACE")/spike/m4_msvc_restrict/registry"
+        set +e
+        bazel --output_base=C:/b build --keep_going --lockfile_mode=off \
+          --registry="$registry" --registry=https://bcr.bazel.build \
+          @m4//:m4 2>&1 | tee build.log
+        status=${PIPESTATUS[0]}
+        echo "::notice title=C2143 count::$(grep -c 'C2143' build.log)"
+        grep -E 'error C[0-9]+' build.log | sort -u | head -20
+        echo "--- restrict in the generated config.h"
+        find "$(bazel --output_base=C:/b info execution_root 2>/dev/null)/bazel-out" \
+          -path '*m4+/lib/config.h' -exec grep -n -E '#\s*(undef|define) restrict\b' {} + || true
+        exit "$status"

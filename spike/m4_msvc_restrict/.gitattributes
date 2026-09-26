@@ -1,0 +1,2 @@
+# Registry files are hashed into source.json: keep bytes as-is on Windows checkouts.
+* -text
