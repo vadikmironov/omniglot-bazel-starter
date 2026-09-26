@@ -8,6 +8,11 @@ load("@rules_cc_autoconf//autoconf:checks.bzl", "checks")
 load("@rules_cc_autoconf//autoconf:package_info.bzl", "package_info")
 load("@rules_cc_autoconf//gnulib:conditional_hdrs.bzl", "cc_gnulib_conditional_hdrs")
 
+# gnulib is configured for MSVC's default C dialect. rules_cc 0.2.19 made MSVC
+# compile C as /std:c17, and gnulib's headers then fail with C2143 on
+# `restrict` inside array brackets.
+package(features = ["-default_c_std"])
+
 LOCAL_DEFINES = [
     "HAVE_CONFIG_H",
 ] + select({
@@ -577,9 +582,6 @@ int main(void) { char buf[1]; return getrandom(buf, 1, 0); }
     deps = [
         ":m4_gnulib-comp",
         ":m4_package_info",
-        # gnulib's m4/regex.m4, stdlib_h.m4 and others AC_REQUIRE this; without
-        # it `restrict` reaches MSVC's C compiler undefined (C2143).
-        "@rules_cc_autoconf//autoconf/macros/AC_C_RESTRICT",
     ] + GNULIB_M4_DEPS,
 )
 

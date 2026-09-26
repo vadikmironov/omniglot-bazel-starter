@@ -92,6 +92,8 @@ jobs:
   # __STDC_VERSION__ makes gnulib put `restrict` inside array brackets, which
   # MSVC rejects. Pin rules_cc to 0.2.25 and try two ways out.
   cstd:
+    # Answered by run 36243917876; re-run by hand only.
+    if: github.event_name == 'workflow_dispatch'
     strategy:
       fail-fast: false
       matrix:
@@ -121,4 +123,72 @@ jobs:
         echo "::notice title=C2143 count::$(grep -c 'C2143' build.log)"
         grep -E 'error C[0-9]+' build.log | sort -u | head -12
         bazel --output_base=C:/b mod graph --lockfile_mode=off 2>/dev/null | grep -o -m1 'rules_cc@[0-9.]*'
+        exit "$status"
+
+  # The candidate: local m4@1.4.21.bcr.5 = bcr.4 + package(features =
+  # ["-default_c_std"]), tested the way BCR's presubmit does (@m4//...), with
+  # rules_cc old (module floor) and new (0.2.25), on both runners.
+  fix:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ windows-latest, windows-11-arm ]
+        rules_cc: [ "floor", "0.2.25" ]
+    runs-on: ${{ matrix.os }}
+    name: m4 bcr.5 fix, rules_cc ${{ matrix.rules_cc }}, ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: spike/m4_msvc_restrict/ws
+    steps:
+    - uses: actions/checkout@v7
+    - uses: bazel-contrib/setup-bazel@0.19.0
+      with:
+        bazelisk-cache: true
+    - name: Build and test @m4//...
+      run: |
+        printf 'bazel_dep(name = "m4", version = "1.4.21.bcr.5")\n' > MODULE.bazel
+        if [ "${{ matrix.rules_cc }}" != floor ]; then
+          printf 'bazel_dep(name = "rules_cc", version = "%s")\n' "${{ matrix.rules_cc }}" >> MODULE.bazel
+        fi
+        registry="file:///$(cygpath -m "$GITHUB_WORKSPACE")/spike/m4_msvc_restrict/registry"
+        flags=(--lockfile_mode=off --registry="$registry" --registry=https://bcr.bazel.build)
+        bazel --output_base=C:/b mod graph "${flags[@]}" 2>/dev/null | grep -o -E -m2 '(m4|rules_cc)@[0-9a-z.]+'
+        set +e
+        bazel --output_base=C:/b test --keep_going "${flags[@]}" @m4//... 2>&1 | tee build.log
+        status=${PIPESTATUS[0]}
+        echo "::notice title=C2143 count::$(grep -c 'C2143' build.log)"
+        grep -E 'error C[0-9]+|Executed [0-9]+ out' build.log | sort -u | head -8
+        exit "$status"
+
+  # End to end: omniglot's cmake module with source-built m4 pinned to bcr.5.
+  omniglot_fix:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ windows-latest, windows-11-arm ]
+    runs-on: ${{ matrix.os }}
+    name: omniglot cmake module, m4 bcr.5, ${{ matrix.os }}
+    env:
+      BAZEL_STARTUP_OPTS: "--output_base=C:/bazel_build"
+    defaults:
+      run:
+        shell: bash
+    steps:
+    - uses: actions/checkout@v7
+    - uses: ./.github/actions/setup_windows
+      with:
+        bazel_startup_opts: ${{ env.BAZEL_STARTUP_OPTS }}
+    - name: Build the cmake module with source-built m4 bcr.5
+      run: |
+        printf '\nsingle_version_override(module_name = "m4", version = "1.4.21.bcr.5")\n' >> MODULE.bazel
+        registry="file:///$(cygpath -m "$GITHUB_WORKSPACE")/spike/m4_msvc_restrict/registry"
+        set +e
+        bazel $BAZEL_STARTUP_OPTS build --lockfile_mode=off --keep_going \
+          --registry="$registry" --registry=https://bcr.bazel.build \
+          //modules/cpp_app_with_cmake_dep/... 2>&1 | tee build.log
+        status=${PIPESTATUS[0]}
+        echo "::notice title=C2143 count::$(grep -c 'C2143' build.log)"
+        grep -E 'error C[0-9]+' build.log | sort -u | head -8
+        grep -o -m3 -E 'Compiling external/m4\+/lib/(regex|spawn[a-z_]*)\.c \[for tool\]' build.log | sort -u
         exit "$status"
