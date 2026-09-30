@@ -49,7 +49,7 @@ bazel_dep(name = "buildifier_prebuilt", version = "10.1.0", dev_dependency = Tru
 # Please find documentation here:
 # https://github.com/aspect-build/rules_lint/releases
 #
-bazel_dep(name = "aspect_rules_lint", version = "2.9.0")
+bazel_dep(name = "aspect_rules_lint", version = "2.9.1")
 
 # Temporary floor, not a dependency: buf is unused here. aspect_rules_lint 2.9.0
 # pins rules_buf 0.5.2, whose rules_go 0.42.0 still uses the native CcInfo
