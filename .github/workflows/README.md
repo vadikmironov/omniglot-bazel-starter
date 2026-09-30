@@ -41,6 +41,11 @@ remote JDK covers `//...`.
 
 - BuildBuddy remote caching speeds up both CI and local builds, each configured
   with its own API key. Fork PRs have no access to the secret and run uncached
+- The cache is never a reason for a red build. Every job calls Bazel through
+  `.github/scripts/bazel.sh`. It adds the cache when the key is present. When
+  Bazel exits with a code it reserves for remote cache or build event failures
+  (32, 34, 38, 39, 45), the script runs the command once more without the cache
+  and leaves a warning on the run. A build or test failure is never retried
 - Stale runs are cancelled when new commits are pushed
 - Any job can be triggered manually via `workflow_dispatch`
 - The `coverage` job publishes the latest `main` report to GitHub Pages and

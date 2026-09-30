@@ -10,7 +10,7 @@
   // (binarySource "install", the default inside the Renovate image).
   "allowedCommands": [
     "^go mod tidy$",
-    "^bazel run --repo_env=REPIN=1 @omniglot-bazel-starter_maven_dependencies//:pin$",
+    "^bazel run --repo_env=REPIN=1 --repo_env=ANDROID_HOME= @omniglot-bazel-starter_maven_dependencies//:pin$",
     "^bazel mod deps --lockfile_mode=update$"
   ]
 }

@@ -28,7 +28,7 @@ inputs:
 runs:
   using: "composite"
   steps:
-    # Fork PRs don't have access to secrets, so we gracefully skip remote cache.
+    # Fork PRs don't have access to secrets, so bazel.sh skips the remote cache.
     # --build_tag_filters / --test_tag_filters with -lint scope this action to
     # non-lint targets; lint runs in its own Linux-only job (clang-tidy/PMD/
     # spotbugs aren't set up on the other platforms), and excluding it here
@@ -40,6 +40,8 @@ runs:
       shell: bash
       env:
         BUILDBUDDY_API_KEY: ${{ inputs.buildbuddy_api_key }}
+        BAZEL_CACHE_CONFIG: ci
+        BAZEL_STARTUP_OPTS: ${{ inputs.bazel_startup_opts }}
         BAZEL_CONFIG: ${{ inputs.bazel_config }}
         EXCLUDE_TAGS: ${{ inputs.exclude_tags }}
         COMPILATION_MODE: ${{ inputs.compilation_mode }}
@@ -58,17 +60,9 @@ runs:
           TAGS="$TAGS,-${EXCLUDE_TAGS//,/,-}"
           echo "Tag filters: $TAGS"
         fi
-        if [ -n "$BUILDBUDDY_API_KEY" ]; then
-          echo "Remote cache enabled"
-          bazel ${{ inputs.bazel_startup_opts }} test --config=ci $EXTRA_CONFIG \
-            --build_tag_filters="$TAGS" \
-            --test_tag_filters="$TAGS" \
-            --remote_header=x-buildbuddy-api-key="$BUILDBUDDY_API_KEY" \
-            ${{ inputs.targets }}
-        else
-          echo "Remote cache disabled (no API key available)"
-          bazel ${{ inputs.bazel_startup_opts }} test $EXTRA_CONFIG \
-            --build_tag_filters="$TAGS" \
-            --test_tag_filters="$TAGS" \
-            ${{ inputs.targets }}
-        fi
+        # bazel.sh adds the remote cache when a key is present and retries
+        # without it when the cache, not the build, is what failed.
+        bash .github/scripts/bazel.sh test $EXTRA_CONFIG \
+          --build_tag_filters="$TAGS" \
+          --test_tag_filters="$TAGS" \
+          ${{ inputs.targets }}

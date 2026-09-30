@@ -336,6 +336,9 @@ build:remote-cache --remote_timeout=3600
 # Build Event Service (BES) — dashboard/analytics at app.buildbuddy.io
 build:remote-cache --bes_results_url=https://app.buildbuddy.io/invocation/
 build:remote-cache --bes_backend=grpcs://remote.buildbuddy.io
+# The dashboard is a convenience: by default a failed upload turns a green
+# build into exit 38. Upload in the background instead.
+build:remote-cache --bes_upload_mode=fully_async
 
 # CI configuration — inherits remote cache and adds CI-specific flags
 build:ci --config=remote-cache

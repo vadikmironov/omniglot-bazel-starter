@@ -5,6 +5,9 @@ of a managed dependency file, then scaffolds again into the same dir and
 verifies the edit survived while the starter baseline stayed intact.
 """
 
+import contextlib
+import hashlib
+import io
 import shutil
 import subprocess
 import tempfile
@@ -16,16 +19,31 @@ from pathlib import Path
 from bootstrap.detect import detect_repo
 from bootstrap.manifest import (
     BOOTSTRAP_MARKER_FILE,
+    UNVERIFIED,
     BootstrapManifest,
     compute_prune_set,
+    file_fingerprint,
     load_manifest,
+    orphan_status,
+    read_bootstrap_inventory,
     read_bootstrap_marker,
+    read_bootstrap_orphans,
     resolve_files,
     starter_revision,
+    unignored_files,
     write_bootstrap_marker,
 )
 from bootstrap.processor import has_user_region
-from bootstrap.scaffolder import feature_remover_commands, prune_paths, scaffold_repo
+from bootstrap.scaffolder import (
+    ConfirmOverwrite,
+    ScaffoldResult,
+    _make_ignore,
+    feature_remover_commands,
+    prunable_orphans,
+    prune_orphans,
+    prune_paths,
+    scaffold_repo,
+)
 
 TEST_REPO_NAME = "rebootstrap_test"
 
@@ -33,6 +51,7 @@ TEST_REPO_NAME = "rebootstrap_test"
 MANAGED_SOURCE_FILES = [
     ".gitignore",
     ".bazelignore",
+    "bazel_downloader.cfg",
     ".clang-tidy",
     "tools/python/pyproject.toml",
     "tools/rust/Cargo.toml",
@@ -62,10 +81,12 @@ class _ScaffoldHarness(unittest.TestCase):
         selected: set[str],
         features: set[str] | None = None,
         module_dir: str = "modules",
-    ) -> None:
+        confirm: ConfirmOverwrite | None = None,
+    ) -> ScaffoldResult:
         features = features or set()
         resolved = resolve_files(self.manifest, selected, features)
-        scaffold_repo(
+        return scaffold_repo(
+            confirm=confirm,
             source_root=self.source_root,
             target_path=target,
             repo_name=TEST_REPO_NAME,
@@ -182,6 +203,39 @@ class TestRebootstrap(_ScaffoldHarness):
         # The bazel-* symlink ignores prove the baseline was refreshed alongside.
         self.assertIn("bazel-out", result, "starter baseline lost on re-bootstrap")
 
+    def test_downloader_cfg_user_rule_survives(self) -> None:
+        target = self._fresh_target()
+        self._scaffold_into(target, {"python"})
+        cfg = target / "bazel_downloader.cfg"
+
+        # User adds a proxy rewrite inside the user-managed region.
+        rule = "rewrite github.com/(.*) proxy.example.com/github/$1"
+        cfg.write_text(cfg.read_text().replace("# --- END user-managed ---", f"{rule}\n# --- END user-managed ---", 1))
+
+        self._scaffold_into(target, {"python"})  # re-bootstrap
+        result = cfg.read_text()
+        self.assertIn(rule, result, "user downloader rule lost on re-bootstrap")
+        self.assertIn("Bazel downloader configuration", result, "starter baseline lost on re-bootstrap")
+
+    def test_file_predating_its_user_region_is_replaced_with_a_note(self) -> None:
+        """A target written before its file gained a region has nothing to
+        splice: it is replaced, and the run says so."""
+        target = self._fresh_target()
+        self._scaffold_into(target, {"python"})
+        cfg = target / "bazel_downloader.cfg"
+        cfg.write_text("rewrite github.com/(.*) proxy.example.com/github/$1\n")  # no region
+
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            self._scaffold_into(target, {"python"})  # re-bootstrap
+        self.assertTrue(has_user_region(cfg.read_text()), "replaced file should carry the region")
+        self.assertIn("had no user-managed region and was replaced", out.getvalue())
+
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            self._scaffold_into(target, {"python"})  # region present now: no note
+        self.assertNotIn("had no user-managed region", out.getvalue())
+
     def test_clang_tidy_user_edit_stays_inside_checks(self) -> None:
         target = self._fresh_target()
         self._scaffold_into(target, {"cpp"})
@@ -219,6 +273,107 @@ class TestRebootstrap(_ScaffoldHarness):
         self._scaffold_into(target, {"go"})
         gomod = (target / "go.mod").read_text()
         self.assertFalse(has_user_region(gomod), "go.mod should not be a managed file")
+
+
+class TestReviewComparesLikeWithLike(_ScaffoldHarness):
+    """``--review`` compares the rendered file after the repo rename, as the
+    file on disk already is."""
+
+    def _recording_confirm(self) -> tuple[list[tuple[str, str, str]], ConfirmOverwrite]:
+        calls: list[tuple[str, str, str]] = []
+
+        def confirm(dst: Path, existing: str, new_content: str) -> bool:
+            calls.append((dst.name, existing, new_content))
+            return True
+
+        return calls, confirm
+
+    def test_an_unedited_repo_is_not_asked_about(self) -> None:
+        """The rename alone is no difference: nothing to review."""
+        target = self._fresh_target()
+        self._scaffold_into(target, {"python"})
+        self.assertIn(TEST_REPO_NAME, (target / "MODULE.bazel").read_text())
+
+        calls, confirm = self._recording_confirm()
+        self._scaffold_into(target, {"python"}, confirm=confirm)
+        self.assertEqual([name for name, _, _ in calls], [])
+
+    def test_a_real_edit_is_shown_without_the_rename(self) -> None:
+        target = self._fresh_target()
+        self._scaffold_into(target, {"python"})
+        module = target / "MODULE.bazel"
+        module.write_text(module.read_text() + "# a local edit outside any user-managed region\n")
+
+        calls, confirm = self._recording_confirm()
+        self._scaffold_into(target, {"python"}, confirm=confirm)
+        self.assertEqual([name for name, _, _ in calls], ["MODULE.bazel"])
+        _, existing, new_content = calls[0]
+        self.assertNotIn(self.manifest.original_name, new_content, "the starter's name must not be offered")
+        changed = set(existing.splitlines()) ^ set(new_content.splitlines())
+        self.assertEqual(changed, {"# a local edit outside any user-managed region"})
+
+
+class TestRenameTouchesOnlyWhatTheToolWrote(_ScaffoldHarness):
+    """The repo rename applies to the starter's text, never to the user's."""
+
+    STARTER = "omniglot-bazel-starter"
+    MENTION = "Bootstrapped from omniglot-bazel-starter; see its README.\n"
+
+    def _write(self, target: Path, rel: str) -> Path:
+        path = target / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(self.MENTION)
+        return path
+
+    def test_user_files_keep_their_mention_of_the_starter(self) -> None:
+        """Documents and code the tool never wrote: untouched by a re-bootstrap."""
+        target = self._fresh_target()
+        self._scaffold_into(target, {"python"})
+        theirs = [
+            self._write(target, rel)
+            for rel in ("docs/bootstrap.md", "NOTES.md", "modules/app/README.md", "modules/app/main.py")
+        ]
+        self._scaffold_into(target, {"python"})
+        for path in theirs:
+            self.assertEqual(path.read_text(), self.MENTION, path.relative_to(target))
+
+    def test_existing_files_survive_a_first_bootstrap_into_their_directory(self) -> None:
+        target = self._fresh_target()
+        theirs = [self._write(target, rel) for rel in ("docs/design.md", "src/legacy/tool.py")]
+        self._scaffold_into(target, {"python"})
+        for path in theirs:
+            self.assertEqual(path.read_text(), self.MENTION, path.relative_to(target))
+
+    def test_a_user_managed_region_is_left_as_the_user_wrote_it(self) -> None:
+        target = self._fresh_target()
+        self._scaffold_into(target, {"python"})
+        ignore = target / ".gitignore"
+        ignore.write_text(
+            ignore.read_text().replace(
+                "# --- END user-managed ---", "# kept from omniglot-bazel-starter\n# --- END user-managed ---", 1
+            )
+        )
+        self._scaffold_into(target, {"python"})
+        self.assertIn("# kept from omniglot-bazel-starter", ignore.read_text())
+
+    def test_orphans_are_not_rewritten(self) -> None:
+        target = self._fresh_target()
+        self._scaffold_into(target, {"python"})
+        orphan = self._write(target, "tools/python/dropped.md")
+        inventory = read_bootstrap_inventory(target) or {}
+        write_bootstrap_marker(target, "modules", {"python"}, set(), files=[*inventory, "tools/python/dropped.md"])
+        result = self._scaffold_into(target, {"python"})
+        self.assertIn("tools/python/dropped.md", result.orphans)
+        self.assertEqual(orphan.read_text(), self.MENTION)
+
+    def test_the_starters_own_files_are_still_renamed(self) -> None:
+        """Verbatim copies and rendered files alike."""
+        target = self._fresh_target()
+        self._scaffold_into(target, {"python", "go"}, features={"publish"})
+        for rel in ("tools/publish/gazelle/lang.go", "tools/publish/lang/python_publish_defs.bzl", "MODULE.bazel"):
+            content = (target / rel).read_text()
+            self.assertNotIn(self.STARTER, content, rel)
+            self.assertIn(TEST_REPO_NAME, content, rel)
 
 
 class TestDetect(_ScaffoldHarness):
@@ -470,6 +625,260 @@ class TestBootstrapMarker(_ScaffoldHarness):
         self.assertIsNone(read_bootstrap_marker(target, self.manifest))
         (target / BOOTSTRAP_MARKER_FILE).write_text("this is not valid toml = = =")
         self.assertIsNone(read_bootstrap_marker(target, self.manifest))
+
+    def test_inventory_round_trips(self) -> None:
+        """Files, a symlink and a path that needs quoting all come back; a
+        listed path that is not on disk is left out."""
+        target = self._fresh_target()
+        (target / "tools").mkdir()
+        (target / "tools" / "a.txt").write_text("alpha\n")
+        (target / 'odd "name".txt').write_text("quoted\n")
+        (target / "link").symlink_to("tools/a.txt")
+        rels = ["tools/a.txt", 'odd "name".txt', "link", "never/written.txt"]
+        write_bootstrap_marker(target, "modules", {"python"}, set(), files=rels)
+
+        inventory = read_bootstrap_inventory(target)
+        self.assertEqual(
+            inventory,
+            {
+                "tools/a.txt": "sha256:" + hashlib.sha256(b"alpha\n").hexdigest(),
+                'odd "name".txt': "sha256:" + hashlib.sha256(b"quoted\n").hexdigest(),
+                "link": "symlink:tools/a.txt",
+            },
+        )
+        # The selection still reads back beside the new table.
+        self.assertEqual(read_bootstrap_marker(target, self.manifest), ({"python"}, set(), "modules"))
+
+    def test_inventory_absent_from_an_older_marker_is_none(self) -> None:
+        """None means "nothing recorded", which an empty table does not."""
+        target = self._fresh_target()
+        self.assertIsNone(read_bootstrap_inventory(target))
+        write_bootstrap_marker(target, "modules", {"python"}, set())
+        self.assertIsNone(read_bootstrap_inventory(target))
+        write_bootstrap_marker(target, "modules", {"python"}, set(), files=[])
+        self.assertEqual(read_bootstrap_inventory(target), {})
+
+    def test_rebootstrap_refreshes_the_inventory(self) -> None:
+        """A re-bootstrap re-records fingerprints, so an edit inside a
+        user-managed region shows up as that file's new fingerprint."""
+        target = self._fresh_target()
+        self._scaffold_into(target, {"python"})
+        before = read_bootstrap_inventory(target) or {}
+        bi = target / ".bazelignore"
+        bi.write_text(bi.read_text().replace("# --- END user-managed ---", "data\n# --- END user-managed ---", 1))
+
+        self._scaffold_into(target, {"python"})
+        after = read_bootstrap_inventory(target) or {}
+        self.assertEqual(set(after), set(before))
+        self.assertNotEqual(after[".bazelignore"], before[".bazelignore"])
+        self.assertEqual(after[".bazelignore"], file_fingerprint(bi))
+
+
+class TestOrphans(_ScaffoldHarness):
+    """Files an earlier run recorded that the starter no longer ships."""
+
+    def _plant(self, target: Path, rel: str, content: str = "left behind\n") -> None:
+        """Make *rel* look like a file the previous run managed: on disk, and in
+        the recorded inventory — which is all a dropped starter file is."""
+        path = target / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content)
+        inventory = read_bootstrap_inventory(target) or {}
+        write_bootstrap_marker(
+            target, "modules", {"python"}, set(), files=[*inventory, rel], orphans=read_bootstrap_orphans(target)
+        )
+
+    def test_clean_rebootstrap_has_no_orphans(self) -> None:
+        target = self._fresh_target()
+        self.assertEqual(self._scaffold_into(target, {"python"}).orphans, {})
+        self.assertEqual(self._scaffold_into(target, {"python"}).orphans, {})
+        self.assertEqual(read_bootstrap_orphans(target), {})
+
+    def test_dropped_file_is_reported_and_recorded(self) -> None:
+        target = self._fresh_target()
+        self._scaffold_into(target, {"python"})
+        self._plant(target, "tools/python/patches/old.patch")
+
+        result = self._scaffold_into(target, {"python"})
+        self.assertEqual(set(result.orphans), {"tools/python/patches/old.patch"})
+        self.assertNotIn("tools/python/patches/old.patch", result.files)
+        self.assertEqual(read_bootstrap_orphans(target), result.orphans)
+        self.assertNotIn("tools/python/patches/old.patch", read_bootstrap_inventory(target) or {})
+
+    def test_orphan_is_carried_until_it_is_dealt_with(self) -> None:
+        """The second run's [files] no longer lists it; [orphans] must."""
+        target = self._fresh_target()
+        self._scaffold_into(target, {"python"})
+        self._plant(target, "tools/python/old.bzl")
+        self._scaffold_into(target, {"python"})
+
+        again = self._scaffold_into(target, {"python"})
+        self.assertEqual(set(again.orphans), {"tools/python/old.bzl"})
+
+        (target / "tools/python/old.bzl").unlink()  # the user removed it by hand
+        self.assertEqual(self._scaffold_into(target, {"python"}).orphans, {})
+        self.assertEqual(read_bootstrap_orphans(target), {})
+
+    def test_modified_is_judged_against_the_recorded_fingerprint(self) -> None:
+        target = self._fresh_target()
+        self._scaffold_into(target, {"python"})
+        self._plant(target, "tools/python/old.bzl", "as the tool left it\n")
+        orphans = self._scaffold_into(target, {"python"}).orphans
+        recorded = orphans["tools/python/old.bzl"]
+        self.assertEqual(orphan_status(target, "tools/python/old.bzl", recorded), "unmodified")
+
+        (target / "tools/python/old.bzl").write_text("edited since\n")
+        self.assertEqual(orphan_status(target, "tools/python/old.bzl", recorded), "modified locally")
+        # A later run keeps the fingerprint the tool recorded, not the edited one.
+        self.assertEqual(self._scaffold_into(target, {"python"}).orphans["tools/python/old.bzl"], recorded)
+
+    def test_a_file_that_ships_again_stops_being_an_orphan(self) -> None:
+        target = self._fresh_target()
+        self._scaffold_into(target, {"python"})
+        shipped = "tools/python/pyproject.toml"
+        inventory = read_bootstrap_inventory(target) or {}
+        write_bootstrap_marker(
+            target, "modules", {"python"}, set(), files=list(inventory), orphans={shipped: inventory[shipped]}
+        )
+        self.assertEqual(self._scaffold_into(target, {"python"}).orphans, {})
+
+    def test_module_dir_is_never_reported(self) -> None:
+        target = self._fresh_target()
+        self._scaffold_into(target, {"python"})
+        self._plant(target, "modules/app/BUILD")
+        self.assertEqual(self._scaffold_into(target, {"python"}).orphans, {})
+
+    def test_deselected_owner_files_left_on_disk_are_orphans(self) -> None:
+        """Declining the deselected-owner prompt leaves them behind; they are
+        still files the tool wrote and no longer manages."""
+        target = self._fresh_target()
+        self._scaffold_into(target, {"python", "rust"})
+        orphans = self._scaffold_into(target, {"python"}).orphans  # rust dropped, nothing pruned
+        self.assertIn("tools/rust/Cargo.toml", orphans)
+        self.assertFalse(any(rel.startswith("tools/python/") for rel in orphans))
+
+    def test_prune_spares_what_the_user_just_declined_to_delete(self) -> None:
+        paths = ["tools/rust/Cargo.toml", "tools/rust/sub/x.bzl", "tools/rusty.bzl", ".rustfmt.toml", "old.patch"]
+        orphans = dict.fromkeys(paths, "sha256:0")
+        declined = ["tools/rust", ".rustfmt.toml"]
+        self.assertEqual(
+            prunable_orphans(orphans, declined, include_unverified=False), ["old.patch", "tools/rusty.bzl"]
+        )
+        self.assertEqual(prunable_orphans(orphans, [], include_unverified=False), sorted(paths))
+
+    def test_prune_orphans_removes_the_directories_it_empties(self) -> None:
+        target = self._fresh_target()
+        self._scaffold_into(target, {"python"})
+        self._plant(target, "tools/python/patches/deep/old.patch")
+        self._plant(target, "tools/python/old.bzl")
+
+        removed = prune_orphans(target, ["tools/python/patches/deep/old.patch", "tools/python/old.bzl", "gone.txt"])
+        self.assertEqual(removed, ["tools/python/old.bzl", "tools/python/patches/deep/old.patch"])
+        self.assertFalse((target / "tools/python/patches").exists(), "emptied directories should go")
+        self.assertTrue((target / "tools/python/pyproject.toml").is_file(), "a directory with content stays")
+
+
+class TestFirstRunInference(_ScaffoldHarness):
+    """A repo bootstrapped before the inventory existed: infer once, from disk."""
+
+    def _predating_repo(self) -> Path:
+        """A scaffolded repo whose marker has no [files], as older ones do."""
+        target = self._fresh_target()
+        self._scaffold_into(target, {"python"})
+        write_bootstrap_marker(target, "modules", {"python"}, set())
+        return target
+
+    def test_stray_file_in_a_tool_directory_is_an_unverified_orphan(self) -> None:
+        target = self._predating_repo()
+        (target / "tools/python/patches").mkdir()
+        (target / "tools/python/patches/old.patch").write_text("dropped by the starter, or the user's\n")
+
+        result = self._scaffold_into(target, {"python"})
+        self.assertEqual(result.orphans, {"tools/python/patches/old.patch": UNVERIFIED})
+        self.assertEqual(read_bootstrap_orphans(target), result.orphans)
+        self.assertEqual(orphan_status(target, "tools/python/patches/old.patch", UNVERIFIED), UNVERIFIED)
+
+    def test_only_directories_the_scaffold_writes_into_are_examined(self) -> None:
+        target = self._predating_repo()
+        for rel in ("stray_at_root.txt", "modules/app/BUILD", "tools/mytool/run.sh", "tools/rust/Cargo.toml"):
+            (target / rel).parent.mkdir(parents=True, exist_ok=True)
+            (target / rel).write_text("not the tool's business\n")
+        self.assertEqual(self._scaffold_into(target, {"python"}).orphans, {})
+
+    def test_files_the_repo_ignores_are_not_candidates(self) -> None:
+        target = self._predating_repo()
+        (target / "tools/python/__pycache__").mkdir()
+        (target / "tools/python/__pycache__/x.cpython-314.pyc").write_text("debris\n")
+        self.assertEqual(self._scaffold_into(target, {"python"}).orphans, {})
+
+    def test_inference_happens_once(self) -> None:
+        """The first run records an inventory; after that the answer is exact."""
+        target = self._predating_repo()
+        self._scaffold_into(target, {"python"})
+        (target / "tools/python/added_later.py").write_text("the user's\n")
+        self.assertEqual(self._scaffold_into(target, {"python"}).orphans, {})
+
+    def test_an_unverified_orphan_is_carried_like_any_other(self) -> None:
+        target = self._predating_repo()
+        (target / "tools/python/old.bzl").write_text("x\n")
+        self._scaffold_into(target, {"python"})
+        self.assertEqual(self._scaffold_into(target, {"python"}).orphans, {"tools/python/old.bzl": UNVERIFIED})
+
+    def test_a_fresh_target_infers_nothing(self) -> None:
+        """No marker means not a bootstrapped repo: whatever is there is the user's."""
+        target = self._fresh_target()
+        (target / "tools/python").mkdir(parents=True)
+        (target / "tools/python/mine.py").write_text("x\n")
+        self.assertEqual(self._scaffold_into(target, {"python"}).orphans, {})
+
+    def test_prune_takes_unverified_orphans_only_file_by_file(self) -> None:
+        orphans = {"tools/python/old.bzl": UNVERIFIED, "tools/python/dropped.patch": "sha256:0"}
+        self.assertEqual(prunable_orphans(orphans, [], include_unverified=False), ["tools/python/dropped.patch"])
+        self.assertEqual(prunable_orphans(orphans, [], include_unverified=True), sorted(orphans))
+
+
+class TestIgnoredFilesStayBehind(_ScaffoldHarness):
+    """A directory copy ships what git does not ignore, not the checkout's debris."""
+
+    def _git_checkout(self) -> Path:
+        repo = self._fresh_target()
+        for args in (["init", "-q"], ["config", "user.email", "t@example.invalid"], ["config", "user.name", "t"]):
+            subprocess.run(["git", "-C", str(repo), *args], check=True, capture_output=True)  # noqa: S603, S607
+        (repo / ".gitignore").write_text("__pycache__/\n*.pyc\n")
+        (repo / "tools/x/tests/__pycache__").mkdir(parents=True)
+        (repo / "tools/x/tracked.py").write_text("tracked\n")
+        (repo / "tools/x/tests/test_x.py").write_text("tracked\n")
+        (repo / "tools/x/tests/__pycache__/test_x.cpython-314.pyc").write_text("debris\n")
+        (repo / "tools/x/stray.pyc").write_text("debris\n")
+        subprocess.run(["git", "-C", str(repo), "add", "-A"], check=True, capture_output=True)  # noqa: S603, S607
+        subprocess.run(["git", "-C", str(repo), "commit", "-q", "-m", "init"], check=True, capture_output=True)  # noqa: S603, S607
+        (repo / "tools/x/work_in_progress.py").write_text("untracked, not ignored\n")
+        return repo
+
+    def test_unignored_files_are_tracked_plus_unignored_untracked(self) -> None:
+        repo = self._git_checkout()
+        self.assertEqual(
+            unignored_files(repo, "tools/x"),
+            {"tools/x/tracked.py", "tools/x/tests/test_x.py", "tools/x/work_in_progress.py"},
+        )
+
+    def test_outside_a_git_checkout_nothing_is_filtered(self) -> None:
+        self.assertIsNone(unignored_files(self._fresh_target(), "tools/x"))
+
+    def test_directory_copy_leaves_ignored_files_behind(self) -> None:
+        repo = self._git_checkout()
+        kept = unignored_files(repo, "tools/x") or set()
+        dst = self._fresh_target() / "x"
+        shutil.copytree(repo / "tools/x", dst, ignore=_make_ignore(set(), {repo / rel for rel in kept}))
+        copied = {path.relative_to(dst).as_posix() for path in dst.rglob("*") if path.is_file()}
+        self.assertEqual(copied, {"tracked.py", "tests/test_x.py", "work_in_progress.py"})
+        self.assertFalse((dst / "tests/__pycache__").exists(), "a directory with only debris should not be created")
+
+    def test_without_a_keep_set_everything_is_copied(self) -> None:
+        repo = self._git_checkout()
+        dst = self._fresh_target() / "x"
+        shutil.copytree(repo / "tools/x", dst, ignore=_make_ignore(set()))
+        self.assertTrue((dst / "stray.pyc").is_file())
 
 
 class TestFeatureRemovers(_ScaffoldHarness):

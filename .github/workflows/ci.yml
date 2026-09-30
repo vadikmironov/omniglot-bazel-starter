@@ -43,23 +43,19 @@ jobs:
     permissions:
       contents: read
 
+    env:
+      # Read by .github/scripts/bazel.sh; empty on fork PRs, which get no secrets.
+      BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
+
     steps:
     - uses: actions/checkout@v7
     - uses: ./.github/actions/setup_linux
-    - name: Configure remote cache
-      env:
-        BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
-      run: |
-        if [ -n "$BUILDBUDDY_API_KEY" ]; then
-          echo "build:remote-cache --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" > user.bazelrc
-          echo "build --config=remote-cache" >> user.bazelrc
-        fi
     # Cheapest first: buildifier needs no toolchain download, so a Starlark
     # formatting slip reports before the LLVM fetch that format.check triggers.
     - name: Run buildifier check
-      run: bazel run //:buildifier.check
+      run: bash .github/scripts/bazel.sh run //:buildifier.check
     - name: Run formatter check
-      run: bazel run //tools/format:format.check
+      run: bash .github/scripts/bazel.sh run //tools/format:format.check
 
   # Linux/Clang leg: build + test. Independent of the lint job (no `needs:`) so
   # build/test feedback isn't gated on lint.
@@ -121,33 +117,28 @@ jobs:
     permissions:
       contents: read
 
+    env:
+      # Read by .github/scripts/bazel.sh; empty on fork PRs, which get no secrets.
+      BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
+
     steps:
     - uses: actions/checkout@v7
     - uses: ./.github/actions/setup_linux
-    - name: Configure remote cache
-      env:
-        BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
-      run: |
-        if [ -n "$BUILDBUDDY_API_KEY" ]; then
-          echo "build:remote-cache --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" > user.bazelrc
-          echo "build --config=remote-cache" >> user.bazelrc
-          echo "Remote cache enabled for lint"
-        fi
     - name: Check MODULE.bazel.lock up-to-date
       # Fails when a *.MODULE.bazel bump merged without regenerating the lock,
       # which otherwise lands in whichever branch next runs Bazel. Linux only:
       # extension results can differ per OS, so a stale-on-macOS lock is not a
       # signal. --nobuild keeps it to loading + analysis.
-      run: bazel build --nobuild --lockfile_mode=error //...
+      run: bash .github/scripts/bazel.sh build --nobuild --lockfile_mode=error //...
     - name: Run linter check
-      run: bazel test --test_tag_filters=lint //...
+      run: bash .github/scripts/bazel.sh test --test_tag_filters=lint //...
     - name: GCC static analysis (-fanalyzer, the clang-tidy analog)
       # GCC's built-in analyzer over first-party C++ only (the gcc_analyzer config
       # scopes -fanalyzer to modules/ sources); -Werror promotes findings to errors.
       # Excludes the cpp_py_* modules, whose Python.h surface mirrors the .clang-tidy
-      # carve-outs. Remote cache is inherited from the user.bazelrc written above.
+      # carve-outs.
       run: |
-        bazel build --config=gcc_analyzer \
+        bash .github/scripts/bazel.sh build --config=gcc_analyzer \
           //modules/cpp_app //modules/cpp_app_with_ext_dep //modules/cpp_library
     - name: Check lint targets up-to-date
       # Scope the diff to BUILD files only — the lint job's bazel invocations
@@ -155,21 +146,21 @@ jobs:
       # transitive-digest nondeterminism, which we don't want to misattribute
       # to gazelle.
       run: |
-        bazel run //:lint_gen
+        bash .github/scripts/bazel.sh run //:lint_gen
         if ! git diff --exit-code -- '**/BUILD' '**/BUILD.bazel'; then
           echo "ERROR: lint_test targets are out of date. Run: bazel run //:lint_gen" >&2
           exit 1
         fi
     - name: Check publish targets up-to-date
       run: |
-        bazel run //:publish_gen -- -publish_strict
+        bash .github/scripts/bazel.sh run //:publish_gen -- -publish_strict
         if ! git diff --exit-code -- '**/BUILD' '**/BUILD.bazel'; then
           echo "ERROR: :publish targets are out of date. Run: bazel run //:publish_gen" >&2
           exit 1
         fi
     - name: Check profiling workload targets up-to-date
       run: |
-        bazel run //:profile_gen
+        bash .github/scripts/bazel.sh run //:profile_gen
         if ! git diff --exit-code -- '**/BUILD' '**/BUILD.bazel'; then
           echo "ERROR: workload targets are out of date. Run: bazel run //:profile_gen" >&2
           exit 1
@@ -179,7 +170,7 @@ jobs:
       # planning, :publish_image discovery via bazel query) without
       # touching any registry. Catches engine regressions the gazelle
       # drift gate above can't see.
-      run: bazel run //tools/publish:mint -- --mode dev --include-pub-targets all --dry-run
+      run: bash .github/scripts/bazel.sh run //tools/publish:mint -- --mode dev --include-pub-targets all --dry-run
 
   # Tier 2 — the same matrix as tier 1 under -c dbg and -c opt.
   #
@@ -270,24 +261,19 @@ jobs:
       contents: read
       pull-requests: write # post the PR coverage comment
 
+    env:
+      # Read by .github/scripts/bazel.sh; empty on fork PRs, which get no secrets.
+      BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
+
     steps:
     - uses: actions/checkout@v7
     - uses: ./.github/actions/setup_linux
-    - name: Configure remote cache
-      env:
-        BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
-      run: |
-        if [ -n "$BUILDBUDDY_API_KEY" ]; then
-          echo "build:remote-cache --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" > user.bazelrc
-          echo "build --config=remote-cache" >> user.bazelrc
-          echo "Remote cache enabled for coverage"
-        fi
     - name: Collect coverage
       # Inherits `test --test_tag_filters=-lint` from .bazelrc (coverage extends
       # the test command), so lint_test rules are excluded. Uses remote-cache
       # rather than --config=ci so outputs stay downloaded and the combined
       # report is available to render.
-      run: bazel coverage --combined_report=lcov //...
+      run: bash .github/scripts/bazel.sh coverage --combined_report=lcov //...
     - name: Compute coverage summary
       id: cov
       run: |
@@ -296,7 +282,7 @@ jobs:
         echo "pct=$pct" >> "$GITHUB_OUTPUT"
         echo "Overall line coverage: ${pct}%"
     - name: Render HTML report
-      run: bazel run //tools/coverage:report
+      run: bash .github/scripts/bazel.sh run //tools/coverage:report
     - name: Publish coverage baseline for delta
       # Emits the overall % as JSON next to the HTML so it deploys to Pages at
       # <pages-url>/coverage.json. Pull requests fetch it to show a delta vs main.

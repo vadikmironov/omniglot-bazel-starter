@@ -13,11 +13,21 @@ from pathlib import Path
 import questionary
 
 from bootstrap.detect import DetectedRepo, detect_repo
-from bootstrap.manifest import BootstrapManifest, compute_prune_set, load_manifest, resolve_files
+from bootstrap.manifest import (
+    UNVERIFIED,
+    BootstrapManifest,
+    compute_prune_set,
+    load_manifest,
+    orphan_status,
+    resolve_files,
+    write_bootstrap_marker,
+)
 from bootstrap.scaffolder import (
     feature_finalizer_commands,
     feature_remover_commands,
     formatter_commands,
+    prunable_orphans,
+    prune_orphans,
     prune_paths,
     refresh_lock_files,
     run_feature_finalizers,
@@ -188,8 +198,10 @@ def run(argv: list[str] | None = None) -> None:
     # ── Prune deselected owners ───────────────────────────────────────
     # Done before scaffolding so all confirmations land up front and so the
     # re-rendered baseline isn't deleted out from under us.
+    declined_prune: list[str] = []
     if prune_rel:
         to_delete = _decide_prune(prune_rel, target_path, review=args.review)
+        declined_prune = [rel for rel in prune_rel if rel not in to_delete]
         if to_delete:
             removed = prune_paths(target_path, to_delete)
             print()
@@ -203,7 +215,7 @@ def run(argv: list[str] | None = None) -> None:
     # ── Scaffold ──────────────────────────────────────────────────────
     print()
     print("  Scaffolding repository...")
-    scaffold_repo(
+    scaffolded = scaffold_repo(
         source_root=source_root,
         target_path=target_path,
         repo_name=repo_name,
@@ -213,6 +225,13 @@ def run(argv: list[str] | None = None) -> None:
         manifest=manifest,
         resolved=resolved,
         confirm=_confirm_overwrite if args.review else None,
+    )
+
+    # ── Orphans ───────────────────────────────────────────────────────
+    # Before the lock refresh, finalizers and formatters, so those run on the
+    # tree the repo keeps: a leftover BUILD file can break them.
+    orphans = _handle_orphans(
+        scaffolded.orphans, target_path, declined=declined_prune, prune=args.prune, review=args.review
     )
 
     # ── Lock file refresh ─────────────────────────────────────────────
@@ -252,6 +271,20 @@ def run(argv: list[str] | None = None) -> None:
     print()
     print("  Formatting generated files...")
     format_results = run_formatters(target_path=target_path)
+
+    # ── File inventory ────────────────────────────────────────────────
+    # The lock refresh, finalizers and formatters above rewrite managed files,
+    # so re-record the marker: its fingerprints must describe the files as this
+    # run leaves them.
+    write_bootstrap_marker(
+        target_path,
+        module_dir,
+        selected_languages,
+        selected_features,
+        source_root,
+        files=scaffolded.files,
+        orphans=orphans,
+    )
 
     # ── Summary ───────────────────────────────────────────────────────
     print()
@@ -461,6 +494,15 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
             "replacing any file that differs from the starter."
         ),
     )
+    parser.add_argument(
+        "--prune",
+        action="store_true",
+        help=(
+            "Delete orphans: files an earlier bootstrap wrote that the starter "
+            "no longer ships. They are always listed; only this flag deletes "
+            "them. With --review, choose per file."
+        ),
+    )
     return parser.parse_args(argv)
 
 
@@ -482,6 +524,50 @@ def _confirm_overwrite(dst: Path, existing: str, new_content: str) -> bool:
 
 _PRUNE_DELETE_ALL = "‹Delete all remaining›"
 _PRUNE_CANCEL = "‹Cancel — keep everything›"
+
+
+def _handle_orphans(
+    orphans: dict[str, str],
+    target_path: Path,
+    *,
+    declined: list[str],
+    prune: bool,
+    review: bool,
+) -> dict[str, str]:
+    """List the orphans, delete them under ``--prune``, return the ones left.
+
+    The return value is what the marker keeps reporting. *declined* are the
+    paths the user just refused to delete in the deselected-owner prompt; see
+    :func:`bootstrap.scaffolder.prunable_orphans`.
+    """
+    if not orphans:
+        return {}
+
+    verified = sorted(rel for rel, recorded in orphans.items() if recorded != UNVERIFIED)
+    unverified = sorted(rel for rel, recorded in orphans.items() if recorded == UNVERIFIED)
+    if verified:
+        print()
+        print(f"  Files the starter no longer ships ({len(verified)}):")
+        width = max(len(rel) for rel in verified)
+        for rel in verified:
+            print(f"    - {rel.ljust(width)}  {orphan_status(target_path, rel, orphans[rel])}")
+    if unverified:
+        print()
+        print(f"  Possibly left over ({len(unverified)}) - in a tool directory, but this repo predates the")
+        print("  file inventory, so each may be a file of yours. Deleted only with --prune --review:")
+        for rel in unverified:
+            print(f"    - {rel}")
+
+    if not prune:
+        print(f"  Re-run with {'--prune' if verified else '--prune --review'} to delete them.")
+        return orphans
+
+    candidates = prunable_orphans(orphans, declined, include_unverified=review)
+    to_delete = _review_prune(candidates, target_path) if review else candidates
+    removed = prune_orphans(target_path, to_delete)
+    print()
+    print(f"  Removed {len(removed)} orphaned file(s).")
+    return {rel: fp for rel, fp in orphans.items() if rel not in removed}
 
 
 def _decide_prune(prune_rel: list[str], target_path: Path, *, review: bool) -> list[str]:

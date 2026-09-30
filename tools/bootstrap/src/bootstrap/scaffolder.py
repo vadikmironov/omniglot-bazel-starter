@@ -12,13 +12,21 @@ import stat
 import subprocess
 import sys
 from collections.abc import Callable, Iterable
+from dataclasses import dataclass
 from pathlib import Path
 
 from bootstrap.manifest import (
+    BOOTSTRAP_MARKER_FILE,
+    UNVERIFIED,
     BootstrapManifest,
     ResolvedFiles,
     all_composite_files,
+    compute_orphans,
     effective_excluded_files,
+    infer_orphans,
+    read_bootstrap_inventory,
+    read_bootstrap_orphans,
+    unignored_files,
     write_bootstrap_marker,
 )
 from bootstrap.processor import filter_sections, has_user_region, splice_user_region
@@ -41,6 +49,16 @@ _CODE_DIR_PLACEHOLDER = "{{code_dir}}"
 ConfirmOverwrite = Callable[[Path, str, str], bool]
 
 
+@dataclass
+class ScaffoldResult:
+    """What a scaffold run manages, and what earlier runs left behind."""
+
+    # Sorted relative paths of every file this run manages.
+    files: list[str]
+    # Path -> last recorded fingerprint, per manifest.compute_orphans.
+    orphans: dict[str, str]
+
+
 def scaffold_repo(
     *,
     source_root: Path,
@@ -52,8 +70,14 @@ def scaffold_repo(
     resolved: ResolvedFiles,
     selected_features: set[str] | None = None,
     confirm: ConfirmOverwrite | None = None,
-) -> None:
+) -> ScaffoldResult:
     """Generate (or re-bootstrap) a Bazel repository at *target_path*.
+
+    The result lists every file this run manages: the copies, each file of a
+    copied directory, the composite files (one kept on disk under ``--review``
+    is still managed) and the README. The marker records them as the repo's
+    file inventory. It also lists the orphans: files an earlier run's inventory
+    recorded that this run no longer manages.
 
     *module_dir* is the name of the top-level directory that will hold the
     repo's code (placeholder created empty during scaffolding). Any
@@ -71,6 +95,12 @@ def scaffold_repo(
     selected_features = selected_features or set()
     target_path.mkdir(parents=True, exist_ok=True)
 
+    # Read the earlier run's tables now: step 7 overwrites the marker. A marker
+    # with no inventory is a repo bootstrapped before the inventory existed.
+    old_files = read_bootstrap_inventory(target_path)
+    old_orphans = read_bootstrap_orphans(target_path)
+    predates_inventory = old_files is None and (target_path / BOOTSTRAP_MARKER_FILE).is_file()
+
     # Build lookup of files to skip during directory copies. Feature-conditional
     # excludes (e.g. tools/cpp/toolchains/ when custom_toolchains is off) are
     # folded in here so a gated subdirectory is pruned from its language
@@ -82,20 +112,33 @@ def scaffold_repo(
     excluded_abs = {source_root / f for f in effective_excluded_files(manifest, selected_features)}
     skip_abs = composite_abs | excluded_abs
 
+    managed: set[str] = set()
+    # The subset written verbatim from the starter, which step 5 renames.
+    copied: set[str] = set()
+
     # 1. Direct file copies (core + language + language_files)
     print("  Copying files...")
     for rel in resolved.copy:
         _copy_file(source_root / rel, target_path / rel)
+        copied.add(rel)
 
     # 2. Directory copies (language tool directories)
     print("  Copying tool directories...")
+
+    def _copy_and_record(src: str, dst: str) -> str:
+        copied.add(Path(dst).relative_to(target_path).as_posix())
+        return shutil.copy2(src, dst)
+
     for rel_dir in resolved.directories:
         src_dir = source_root / rel_dir
         dst_dir = target_path / rel_dir
+        kept = unignored_files(source_root, rel_dir)
+        keep_abs = {source_root / rel for rel in kept} if kept is not None else None
         shutil.copytree(
             src_dir,
             dst_dir,
-            ignore=_make_ignore(skip_abs),
+            ignore=_make_ignore(skip_abs, keep_abs),
+            copy_function=_copy_and_record,
             dirs_exist_ok=True,
         )
 
@@ -120,6 +163,8 @@ def scaffold_repo(
                     f"--per_file_copt={module_dir}/",
                 )
         dst = target_path / rel
+        managed.add(rel)
+        filtered = _renamed(filtered, dst, manifest.original_name, repo_name)
         to_write = _resolve_managed(filtered, dst, confirm=confirm)
         if to_write is None:
             print(f"    kept existing {rel}")
@@ -132,8 +177,7 @@ def scaffold_repo(
 
     # 4. Generated starter README — rendered from the bootstrap template,
     #    section-filtered for the selection, with the user-managed intro carried
-    #    forward on re-bootstrap. Done before substitutions so its module-name
-    #    tokens are rewritten alongside everything else.
+    #    forward on re-bootstrap.
     print("  Rendering README...")
     _render_readme(
         source_root=source_root,
@@ -141,23 +185,41 @@ def scaffold_repo(
         module_dir=module_dir,
         selected_languages=selected_languages,
         selected_features=selected_features,
+        original_name=manifest.original_name,
+        repo_name=repo_name,
         confirm=confirm,
     )
+    managed.add(_README_OUTPUT)
 
-    # 5. Name substitutions across all text files
+    # 5. Name substitutions in the files copied verbatim, and only those.
+    #    Composite files and the README arrive already renamed (see _renamed),
+    #    with their user-managed regions left as the user wrote them. Nothing
+    #    else under the target is the tool's to rewrite: the user's code and
+    #    documents may well mention the starter by name.
     print("  Applying name substitutions...")
-    _apply_substitutions(target_path, manifest.original_name, repo_name)
+    _apply_substitutions(target_path, copied, manifest.original_name, repo_name)
+    managed |= copied
 
     # 6. Create empty placeholder module directory
     (target_path / module_dir).mkdir(exist_ok=True)
 
-    # 7. Record the selection so a re-bootstrap recovers it exactly. Written
-    #    after substitutions (its content carries no original_name to rewrite).
-    write_bootstrap_marker(target_path, module_dir, selected_languages, selected_features, source_root)
+    # 7. Record the selection and the file inventory so a re-bootstrap recovers
+    #    them exactly. Written after substitutions: its content carries no
+    #    original_name to rewrite, and the hashes must be of the final bytes.
+    files = sorted(managed)
+    orphans = compute_orphans(target_path, module_dir, old_files or {}, old_orphans, files)
+    if predates_inventory:
+        # Nothing was recorded, so infer once from the filesystem. From the next
+        # run on the inventory this run writes makes the answer exact.
+        orphans = {**infer_orphans(target_path, module_dir, files), **orphans}
+    write_bootstrap_marker(
+        target_path, module_dir, selected_languages, selected_features, source_root, files=files, orphans=orphans
+    )
 
     # 8. Git init
     print("  Initializing git repository...")
     subprocess.run(["git", "init", "-b", "main"], cwd=target_path, check=True, capture_output=True)  # noqa: S607
+    return ScaffoldResult(files=files, orphans=orphans)
 
 
 def prune_paths(target_path: Path, rel_paths: Iterable[str]) -> list[str]:
@@ -184,6 +246,39 @@ def prune_paths(target_path: Path, rel_paths: Iterable[str]) -> list[str]:
     return removed
 
 
+def prunable_orphans(orphans: dict[str, str], declined: Iterable[str], *, include_unverified: bool) -> list[str]:
+    """The orphans ``--prune`` may delete, sorted.
+
+    Not a path the user just declined to delete in the deselected-owner prompt
+    (*declined*), nor anything under one: the flag must not overrule an answer
+    given a moment ago. And not an unverified one, which may be a file the user
+    added, unless *include_unverified*: the caller sets it when the user picks
+    file by file. Whatever is left out stays listed as an orphan.
+    """
+    kept = list(declined)
+    return sorted(
+        rel
+        for rel, recorded in orphans.items()
+        if (include_unverified or recorded != UNVERIFIED) and not any(rel == d or rel.startswith(f"{d}/") for d in kept)
+    )
+
+
+def prune_orphans(target_path: Path, rel_paths: Iterable[str]) -> list[str]:
+    """Delete orphaned files, then every directory that leaves empty.
+
+    Returns the files removed. Empty parents go too, up to but never including
+    *target_path*: a directory that only ever held dropped files (a patches
+    dir, say) would otherwise linger as an empty shell.
+    """
+    removed = prune_paths(target_path, rel_paths)
+    for rel in removed:
+        parent = (target_path / rel).parent
+        while parent != target_path and parent.is_dir() and not any(parent.iterdir()):
+            parent.rmdir()
+            parent = parent.parent
+    return removed
+
+
 # ── Internal helpers ──────────────────────────────────────────────────
 
 
@@ -199,13 +294,24 @@ def _copy_file(src: Path, dst: Path) -> None:
         shutil.copy2(src, dst)
 
 
-def _make_ignore(skip_abs: set[Path]):
-    """Return an ignore callable for shutil.copytree that skips files
-    present in *skip_abs* (composite or excluded files)."""
+def _make_ignore(skip_abs: set[Path], keep_abs: set[Path] | None = None):
+    """Return an ignore callable for shutil.copytree.
+
+    It skips the files in *skip_abs* (composite or excluded files) and, when
+    *keep_abs* is given, every file not in it: the starter checkout's
+    git-ignored debris, which would otherwise ship and later be reported as an
+    orphan. A directory is kept only while it leads to a kept file.
+    """
+    keep_dirs = {parent for path in keep_abs for parent in path.parents} if keep_abs is not None else set()
 
     def _ignore(directory: str, names: list[str]) -> set[str]:
         dir_path = Path(directory)
-        return {name for name in names if dir_path / name in skip_abs}
+        ignored = set()
+        for name in names:
+            path = dir_path / name
+            if path in skip_abs or (keep_abs is not None and path not in keep_abs and path not in keep_dirs):
+                ignored.add(name)
+        return ignored
 
     return _ignore
 
@@ -219,9 +325,14 @@ def _resolve_managed(rendered: str, dst: Path, *, confirm: ConfirmOverwrite | No
     survive a re-bootstrap while the starter baseline is refreshed. When
     *confirm* is supplied (``--review``) and the result differs from what's on
     disk, the user is asked before the file is overwritten.
+
+    A target that predates its file's user-managed region has nothing to
+    splice, so it is replaced like any other file; a note says so, because any
+    local edits now belong inside the new region.
     """
     existing = dst.read_text() if dst.exists() else None
     new_content = rendered
+    gained_region = existing is not None and has_user_region(rendered) and not has_user_region(existing)
     if existing is not None and has_user_region(rendered) and has_user_region(existing):
         new_content = splice_user_region(rendered, existing)
     if (
@@ -231,6 +342,9 @@ def _resolve_managed(rendered: str, dst: Path, *, confirm: ConfirmOverwrite | No
         and not confirm(dst, existing, new_content)
     ):
         return None
+    if gained_region and existing != new_content:
+        print(f"    note: {dst} had no user-managed region and was replaced.")
+        print("          Recover local edits from version control and put them inside the region.")
     return new_content
 
 
@@ -244,6 +358,8 @@ def _render_readme(
     module_dir: str,
     selected_languages: set[str],
     selected_features: set[str],
+    original_name: str,
+    repo_name: str,
     confirm: ConfirmOverwrite | None,
 ) -> None:
     """Render the starter README from the bootstrap template into the repo root.
@@ -261,6 +377,7 @@ def _render_readme(
     rendered = filter_sections(src.read_text(), selected_languages, selected_features, filename=_README_OUTPUT)
     rendered = rendered.replace(_CODE_DIR_PLACEHOLDER, module_dir)
     dst = target_path / _README_OUTPUT
+    rendered = _renamed(rendered, dst, original_name, repo_name)
     to_write = _resolve_managed(rendered, dst, confirm=confirm)
     if to_write is None:
         print(f"    kept existing {_README_OUTPUT}")
@@ -664,10 +781,28 @@ def formatter_commands(labels: Iterable[str]) -> list[str]:
     return [_format_cmd(list(cmd), {}) for label, _desc, cmd in _FORMAT_CMDS if label in wanted]
 
 
-def _apply_substitutions(target_path: Path, original_name: str, new_name: str) -> None:
-    """Replace original_name with new_name in all text files under target_path."""
-    for path in target_path.rglob("*"):
-        if path.is_file() and _is_text_file(path):
+def _renamed(content: str, dst: Path, original_name: str, new_name: str) -> str:
+    """*content* with the repo name substituted, as step 5 would leave *dst*.
+
+    Done before a rendered file is compared with the one on disk, which already
+    carries the new name. Otherwise ``--review`` shows every line that mentions
+    the repo as a change back to the starter's name, and asks about files that
+    would not change at all. Same text-file rule as :func:`_apply_substitutions`,
+    so the two never disagree.
+    """
+    return content.replace(original_name, new_name) if _is_text_file(dst) else content
+
+
+def _apply_substitutions(target_path: Path, rel_paths: Iterable[str], original_name: str, new_name: str) -> None:
+    """Replace original_name with new_name in the text files among *rel_paths*.
+
+    Only the files named: a walk of the whole target would also rewrite the
+    user's own code and documents. A symlink is skipped, so nothing is written
+    through it into a file that is not in the list.
+    """
+    for rel in rel_paths:
+        path = target_path / rel
+        if path.is_file() and not path.is_symlink() and _is_text_file(path):
             try:
                 content = path.read_text()
             except (UnicodeDecodeError, PermissionError):

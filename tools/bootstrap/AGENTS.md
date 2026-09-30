@@ -19,7 +19,17 @@ subset of this repo into the target, rewrites the module name, `git init`s, and
   user-managed region splicing (`splice_user_region`).
 - `src/bootstrap/scaffolder.py` — orchestrates copy → filter → render-README →
   substitute → git, then lock-file refresh and `_FEATURE_FINALIZERS` (e.g.
-  `publish_gen`, `lint_gen`). `_render_readme` filters `templates/README.md` for the
+  `publish_gen`, `lint_gen`). Composite files and the README are renamed
+  (`_renamed`) *before* they are compared with the file on disk, which already
+  carries the new name; otherwise `--review` reports every mention of the repo as
+  a change back to the starter's name. The substitute step then renames the
+  files copied verbatim in this run, and nothing else: it never walks the
+  target, so the user's code, documents and orphans keep any mention of the
+  starter, and so does the content of a user-managed region. A directory copy ships only what git does not ignore
+  in the starter checkout (`manifest.unignored_files`: tracked files plus
+  untracked ones no ignore rule matches), so `__pycache__` and the like stay
+  behind while uncommitted work still ships. Outside a git checkout it ships
+  everything. `_render_readme` filters `templates/README.md` for the
   selection, swaps the `{{code_dir}}` token, and writes `README.md` through the same
   managed-overwrite path as composite files (user-managed intro preserved on re-bootstrap).
 - `templates/README.md` — section-markered template for the *generated* repo README.
@@ -48,6 +58,46 @@ omitted entirely when the source is not a git checkout — scaffolding from an
 unpacked tarball is legitimate, so it records nothing rather than a guess.
 `git -C <starter> diff <starter_revision>..HEAD -- <path>` then answers "what
 changed in this file since that scaffold?" directly.
+
+The marker also carries a `[files]` table: the **file inventory**, one entry per
+file the tool manages (`scaffold_repo` returns the list — copies, each file of a
+copied directory, composite files, the README), mapped to
+`manifest.file_fingerprint`: `sha256:<hex>`, or `symlink:<target>`. The CLI
+rewrites the marker at the very end of the run, because the lock refresh,
+finalizers and formatters rewrite managed files after the scaffold step, and a
+fingerprint must describe the file as the run left it.
+`manifest.read_bootstrap_inventory` reads the table back; `None` means the marker
+predates the inventory, which is not the same as an empty table. A write added
+to `scaffold_repo` must add its path to the returned list —
+`test_inventory_is_every_file_the_scaffold_leaves` fails otherwise.
+
+**Orphans** are what the inventory is for. `scaffold_repo` reads the old `[files]`
+and `[orphans]` before it overwrites the marker, and `manifest.compute_orphans`
+returns every path in either that this run does not manage, is still on disk, and
+is not under the module dir. That covers a file the starter dropped or renamed
+(nine tool directories are copied wholesale, so this is common) and a deselected
+owner's files the user declined to prune. They are written to `[orphans]` with the
+fingerprint last *recorded*, not the current one: the next `[files]` no longer
+lists them, so without the table an orphan would be forgotten one run later, and
+the recorded fingerprint is what `orphan_status` compares against. An entry
+leaves when the file is deleted, leaves the disk, or ships again.
+
+The CLI lists orphans on every run and deletes only under `--prune`
+(`scaffolder.prune_orphans`, which also removes directories it empties), before
+the lock refresh and formatters so they run on the tree the repo keeps.
+`--prune` takes modified orphans too — the repo is under version control — but
+never a path the user declined in the deselected-owner prompt of the same run
+(`scaffolder.prunable_orphans`).
+
+A marker that predates the inventory has nothing to compare against, so that one
+run infers from the filesystem instead (`manifest.infer_orphans`): any file under
+a directory the scaffold writes into — the first two components of the managed
+paths, so each `tools/<name>` and never the repo root or the module dir — that
+the scaffold does not write and the target's `.gitignore` does not cover. A file
+the user added there looks the same as one the starter dropped, so each is
+recorded as `unverified` instead of with a fingerprint, listed under its own
+heading, and excluded from `--prune` unless `--review` lets the user decide file
+by file. The run writes an inventory, so inference never happens twice.
 
 On a detected repo, `_reuse_detected` reuses the detected languages/features by
 default, but offers to **change** them: it re-presents both checkboxes

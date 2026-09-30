@@ -4,16 +4,23 @@ Parses bootstrap_manifest.toml and resolves the set of files to include
 in a new repository based on the user's language selection.
 """
 
+import hashlib
+import json
 import subprocess
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 
 import tomllib
 
-# Marker file written into every scaffolded repo, recording the selection so a
-# re-bootstrap recovers it exactly instead of inferring it from the filesystem.
+# Marker file written into every scaffolded repo, recording the selection and
+# the file inventory so a re-bootstrap recovers them exactly instead of
+# inferring them from the filesystem.
 BOOTSTRAP_MARKER_FILE = ".omniglot_bootstrap.toml"
+
+# What [orphans] records for a file no run ever fingerprinted: see infer_orphans.
+UNVERIFIED = "unverified"
 
 
 @dataclass
@@ -305,6 +312,20 @@ def _git(source_root: Path, *args: str) -> str | None:
     return result.stdout.strip()
 
 
+def unignored_files(source_root: Path, rel_dir: str) -> set[str] | None:
+    """Files under *rel_dir* that git does not ignore, relative to *source_root*.
+
+    Tracked files plus untracked ones no ignore rule matches, so work in
+    progress still ships while build debris (``__pycache__``, editor backups)
+    does not. None when *source_root* is not a git checkout: a tarball has no
+    debris to filter, and everything in it ships.
+    """
+    listing = _git(source_root, "ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", rel_dir)
+    if listing is None:
+        return None
+    return {rel for rel in listing.split("\0") if rel}
+
+
 def starter_revision(source_root: Path) -> str | None:
     """The starter checkout's HEAD, ``-dirty`` when it has uncommitted changes.
 
@@ -318,12 +339,24 @@ def starter_revision(source_root: Path) -> str | None:
     return f"{head}-dirty" if _git(source_root, "status", "--porcelain") else head
 
 
+def file_fingerprint(path: Path) -> str | None:
+    """What the inventory records for *path*: ``sha256:<hex>`` of a file's
+    bytes, ``symlink:<target>`` for a symlink, None when it is neither."""
+    if path.is_symlink():
+        return f"symlink:{path.readlink()}"
+    if not path.is_file():
+        return None
+    return f"sha256:{hashlib.sha256(path.read_bytes()).hexdigest()}"
+
+
 def write_bootstrap_marker(
     target_path: Path,
     module_dir: str,
     languages: set[str],
     features: set[str],
     source_root: Path | None = None,
+    files: Iterable[str] | None = None,
+    orphans: dict[str, str] | None = None,
 ) -> None:
     """Record the scaffolded selection in ``BOOTSTRAP_MARKER_FILE``.
 
@@ -337,6 +370,16 @@ def write_bootstrap_marker(
     answer "how far behind the starter is this repo?" when a generated file
     turns out to predate a starter change. ``starter_revision`` is omitted when
     *source_root* is absent or is not a git checkout.
+
+    *files* are the relative paths this run manages. Each one present on disk
+    goes into a ``[files]`` table with its :func:`file_fingerprint` as of this
+    call, so a later run can tell which files the starter stopped shipping and
+    whether one changed since. Omitted, no table is written.
+
+    *orphans* (see :func:`compute_orphans`) go into an ``[orphans]`` table with
+    the fingerprint they were last recorded with, not their current one. The
+    marker has to carry them: the next run's ``[files]`` no longer lists them,
+    so an orphan left on disk would otherwise be forgotten one run later.
     """
     langs = ", ".join(f'"{x}"' for x in sorted(languages))
     feats = ", ".join(f'"{x}"' for x in sorted(features))
@@ -354,7 +397,114 @@ def write_bootstrap_marker(
     )
     if revision:
         content += f'starter_revision = "{revision}"\n'
+    if files is not None:
+        content += "\n# Every file the bootstrap tool manages, as it left them.\n[files]\n"
+        for rel in sorted(set(files)):
+            fingerprint = file_fingerprint(target_path / rel)
+            if fingerprint:
+                # JSON string escapes are TOML basic-string escapes too.
+                content += f"{json.dumps(rel, ensure_ascii=False)} = {json.dumps(fingerprint, ensure_ascii=False)}\n"
+    if orphans:
+        content += "\n# Files the starter no longer ships that are still on disk.\n[orphans]\n"
+        for rel, fingerprint in sorted(orphans.items()):
+            content += f"{json.dumps(rel, ensure_ascii=False)} = {json.dumps(fingerprint, ensure_ascii=False)}\n"
     (target_path / BOOTSTRAP_MARKER_FILE).write_text(content)
+
+
+def _read_marker_table(target_path: Path, table: str) -> dict[str, str] | None:
+    """A path -> fingerprint table of the marker, or None when the marker is
+    absent, unparseable, or has no such table."""
+    path = target_path / BOOTSTRAP_MARKER_FILE
+    if not path.is_file():
+        return None
+    try:
+        entries = tomllib.loads(path.read_text()).get(table)
+    except (tomllib.TOMLDecodeError, OSError):
+        return None
+    if not isinstance(entries, dict):
+        return None
+    return {rel: fp for rel, fp in entries.items() if isinstance(fp, str)}
+
+
+def read_bootstrap_inventory(target_path: Path) -> dict[str, str] | None:
+    """The marker's ``[files]`` table (path -> fingerprint), or None.
+
+    None when the marker is absent, unparseable, or predates the inventory, so
+    a caller can tell "nothing recorded yet" from "recorded, and empty".
+    """
+    return _read_marker_table(target_path, "files")
+
+
+def read_bootstrap_orphans(target_path: Path) -> dict[str, str]:
+    """The marker's ``[orphans]`` table (path -> last recorded fingerprint)."""
+    return _read_marker_table(target_path, "orphans") or {}
+
+
+def compute_orphans(
+    target_path: Path,
+    module_dir: str,
+    old_files: dict[str, str],
+    old_orphans: dict[str, str],
+    new_files: Iterable[str],
+) -> dict[str, str]:
+    """Files an earlier run managed that this run does not, still on disk.
+
+    Maps each path to the fingerprint it was last recorded with, so
+    :func:`orphan_status` can tell whether it changed since. Covers both a
+    file the starter stopped shipping (or renamed) and one a deselected owner
+    left behind. *old_orphans* are carried forward until they are deleted, leave
+    the disk, or ship again. Nothing under *module_dir* is ever reported: that
+    tree is the user's.
+    """
+    shipped = set(new_files)
+    orphans: dict[str, str] = {}
+    for rel, fingerprint in {**old_orphans, **old_files}.items():
+        if rel in shipped or rel == module_dir or rel.startswith(f"{module_dir}/"):
+            continue
+        if file_fingerprint(target_path / rel) is None:
+            continue
+        orphans[rel] = fingerprint
+    return orphans
+
+
+def infer_orphans(target_path: Path, module_dir: str, new_files: Iterable[str]) -> dict[str, str]:
+    """Orphan candidates for a repo whose marker predates the inventory.
+
+    With nothing recorded, the filesystem is the only evidence: any file under a
+    directory this run writes into, that this run does not itself write. The
+    directories are the first two components of the managed paths (in practice
+    each ``tools/<name>``), never the repo root and never *module_dir*, and
+    files the target's own ``.gitignore`` covers are skipped.
+
+    A file the user added there looks the same as one the starter dropped, so
+    every candidate is recorded as :data:`UNVERIFIED` rather than with a
+    fingerprint, and is only ever deleted file by file.
+    """
+    shipped = set(new_files)
+    roots = {"/".join(parts[:2]) for rel in shipped if len(parts := rel.split("/")) > 2}
+    candidates: dict[str, str] = {}
+    for root in sorted(roots):
+        if root == module_dir or root.startswith(f"{module_dir}/"):
+            continue
+        listed = unignored_files(target_path, root)
+        if listed is None:
+            base = target_path / root
+            listed = {p.relative_to(target_path).as_posix() for p in base.rglob("*") if p.is_file() or p.is_symlink()}
+        for rel in listed:
+            if rel not in shipped and file_fingerprint(target_path / rel) is not None:
+                candidates[rel] = UNVERIFIED
+    return candidates
+
+
+def orphan_status(target_path: Path, rel: str, recorded: str) -> str:
+    """How an orphan is listed: ``unverified``, ``unmodified`` or ``modified locally``.
+
+    "Modified" means "differs from what the bootstrap left", which a formatter
+    or a dependency bot causes as readily as a hand edit.
+    """
+    if recorded == UNVERIFIED:
+        return UNVERIFIED
+    return "unmodified" if file_fingerprint(target_path / rel) == recorded else "modified locally"
 
 
 def read_bootstrap_marker(
