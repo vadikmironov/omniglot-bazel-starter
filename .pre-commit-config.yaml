@@ -14,7 +14,7 @@ repos:
   # version component is a release counter, so revs sharing the first three
   # (the buildifier version) format identically and need not match exactly.
   - repo: https://github.com/keith/pre-commit-buildifier
-    rev: 10.0.1
+    rev: 10.1.0
     hooks:
       - id: buildifier
       - id: buildifier-lint
