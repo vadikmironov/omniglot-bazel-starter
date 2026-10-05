@@ -21,7 +21,7 @@ bazel build --config=gcc_host //modules/cpp_app
 bazel build --config=clang_host //modules/cpp_app
 
 # C++ with remote pinned compilers (downloaded on first use, link against host
-# glibc): xPack GCC 15.2.0 / hermetic-llvm minimal clang 22.1.8 (~41 MB)
+# glibc): xPack GCC 15.2.0 / hermetic-llvm minimal clang 23.1.2 (~38 MB)
 bazel build --config=gcc_remote //modules/cpp_app
 bazel build --config=clang_remote //modules/cpp_app
 

@@ -34,7 +34,7 @@ bazel build --config=gcc_host_debug //modules/cpp_app
 `remote_cc_toolchains.bzl` adds a corretto-style middle tier between the host configs and
 the hermetic defaults: a pinned vendor archive — [xPack GCC](https://github.com/xpack-dev-tools/gcc-xpack)
 or the [hermetic-llvm](https://github.com/hermeticbuild/hermetic-llvm) "minimal" Clang
-(~41 MB, also ships clang-tidy/clang-format/llvm-cov) — is downloaded with SHA256
+(~38 MB, also ships clang-tidy/clang-format/llvm-cov) — is downloaded with SHA256
 verification on first use of its `--config` and wired through the same
 `toolchain_config.bzl` as the host compilers. Neither archive carries a libc/sysroot, so
 both compile and link against the host glibc: pinned compiler, host runtime. Use them when
