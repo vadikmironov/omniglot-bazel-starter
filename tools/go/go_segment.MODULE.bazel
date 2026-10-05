@@ -6,7 +6,7 @@
 # Please find documentation here:
 # https://github.com/bazel-contrib/rules_go/releases
 #
-bazel_dep(name = "rules_go", version = "0.63.0")
+bazel_dep(name = "rules_go", version = "0.64.1")
 
 # Gazelle is used to generate BUILD files and manage Go dependencies.
 # Documentation: https://github.com/bazel-contrib/bazel-gazelle
@@ -28,14 +28,14 @@ go_sdk.download(
     # https://github.com/bazel-contrib/rules_go/blob/master/go/private/sdk.bzl#L74
     #
     #sdks = {
-    #    "darwin_amd64": ("go1.26.5.darwin-amd64.tar.gz", "6231d8d3b8f5552ec6cbf6d685bdd5482e1e703214b120e89b3bf0d7bf1ef725"),
-    #    "darwin_arm64": ("go1.26.5.darwin-arm64.tar.gz", "efb87ff28af9a188d0536ef5d42e63dd52ba8263cd7344a993cc48dd11dedb6a"),
-    #    "linux_amd64": ("go1.26.5.linux-amd64.tar.gz", "5c2c3b16caefa1d968a94c1daca04a7ca301a496d9b086e17ad77bb81393f053"),
-    #    "linux_arm64": ("go1.26.5.linux-arm64.tar.gz", "fe4789e92b1f33358680864bbe8704289e7bb5fc207d80623c308935bd696d49"),
-    #    "windows_amd64": ("go1.26.5.windows-amd64.zip", "97e6b2a833b6d89f9ff17d25419ac0a7e3b482a044e9ab18cdef834bd834fd38"),
+    #    "darwin_amd64": ("go1.26.7.darwin-amd64.tar.gz", "92e8b34bff3c89ab16404c595669ac8cb004cc2f676dcbd1f5b87a6b8def3b47"),
+    #    "darwin_arm64": ("go1.26.7.darwin-arm64.tar.gz", "020a1e8224811be75163e920bc77e0926a1390a6aeea19bdcf23f74b9d749f6d"),
+    #    "linux_amd64": ("go1.26.7.linux-amd64.tar.gz", "ffb5f8de10c62550dfddab66b36b57030721e0a44a3218e9e1181d7b59f121ca"),
+    #    "linux_arm64": ("go1.26.7.linux-arm64.tar.gz", "5a4ec883379d51ee9ce1040d5e87f8d35e20387574dd8c947feb01eabc3c1b37"),
+    #    "windows_amd64": ("go1.26.7.windows-amd64.zip", "f4f534a486e4bc3387fa18f08208f2f854b7aaea8a08f2a2d829a914a05abb11"),
     #},
     #
-    version = "1.26.5",
+    version = "1.26.7",
 )
 
 # --- BEGIN feature:lint ---
