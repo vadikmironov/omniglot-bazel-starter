@@ -21,7 +21,7 @@ auto has_python_stdlib(const std::filesystem::path& python_home) -> bool {
     return std::filesystem::exists(python_home / "Lib" / "os.py");
 #else
     // Unix/macOS: <home>/lib/pythonX.Y/os.py
-    auto lib_dir = python_home / "lib";
+    const auto lib_dir = python_home / "lib";
     if (!std::filesystem::is_directory(lib_dir)) {
         return false;
     }
@@ -38,7 +38,7 @@ auto has_python_stdlib(const std::filesystem::path& python_home) -> bool {
 
 }  // namespace
 
-auto get_python_toolchain_path_via_runfiles(char** argv, const std::string& rel_interpreter_path,
+auto get_python_toolchain_path_via_runfiles(char* const* argv, const std::string& rel_interpreter_path,
                                             std::string& abs_interpreter_path) -> bool {
     using bazel::tools::cpp::runfiles::Runfiles;
 

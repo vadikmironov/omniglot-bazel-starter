@@ -1,7 +1,7 @@
 # https://clang.llvm.org/extra/clang-tidy/
 #
 # Disabled check families:
-#   -abseil-*, -fuchsia-*, -llvm-*, -llvmlibc-*, -altera-*, -boost-*
+#   -abseil-*, -fuchsia-*, -zircon-*, -llvm-*, -llvmlibc-*, -altera-*, -boost-*
 #     Libraries not used in this codebase.
 #
 # Disabled individual checks:
@@ -33,6 +33,7 @@ Checks:
   - '*'
   - '-abseil-*'
   - '-fuchsia-*'
+  - '-zircon-*'
   - '-llvm-*'
   - '-llvmlibc-*'
   - '-altera-*'

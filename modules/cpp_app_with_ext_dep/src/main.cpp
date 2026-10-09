@@ -20,17 +20,17 @@ auto write_callback(void* contents, size_t size, size_t nmemb, std::string* cons
 }
 
 auto extract_body_text(const std::string& html, std::string& text) -> int {
-    auto htmlDocPtr_close = [](htmlDocPtr doc) -> void { xmlFreeDoc(doc); };
+    const auto htmlDocPtr_close = [](htmlDocPtr doc) -> void { xmlFreeDoc(doc); };
     const std::unique_ptr<xmlDoc, decltype(htmlDocPtr_close)> doc{htmlReadMemory(
                                                                       html.c_str(), static_cast<int>(html.size()), nullptr, nullptr,
-                                                                      HTML_PARSE_RECOVER | HTML_PARSE_NOERROR | HTML_PARSE_NOWARNING),  // NOLINT(hicpp-signed-bitwise)
+                                                                      HTML_PARSE_RECOVER | HTML_PARSE_NOERROR | HTML_PARSE_NOWARNING),  // NOLINT(hicpp-signed-bitwise,bugprone-signed-bitwise)
                                                                   htmlDocPtr_close};
     if (!doc) {
         std::cerr << "Failed to parse HTML." << '\n';
         return -2;
     }
 
-    auto xmlXPathContextPtr_close = [](xmlXPathContextPtr xpath_ctx) -> void { xmlXPathFreeContext(xpath_ctx); };
+    const auto xmlXPathContextPtr_close = [](xmlXPathContextPtr xpath_ctx) -> void { xmlXPathFreeContext(xpath_ctx); };
     const std::unique_ptr<xmlXPathContext, decltype(xmlXPathContextPtr_close)> xpath_ctx{xmlXPathNewContext(doc.get()),
                                                                                          xmlXPathContextPtr_close};
     if (!xpath_ctx) {
@@ -38,7 +38,7 @@ auto extract_body_text(const std::string& html, std::string& text) -> int {
         return -2;
     }
 
-    auto xmlXPathObjectPtr_close = [](xmlXPathObjectPtr xpath_obj) -> void { xmlXPathFreeObject(xpath_obj); };
+    const auto xmlXPathObjectPtr_close = [](xmlXPathObjectPtr xpath_obj) -> void { xmlXPathFreeObject(xpath_obj); };
     const std::unique_ptr<xmlXPathObject, decltype(xmlXPathObjectPtr_close)> xpath_body_obj{
         xmlXPathEvalExpression(reinterpret_cast<const xmlChar*>("//body"), xpath_ctx.get()),  // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
         xmlXPathObjectPtr_close};

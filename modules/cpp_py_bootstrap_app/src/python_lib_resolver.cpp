@@ -28,7 +28,7 @@ auto is_valid_python_lib_path(const std::filesystem::path& path) -> bool {
 
 }  // namespace
 
-auto get_python_lib_path_via_runfiles(char** argv, std::string_view runfiles_relative_path,
+auto get_python_lib_path_via_runfiles(char* const* argv, std::string_view runfiles_relative_path,
                                       std::string& abs_lib_path) -> bool {
     using bazel::tools::cpp::runfiles::Runfiles;
 
@@ -42,7 +42,7 @@ auto get_python_lib_path_via_runfiles(char** argv, std::string_view runfiles_rel
     return !abs_lib_path.empty() && is_valid_python_lib_path(abs_lib_path);
 }
 
-auto get_python_lib_path_via_env(char** argv, std::string& abs_lib_path) -> bool {
+auto get_python_lib_path_via_env(char* const* argv, std::string& abs_lib_path) -> bool {
     if (const char* lib_path = std::getenv("PYTHON_LIB_PATH"); lib_path != nullptr) {  // NOLINT(concurrency-mt-unsafe)
         std::filesystem::path const env_path(lib_path);
         if (is_valid_python_lib_path(env_path)) {

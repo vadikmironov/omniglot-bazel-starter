@@ -11,7 +11,7 @@ Vendors:
   https://github.com/xpack-dev-tools/gcc-xpack/releases
 - clang_remote_llvm: hermeticbuild/hermetic-llvm "minimal" archive (a single
   static-musl multiplexed binary providing clang/lld/clang-tidy/clang-format
-  and the llvm- binutils, ~41 MB).
+  and the llvm- binutils, ~38 MB).
   https://github.com/hermeticbuild/hermetic-llvm/releases
 
 Fully hermetic upgrades of the same vendors exist and are the intended end
@@ -62,13 +62,13 @@ _SPECS = {
         },
         archives = {
             "amd64": struct(
-                url = "https://github.com/hermeticbuild/hermetic-llvm/releases/download/llvm-22.1.8-1/llvm-toolchain-minimal-22.1.8-linux-amd64-musl.tar.zst",
-                sha256 = "89f29294a584267251edac00ab723a0a74514b8e1acb7f036840d13635c66bfa",
+                url = "https://github.com/hermeticbuild/hermetic-llvm/releases/download/llvm-23.1.2-1/llvm-toolchain-minimal-23.1.2-linux-amd64-musl.tar.zst",
+                sha256 = "9b8c7a406b4aa4f674ddae7c95c78a45803a73540afe98f34d34e7d150632502",
                 strip_prefix = "",
             ),
             "arm64": struct(
-                url = "https://github.com/hermeticbuild/hermetic-llvm/releases/download/llvm-22.1.8-1/llvm-toolchain-minimal-22.1.8-linux-arm64-musl.tar.zst",
-                sha256 = "2914968f1fff964c654627599d15ade423e17ed310b09e2d6b61e82c16a1993d",
+                url = "https://github.com/hermeticbuild/hermetic-llvm/releases/download/llvm-23.1.2-1/llvm-toolchain-minimal-23.1.2-linux-arm64-musl.tar.zst",
+                sha256 = "fddb1f0fa724bbfc15b5f748b77b5925380509e63cf4c8c3f2557f018485bd97",
                 strip_prefix = "",
             ),
         },
