@@ -29,9 +29,10 @@
          "groupName": "python requirements"
       },
       {
-         "description": "Any MODULE segment or Cargo.lock change moves MODULE.bazel.lock, so refresh it before the commit and the freshness gate passes. Renovate's own `bazel mod deps` step only fires when the lock sits next to the bumped file, which is never the case for the tools/*/*.MODULE.bazel segments.",
+         "description": "Any MODULE segment or Cargo.lock change moves MODULE.bazel.lock, and so does a Bazel bump in .bazelversion, which changes the .bzl digests of module extensions, so refresh it before the commit and the freshness gate passes. Renovate's own `bazel mod deps` step only fires when the lock sits next to the bumped file, which is never the case for the tools/*/*.MODULE.bazel segments.",
          "matchManagers": [
             "bazel-module",
+            "bazelisk",
             "cargo"
          ],
          "postUpgradeTasks": {

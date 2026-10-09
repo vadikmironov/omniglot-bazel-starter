@@ -90,6 +90,25 @@ def _module_file_labels(content: str) -> set[tuple[str, str]]:
     return labels
 
 
+# A repository that a .bazelrc option names, as `@repo//` or `@@repo//`.
+_BAZELRC_REPO_RE = re.compile(r"(?<![\w@])@@?([A-Za-z0-9_.+~-]+)//")
+# A repository that a MODULE file makes visible: a bazel_dep name or repo_name,
+# a repo rule's name, or a use_repo() argument.
+_MODULE_REPO_NAME_RE = re.compile(r"\b(?:name|repo_name)\s*=\s*\"([^\"]+)\"")
+_MODULE_USE_REPO_RE = re.compile(r"use_repo\(([^)]*)\)", re.S)
+
+
+def _visible_repos(target: Path) -> set[str]:
+    """Repository names the scaffold's MODULE files make visible, plus Bazel's own."""
+    repos = {"bazel_tools"}
+    for module_file in [target / "MODULE.bazel", *target.rglob("*.MODULE.bazel")]:
+        content = "\n".join(line.split("#", 1)[0] for line in module_file.read_text().splitlines())
+        repos.update(_MODULE_REPO_NAME_RE.findall(content))
+        for call in _MODULE_USE_REPO_RE.finditer(content):
+            repos.update(re.findall(r"\"([^\"]+)\"", call.group(1)))
+    return repos
+
+
 def _find_source_root() -> Path:
     """Locate the monorepo root by walking up from this test file."""
     # __file__ is at <repo>/tools/bootstrap/tests/test_scaffolder.py
@@ -279,6 +298,24 @@ class TestScaffolder(unittest.TestCase):
                     f"{rel} references //{package}:{name} but {package} has no BUILD file",
                 )
 
+    def _assert_bazelrc_repos_resolve(self, target: Path) -> None:
+        """Every repository the scaffold's .bazelrc names is visible to it.
+
+        A .bazelrc line kept for one language can name a module that only another
+        language brings in. Bazel then rejects the whole config on its first use,
+        for example `--config=gcc_hermetic` with `No repository visible as
+        '@rules_rust'` in a C++ scaffold without Rust.
+        """
+        bazelrc = target / ".bazelrc"
+        if not bazelrc.is_file():
+            return
+        visible = _visible_repos(target)
+        for num, line in enumerate(bazelrc.read_text().splitlines(), 1):
+            for repo in _BAZELRC_REPO_RE.findall(line.split("#", 1)[0]):
+                self.assertIn(
+                    repo, visible, f".bazelrc:{num} names @{repo}, which this scaffold does not have: {line.strip()}"
+                )
+
     def _assert_name_substitution(self, target: Path) -> None:
         """omniglot-bazel-starter must be replaced with the test repo name."""
         module_bazel = target / "MODULE.bazel"
@@ -456,6 +493,7 @@ class TestScaffolder(unittest.TestCase):
         # Content correctness
         self._assert_no_markers(target)
         self._assert_module_labels_resolve(target)
+        self._assert_bazelrc_repos_resolve(target)
         self._assert_name_substitution(target)
         self._assert_module_bazel_content(target, selected)
         self._assert_format_build_content(target, selected)
@@ -847,6 +885,7 @@ class TestScaffolder(unittest.TestCase):
         selections: list[tuple[set[str], set[str]]] = [
             (set(LANGUAGES), set(self.manifest.features)),
             ({"cpp"}, {"lint"}),
+            ({"cpp"}, {"custom_toolchains"}),
             ({"java"}, {"lint"}),
             (set(), {"publish"}),
             (set(), {"coverage"}),
@@ -858,6 +897,7 @@ class TestScaffolder(unittest.TestCase):
                 target = self._scaffold(languages, features=features)
                 self._assert_no_markers(target)
                 self._assert_module_labels_resolve(target)
+                self._assert_bazelrc_repos_resolve(target)
                 # The lint feature's per-language files: present with one of their
                 # languages AND lint, absent otherwise.
                 for tag, rels in self.manifest.features["lint"].language_files.items():
