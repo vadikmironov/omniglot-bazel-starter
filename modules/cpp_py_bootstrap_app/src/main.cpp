@@ -39,9 +39,9 @@ auto main(int /*argc*/, char** argv) -> int {
     // Release GIL before spawning async tasks.
     // CRITICAL: declared AFTER runtime so it is destroyed BEFORE the runtime,
     // restoring the GIL before Py_FinalizeEx() is called in ~EmbeddedPythonRuntime.
-    auto gil_guard = runtime->release_gil();
+    const auto gil_guard = runtime->release_gil();
 
-    std::array<std::future<std::optional<std::string>>, 3> futures{{
+    std::array<std::future<std::optional<std::string>>, 3> futures{
         std::async(std::launch::async, [&runtime] -> std::optional<std::basic_string<char, std::char_traits<char>, std::allocator<char>>> {
             return runtime->call_in_subinterpreter("async-1", "python_lib.hello_world_lib",
                                                    "get_hello_world_string", {1});
@@ -54,7 +54,7 @@ auto main(int /*argc*/, char** argv) -> int {
             return runtime->call_in_subinterpreter("async-3", "python_lib.hello_world_lib",
                                                    "get_hello_world_string", {3});
         }),
-    }};
+    };
 
     std::array<std::optional<std::string>, 3> results;
     std::ranges::transform(futures, results.begin(),
