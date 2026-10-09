@@ -19,7 +19,7 @@ require (
 )
 
 // --- BEGIN exclude ---
-require golang.org/x/net v0.59.0
+require golang.org/x/net v0.60.0
 
 // --- END exclude ---
 
