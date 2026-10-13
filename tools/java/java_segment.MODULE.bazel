@@ -189,7 +189,7 @@ use_repo(
 #
 # Documentation: https://github.com/bazel-contrib/rules_jvm_external/releases
 #
-bazel_dep(name = "rules_jvm_external", version = "7.1")
+bazel_dep(name = "rules_jvm_external", version = "7.2")
 
 # COURSIER_CACHE is set only on the pinned path, so a repin spawns coursier
 # without it. Coursier then derives its cache from the JVM's user.home, which
