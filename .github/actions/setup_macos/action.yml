@@ -9,7 +9,7 @@ runs:
   using: "composite"
   steps:
     - name: Setup Bazel
-      uses: bazel-contrib/setup-bazel@0.19.0
+      uses: bazel-contrib/setup-bazel@0.19.1
       with:
         bazelisk-cache: true
         disk-cache: ${{ hashFiles('.bazelversion', 'MODULE.bazel') }}
