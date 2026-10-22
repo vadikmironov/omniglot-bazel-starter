@@ -26,7 +26,7 @@ bazel_dep(name = "google_benchmark", version = "1.9.5")
 # gperftools homepage: https://github.com/gperftools/gperftools
 # Documentation: https://gperftools.github.io/gperftools/
 #
-bazel_dep(name = "gperftools", version = "2.18.1")
+bazel_dep(name = "gperftools", version = "2.19.1")
 # --- END feature:profiling ---
 
 # --- BEGIN user-managed ---
