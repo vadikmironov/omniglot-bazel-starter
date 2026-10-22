@@ -395,6 +395,10 @@ build --per_file_copt=external/google_benchmark.*@-Wno-thread-safety-analysis
 # or fix this source, so demote all of its warnings back to non-fatal rather
 # than police a third-party TU. First-party -Werror is unaffected.
 build --per_file_copt=external/gperftools.*@-Wno-error
+# gperftools' aw-backtrace unwinder needs glibc 2.35 (_dl_find_object); the
+# hermetic GCC sysroot is glibc 2.28. gperftools falls back to its other unwinders.
+# https://github.com/gperftools/gperftools/blob/gperftools-2.19.1/BUILD.bazel#L43-L46
+build:gcc_hermetic --@gperftools//:enable_aw_backtrace=false
 # Debug info for inline-frame symbolization and frame pointers for reliable
 # in-process stack capture (the C++ counterpart of the rust settings above).
 build:profile --copt=-g --copt=-fno-omit-frame-pointer
