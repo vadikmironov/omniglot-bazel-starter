@@ -79,28 +79,28 @@ oci = use_extension("@rules_oci//oci:extensions.bzl", "oci")
 #   - static/cc carry no version suffix — they encode flavor, not version.
 oci.pull(
     name = "gcr_io_distroless_java17",
-    digest = "sha256:890021421383f5613068800efe9b6d76688b78f501177dcd912c5908a8c5b437",
+    digest = "sha256:bb551796de0958c414f26020d4fabd0fb3d23687819f7dbef1b713fac0872448",
     image = "gcr.io/distroless/java17-debian13",
     platforms = ["linux/amd64"],
     tag = "nonroot",
 )
 oci.pull(
     name = "gcr_io_distroless_python3",
-    digest = "sha256:727eccc5d83f11273c954652667b5b5a1c66120bd4cfb884e879ab77dcdf966a",
+    digest = "sha256:64e54c4b1200da244d80181d98e86fc01d73c8101f107d5baf472152d8e119a2",
     image = "gcr.io/distroless/python3-debian13",
     platforms = ["linux/amd64"],
     tag = "nonroot",
 )
 oci.pull(
     name = "gcr_io_distroless_static",
-    digest = "sha256:d62067879de890a1def9da0e7766b7d20810a5e5555cef8506b752437d7a3e88",
+    digest = "sha256:18f4cc26c9ffa7f20a359298be7deadac5c607c8e03a02b8119f1a5fc2f82c99",
     image = "gcr.io/distroless/static-debian13",
     platforms = ["linux/amd64"],
     tag = "nonroot",
 )
 oci.pull(
     name = "gcr_io_distroless_cc",
-    digest = "sha256:83b9b50586253821cf63ffcec87d3d94265a093ad30da232039af962dd8f4edf",
+    digest = "sha256:3ee00291cf386ec52a552e6a858d555debd74776eb4bfa53fa3df2cd6677515e",
     image = "gcr.io/distroless/cc-debian13",
     platforms = ["linux/amd64"],
     tag = "nonroot",

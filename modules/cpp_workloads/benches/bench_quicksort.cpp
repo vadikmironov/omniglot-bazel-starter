@@ -1,7 +1,9 @@
 // Quicksort bench: recursive call tree renders as a quicksort →
 // partition flamegraph tower, with a branch-miss story on random input.
 
-#include <benchmark/benchmark.h>
+#include <benchmark/registration.h>
+#include <benchmark/state.h>
+#include <benchmark/utils.h>
 
 #include <algorithm>
 #include <cstddef>

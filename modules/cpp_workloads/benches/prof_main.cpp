@@ -5,7 +5,7 @@
 // gperftools' own CPUPROFILE env activation is avoided: it resolves the
 // output path twice and the second pass appends the pid.
 
-#include <benchmark/benchmark.h>
+#include <benchmark/benchmark_api.h>
 #include <gperftools/profiler.h>
 
 #include <cstdlib>

@@ -1,7 +1,9 @@
 // Pointer-chase bench: serially dependent random loads (memory-latency
 // bound) against a contiguous sum of the same buffer (bandwidth bound).
 
-#include <benchmark/benchmark.h>
+#include <benchmark/registration.h>
+#include <benchmark/state.h>
+#include <benchmark/utils.h>
 
 #include <cstddef>
 

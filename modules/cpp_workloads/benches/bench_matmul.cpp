@@ -2,7 +2,9 @@
 // behaviour — in-process profiles show a hot loop, an external
 // sampler's cache counters explain the difference.
 
-#include <benchmark/benchmark.h>
+#include <benchmark/registration.h>
+#include <benchmark/state.h>
+#include <benchmark/utils.h>
 
 #include <cstddef>
 
