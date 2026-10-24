@@ -137,9 +137,10 @@
     "https://bcr.bazel.build/modules/gazelle/0.54.0/source.json": "6c9639ac87508c7edea37bd9d5380581c96defde056ca26518d201a8816805e4",
     "https://bcr.bazel.build/modules/gcc_toolchain/0.13.0/MODULE.bazel": "8912be8684729c2814e922aa3555d163d1c6e7dbf620e72753fe44f3761250e4",
     "https://bcr.bazel.build/modules/gcc_toolchain/0.13.0/source.json": "41e8693ad56244dde548f7711126deda72eeff630f66f5e2d8403227d4a78097",
+    "https://bcr.bazel.build/modules/google_benchmark/1.10.0/MODULE.bazel": "f2b41eb96031b9741ae63e32d8cdbec80518136a8b90a6ad2ec543ed6027101e",
+    "https://bcr.bazel.build/modules/google_benchmark/1.10.0/source.json": "e69cb72e0f202d890714646be37a3981d482e2cbc7f63ec62f407b60caf1e75b",
     "https://bcr.bazel.build/modules/google_benchmark/1.8.2/MODULE.bazel": "a70cf1bba851000ba93b58ae2f6d76490a9feb74192e57ab8e8ff13c34ec50cb",
     "https://bcr.bazel.build/modules/google_benchmark/1.9.5/MODULE.bazel": "8a85cfd90b1e45e6e68f1aa2aa9efce3c04add57df732571d7fd54c07e7c5143",
-    "https://bcr.bazel.build/modules/google_benchmark/1.9.5/source.json": "0bd357fd9db30ee31d5eb4c78b1086ce3d79b4423ce76de19e8a2fa7b2fa2e10",
     "https://bcr.bazel.build/modules/googletest/1.11.0/MODULE.bazel": "3a83f095183f66345ca86aa13c58b59f9f94a2f81999c093d4eeaa2d262d12f4",
     "https://bcr.bazel.build/modules/googletest/1.14.0.bcr.1/MODULE.bazel": "22c31a561553727960057361aa33bf20fb2e98584bc4fec007906e27053f80c6",
     "https://bcr.bazel.build/modules/googletest/1.14.0/MODULE.bazel": "cfbcbf3e6eac06ef9d85900f64424708cc08687d1b527f0ef65aa7517af8118f",
@@ -259,8 +260,8 @@
     "https://bcr.bazel.build/modules/rules_cc/0.2.20/MODULE.bazel": "f5c07bce5ddcb99be21a0812ff5aadb439e688b7449c6542152363b2fd859c1a",
     "https://bcr.bazel.build/modules/rules_cc/0.2.22/MODULE.bazel": "94df4328edef9e44d38de5e73b037cd348e75e7ae55f4e21bf07878c41a31ebb",
     "https://bcr.bazel.build/modules/rules_cc/0.2.25/MODULE.bazel": "4a3d4f3606d3b3190be495dbc497acca552807d1d5540661ef0d1658472882e3",
-    "https://bcr.bazel.build/modules/rules_cc/0.2.26/MODULE.bazel": "a9f7b7f4a52747910965bddb1f58fc1fef50604ed1980ebdd16ea6f446d92249",
-    "https://bcr.bazel.build/modules/rules_cc/0.2.26/source.json": "bf9ff315da6055c1e374d627012cc51947a05b3560674af7d69fbedbb4fde6ef",
+    "https://bcr.bazel.build/modules/rules_cc/0.2.27/MODULE.bazel": "99483699eeba3ec1159e938d724134762e748e8dc16dd0d8cbcc3d01a3d19440",
+    "https://bcr.bazel.build/modules/rules_cc/0.2.27/source.json": "a1e5e45c8a56ec19fadf109ef34abb06979982badf55a504d3f82a1258d83e3f",
     "https://bcr.bazel.build/modules/rules_cc/0.2.4/MODULE.bazel": "1ff1223dfd24f3ecf8f028446d4a27608aa43c3f41e346d22838a4223980b8cc",
     "https://bcr.bazel.build/modules/rules_cc/0.2.8/MODULE.bazel": "f1df20f0bf22c28192a794f29b501ee2018fa37a3862a1a2132ae2940a23a642",
     "https://bcr.bazel.build/modules/rules_cc/0.2.9/MODULE.bazel": "34263f1dca62ea664265438cef714d7db124c03e1ed55ebb4f1dc860164308d1",
@@ -368,8 +369,8 @@
     "https://bcr.bazel.build/modules/rules_python/1.6.3/MODULE.bazel": "a7b80c42cb3de5ee2a5fa1abc119684593704fcd2fec83165ebe615dec76574f",
     "https://bcr.bazel.build/modules/rules_python/1.7.0/MODULE.bazel": "d01f995ecd137abf30238ad9ce97f8fc3ac57289c8b24bd0bf53324d937a14f8",
     "https://bcr.bazel.build/modules/rules_python/1.9.0/MODULE.bazel": "afc3a05f29f09f2d3ee95ad99a145250dab41a2b2d8d6f82cc91936b3213282c",
-    "https://bcr.bazel.build/modules/rules_python/2.4.3/MODULE.bazel": "20c3724a775c8245f3c73bda2ccc491965ee8b552c3ad8a53e8deb06dc164c43",
-    "https://bcr.bazel.build/modules/rules_python/2.4.3/source.json": "bf2b0ed2e90121e299774299cdc6b90475c3f81477473f32044cb45674b8e6bb",
+    "https://bcr.bazel.build/modules/rules_python/2.4.5/MODULE.bazel": "5a070795714c70d9841c2c19897ebd1177d46d74961193425521da006942d321",
+    "https://bcr.bazel.build/modules/rules_python/2.4.5/source.json": "04cc90b07e4f0abba225743fa138e12a3dee6f04a92ec3741112e83fbf100dc1",
     "https://bcr.bazel.build/modules/rules_robolectric/4.14.1.2/MODULE.bazel": "d44fec647d0aeb67b9f3b980cf68ba634976f3ae7ccd6c07d790b59b87a4f251",
     "https://bcr.bazel.build/modules/rules_robolectric/4.14.1.2/source.json": "37c10335f2361c337c5c1f34ed36d2da70534c23088062b33a8bdaab68aa9dea",
     "https://bcr.bazel.build/modules/rules_rust/0.74.0/MODULE.bazel": "6e6fa04d7c8202f9cd63205ec9f96da39382a4ac971ee1d7a900fe8e1f68be17",
@@ -1285,88 +1286,88 @@
     },
     "@@rules_python+//python/uv:uv.bzl%uv": {
       "general": {
-        "bzlTransitiveDigest": "+9d3Xk+XLM+3cS8xVHR6XRn3dYpPmBavXbfU8v/qtnc=",
-        "usagesDigest": "yTx8VcW/rGI8ob2zGODjSB7ABkcfk6f6H0A26fXAa6U=",
+        "bzlTransitiveDigest": "RH0xYDM+3D/BJrY901xKB9oHbAVDI7DBo6UhvEjliCw=",
+        "usagesDigest": "8+Lh0+jGMSXK3RdCNsbGNKfHvBCyOrWi/fukO3w4xJ0=",
         "recordedInputs": [
           "REPO_MAPPING:rules_python+,bazel_tools bazel_tools",
           "REPO_MAPPING:rules_python+,platforms platforms"
         ],
         "generatedRepoSpecs": {
-          "uv_0_11_2_aarch64_apple_darwin": {
+          "uv_0_13_5_aarch64_apple_darwin": {
             "repoRuleId": "@@rules_python+//python/uv/private:uv_repository.bzl%uv_repository",
             "attributes": {
-              "version": "0.11.2",
+              "version": "0.13.5",
               "platform": "aarch64-apple-darwin",
               "urls": [
-                "https://releases.astral.sh/github/uv/releases/download/0.11.2/uv-aarch64-apple-darwin.tar.gz"
+                "https://releases.astral.sh/github/uv/releases/download/0.13.5/uv-aarch64-apple-darwin.tar.gz"
               ],
-              "sha256": "4beaa9550f93ef7f0fc02f7c28c9c48cd61fe30db00f5ac8947e0a425c3fb282"
+              "sha256": "743f85035a1996ecb350659e01cd9faea9709829be09b1b4b03c73eaf3c9cd73"
             }
           },
-          "uv_0_11_2_aarch64_unknown_linux_gnu": {
+          "uv_0_13_5_aarch64_unknown_linux_gnu": {
             "repoRuleId": "@@rules_python+//python/uv/private:uv_repository.bzl%uv_repository",
             "attributes": {
-              "version": "0.11.2",
+              "version": "0.13.5",
               "platform": "aarch64-unknown-linux-gnu",
               "urls": [
-                "https://releases.astral.sh/github/uv/releases/download/0.11.2/uv-aarch64-unknown-linux-gnu.tar.gz"
+                "https://releases.astral.sh/github/uv/releases/download/0.13.5/uv-aarch64-unknown-linux-gnu.tar.gz"
               ],
-              "sha256": "04792cac761c4a6ba78267f36f2af541b7f92196d42ac55d21d3ff6b0f5ab6a5"
+              "sha256": "4bb69cf95ed13f23713bb7bc09f241896ea0c75b7c557e615a20604b82f9c403"
             }
           },
-          "uv_0_11_2_powerpc64le_unknown_linux_gnu": {
+          "uv_0_13_5_powerpc64le_unknown_linux_gnu": {
             "repoRuleId": "@@rules_python+//python/uv/private:uv_repository.bzl%uv_repository",
             "attributes": {
-              "version": "0.11.2",
+              "version": "0.13.5",
               "platform": "powerpc64le-unknown-linux-gnu",
               "urls": [
-                "https://releases.astral.sh/github/uv/releases/download/0.11.2/uv-powerpc64le-unknown-linux-gnu.tar.gz"
+                "https://releases.astral.sh/github/uv/releases/download/0.13.5/uv-powerpc64le-unknown-linux-gnu.tar.gz"
               ],
-              "sha256": "3f3a50e99364efc8ff7add10e79757a2b8458700a38180ec5f313524481b9fbc"
+              "sha256": "f891bc62de89832775d5104ad3b3332848122536a8dc8bac5775a18cce42b845"
             }
           },
-          "uv_0_11_2_s390x_unknown_linux_gnu": {
+          "uv_0_13_5_s390x_unknown_linux_gnu": {
             "repoRuleId": "@@rules_python+//python/uv/private:uv_repository.bzl%uv_repository",
             "attributes": {
-              "version": "0.11.2",
+              "version": "0.13.5",
               "platform": "s390x-unknown-linux-gnu",
               "urls": [
-                "https://releases.astral.sh/github/uv/releases/download/0.11.2/uv-s390x-unknown-linux-gnu.tar.gz"
+                "https://releases.astral.sh/github/uv/releases/download/0.13.5/uv-s390x-unknown-linux-gnu.tar.gz"
               ],
-              "sha256": "42ebe40775f2a77a514fa47399fde86473bf35bd33b6896c6410a0309fc4d205"
+              "sha256": "b383e82d562f269fffbb69f44258ae278b6f4b45fbe7e572574669021b547e94"
             }
           },
-          "uv_0_11_2_x86_64_apple_darwin": {
+          "uv_0_13_5_x86_64_apple_darwin": {
             "repoRuleId": "@@rules_python+//python/uv/private:uv_repository.bzl%uv_repository",
             "attributes": {
-              "version": "0.11.2",
+              "version": "0.13.5",
               "platform": "x86_64-apple-darwin",
               "urls": [
-                "https://releases.astral.sh/github/uv/releases/download/0.11.2/uv-x86_64-apple-darwin.tar.gz"
+                "https://releases.astral.sh/github/uv/releases/download/0.13.5/uv-x86_64-apple-darwin.tar.gz"
               ],
-              "sha256": "a9c3653245031304c50dd60ac0301bf6c112e12c38c32302a71d4fa6a63ba2cb"
+              "sha256": "b0f52b0e3945b4107d89024ea38e625683011fbfc05a0d98f9fa2d6dcee28c66"
             }
           },
-          "uv_0_11_2_x86_64_pc_windows_msvc": {
+          "uv_0_13_5_x86_64_pc_windows_msvc": {
             "repoRuleId": "@@rules_python+//python/uv/private:uv_repository.bzl%uv_repository",
             "attributes": {
-              "version": "0.11.2",
+              "version": "0.13.5",
               "platform": "x86_64-pc-windows-msvc",
               "urls": [
-                "https://releases.astral.sh/github/uv/releases/download/0.11.2/uv-x86_64-pc-windows-msvc.zip"
+                "https://releases.astral.sh/github/uv/releases/download/0.13.5/uv-x86_64-pc-windows-msvc.zip"
               ],
-              "sha256": "171b7ccda1bbd562da6babeffcf533a1c6cc7862cf998da826e1db534fc43e48"
+              "sha256": "a38b8d1902b7cfbc76b423ba1bb456f623f42064cdc72628b6075b89afd1019a"
             }
           },
-          "uv_0_11_2_x86_64_unknown_linux_gnu": {
+          "uv_0_13_5_x86_64_unknown_linux_gnu": {
             "repoRuleId": "@@rules_python+//python/uv/private:uv_repository.bzl%uv_repository",
             "attributes": {
-              "version": "0.11.2",
+              "version": "0.13.5",
               "platform": "x86_64-unknown-linux-gnu",
               "urls": [
-                "https://releases.astral.sh/github/uv/releases/download/0.11.2/uv-x86_64-unknown-linux-gnu.tar.gz"
+                "https://releases.astral.sh/github/uv/releases/download/0.13.5/uv-x86_64-unknown-linux-gnu.tar.gz"
               ],
-              "sha256": "7ac2ca0449c8d68dae9b99e635cd3bc9b22a4cb1de64b7c43716398447d42981"
+              "sha256": "f68d291c75783122dad58ab77def0e13f3233f358731db5d6d7e8715603b928f"
             }
           },
           "uv": {
@@ -1374,49 +1375,49 @@
             "attributes": {
               "toolchain_type": "'@@rules_python+//python/uv:uv_toolchain_type'",
               "toolchain_names": [
-                "0_11_2_aarch64_apple_darwin",
-                "0_11_2_aarch64_unknown_linux_gnu",
-                "0_11_2_powerpc64le_unknown_linux_gnu",
-                "0_11_2_s390x_unknown_linux_gnu",
-                "0_11_2_x86_64_apple_darwin",
-                "0_11_2_x86_64_pc_windows_msvc",
-                "0_11_2_x86_64_unknown_linux_gnu"
+                "0_13_5_aarch64_apple_darwin",
+                "0_13_5_aarch64_unknown_linux_gnu",
+                "0_13_5_powerpc64le_unknown_linux_gnu",
+                "0_13_5_s390x_unknown_linux_gnu",
+                "0_13_5_x86_64_apple_darwin",
+                "0_13_5_x86_64_pc_windows_msvc",
+                "0_13_5_x86_64_unknown_linux_gnu"
               ],
               "toolchain_implementations": {
-                "0_11_2_aarch64_apple_darwin": "@uv_0_11_2_aarch64_apple_darwin//:uv_toolchain",
-                "0_11_2_aarch64_unknown_linux_gnu": "@uv_0_11_2_aarch64_unknown_linux_gnu//:uv_toolchain",
-                "0_11_2_powerpc64le_unknown_linux_gnu": "@uv_0_11_2_powerpc64le_unknown_linux_gnu//:uv_toolchain",
-                "0_11_2_s390x_unknown_linux_gnu": "@uv_0_11_2_s390x_unknown_linux_gnu//:uv_toolchain",
-                "0_11_2_x86_64_apple_darwin": "@uv_0_11_2_x86_64_apple_darwin//:uv_toolchain",
-                "0_11_2_x86_64_pc_windows_msvc": "@uv_0_11_2_x86_64_pc_windows_msvc//:uv_toolchain",
-                "0_11_2_x86_64_unknown_linux_gnu": "@uv_0_11_2_x86_64_unknown_linux_gnu//:uv_toolchain"
+                "0_13_5_aarch64_apple_darwin": "@uv_0_13_5_aarch64_apple_darwin//:uv_toolchain",
+                "0_13_5_aarch64_unknown_linux_gnu": "@uv_0_13_5_aarch64_unknown_linux_gnu//:uv_toolchain",
+                "0_13_5_powerpc64le_unknown_linux_gnu": "@uv_0_13_5_powerpc64le_unknown_linux_gnu//:uv_toolchain",
+                "0_13_5_s390x_unknown_linux_gnu": "@uv_0_13_5_s390x_unknown_linux_gnu//:uv_toolchain",
+                "0_13_5_x86_64_apple_darwin": "@uv_0_13_5_x86_64_apple_darwin//:uv_toolchain",
+                "0_13_5_x86_64_pc_windows_msvc": "@uv_0_13_5_x86_64_pc_windows_msvc//:uv_toolchain",
+                "0_13_5_x86_64_unknown_linux_gnu": "@uv_0_13_5_x86_64_unknown_linux_gnu//:uv_toolchain"
               },
               "toolchain_compatible_with": {
-                "0_11_2_aarch64_apple_darwin": [
+                "0_13_5_aarch64_apple_darwin": [
                   "'@@platforms//os:macos'",
                   "'@@platforms//cpu:aarch64'"
                 ],
-                "0_11_2_aarch64_unknown_linux_gnu": [
+                "0_13_5_aarch64_unknown_linux_gnu": [
                   "'@@platforms//os:linux'",
                   "'@@platforms//cpu:aarch64'"
                 ],
-                "0_11_2_powerpc64le_unknown_linux_gnu": [
+                "0_13_5_powerpc64le_unknown_linux_gnu": [
                   "'@@platforms//os:linux'",
                   "'@@platforms//cpu:ppc64le'"
                 ],
-                "0_11_2_s390x_unknown_linux_gnu": [
+                "0_13_5_s390x_unknown_linux_gnu": [
                   "'@@platforms//os:linux'",
                   "'@@platforms//cpu:s390x'"
                 ],
-                "0_11_2_x86_64_apple_darwin": [
+                "0_13_5_x86_64_apple_darwin": [
                   "'@@platforms//os:macos'",
                   "'@@platforms//cpu:x86_64'"
                 ],
-                "0_11_2_x86_64_pc_windows_msvc": [
+                "0_13_5_x86_64_pc_windows_msvc": [
                   "'@@platforms//os:windows'",
                   "'@@platforms//cpu:x86_64'"
                 ],
-                "0_11_2_x86_64_unknown_linux_gnu": [
+                "0_13_5_x86_64_unknown_linux_gnu": [
                   "'@@platforms//os:linux'",
                   "'@@platforms//cpu:x86_64'"
                 ]
@@ -1429,7 +1430,7 @@
     },
     "@@rules_rust+//crate_universe:extensions.bzl%crate": {
       "general": {
-        "bzlTransitiveDigest": "cJflK2wnLaTRhYpAnWwaePPxaKoo613OjJNVWRmY8fU=",
+        "bzlTransitiveDigest": "HU+vQ3EaoNN24BC+ynatztkge2tBUuQGZY3lOoe8n1g=",
         "usagesDigest": "xO+N8eLrQX0hCD0OTAtfUCUps6SHXgtkYpsOFCVJThs=",
         "recordedInputs": [
           "ENV:CARGO_BAZEL_DEBUG \\0",
@@ -5483,7 +5484,7 @@
     },
     "@@rules_rust+//crate_universe/private:internal_extensions.bzl%cu_nr": {
       "general": {
-        "bzlTransitiveDigest": "jftgYo2XitGy4I2f/O6kAsYprHLLMC09NSnfiWPnJS4=",
+        "bzlTransitiveDigest": "moR84Vevyn/gFFLY2P4/1ycsGI0zWGQJIUuKqwrx/Uw=",
         "usagesDigest": "McimNXAztVHDzspa1Kng94T+YeyY/44zx9FkNqIMn2s=",
         "recordedInputs": [
           "REPO_MAPPING:apple_support+,bazel_skylib bazel_skylib+",
