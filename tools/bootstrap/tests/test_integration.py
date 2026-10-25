@@ -23,8 +23,10 @@ subset directly when iterating::
     python -m unittest test_integration.TestIntegration.test_java_only
 """
 
+import atexit
 import os
 import shutil
+import signal
 import subprocess
 import tempfile
 import textwrap
@@ -65,8 +67,10 @@ def _find_source_root() -> Path:
 # timeout on the all-languages subset.
 #
 # Set $INTEGRATION_TEST_CACHE_DIR to reuse the tree across runs (e.g. an
-# actions/cache path in CI); otherwise a fresh temp dir per run. In CI the
-# within-run reuse alone is the big win and needs no setup. If you *do* persist
+# actions/cache path in CI); otherwise a fresh temp dir per run, which the run
+# deletes when it ends. It grows to 20-30 GB, and a dev box that kept one per
+# run filled its disk on the second. In CI the within-run reuse alone is the big
+# win and needs no setup. If you *do* persist
 # it, bound it: --disk_cache has no built-in garbage collection, so pair it with
 # an eviction policy (or --experimental_disk_cache_gc_max_size) to stay under
 # the runner's cache-size limit.
@@ -77,7 +81,14 @@ def _cache_dir() -> Path:
     global _SHARED_CACHE  # noqa: PLW0603
     if _SHARED_CACHE is None:
         env = os.environ.get("INTEGRATION_TEST_CACHE_DIR")
-        _SHARED_CACHE = Path(env) if env else Path(tempfile.mkdtemp(prefix="bootstrap_integ_cache_"))
+        if env:
+            _SHARED_CACHE = Path(env)  # the caller's to keep
+        else:
+            # Under Bazel the tree goes in $TEST_TMPDIR, so a run killed before
+            # its cleanup leaves it where Bazel clears it, not in /tmp for good.
+            tmp = os.environ.get("TEST_TMPDIR")
+            _SHARED_CACHE = Path(tempfile.mkdtemp(prefix="bootstrap_integ_cache_", dir=tmp))
+            atexit.register(shutil.rmtree, _SHARED_CACHE, ignore_errors=True)
         _SHARED_CACHE.mkdir(parents=True, exist_ok=True)
     return _SHARED_CACHE
 
@@ -708,4 +719,8 @@ class TestIntegration(unittest.TestCase):
 
 
 if __name__ == "__main__":
+    # Bazel ends a timed-out test with SIGTERM, which skips atexit. Raised as
+    # KeyboardInterrupt it unwinds like Ctrl-C: each workspace is expunged and
+    # the shared cache deleted.
+    signal.signal(signal.SIGTERM, signal.default_int_handler)
     unittest.main()
