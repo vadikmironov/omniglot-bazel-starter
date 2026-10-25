@@ -15,6 +15,7 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
+from bootstrap.gomod import merge_go_mod, merge_go_sum, merge_go_use_repo
 from bootstrap.manifest import (
     BOOTSTRAP_MARKER_FILE,
     UNVERIFIED,
@@ -47,6 +48,17 @@ _CODE_DIR_PLACEHOLDER = "{{code_dir}}"
 # overwrite the file or False to keep what's on disk. None means no review —
 # existing files are overwritten (managed files still keep their user region).
 ConfirmOverwrite = Callable[[Path, str, str], bool]
+
+# Files that hold the repo's Go dependencies but cannot hold a user-managed
+# region, because go and bazel mod tidy rewrite them. A re-bootstrap merges the
+# repo's entries into the starter's instead of replacing them (see
+# bootstrap.gomod). Each merger takes (rendered, existing, shippable), where
+# shippable is the starter's file rendered with every language and feature.
+_MERGERS: dict[str, Callable[[str, str, str], str]] = {
+    "go.mod": merge_go_mod,
+    "go.sum": merge_go_sum,
+    "tools/go/go_segment.MODULE.bazel": merge_go_use_repo,
+}
 
 
 @dataclass
@@ -133,7 +145,14 @@ def scaffold_repo(
     for rel in resolved.copy:
         if _keep_seed(rel):
             continue
-        _copy_file(source_root / rel, target_path / rel)
+        dst = target_path / rel
+        if rel in _MERGERS and dst.exists():
+            # Written by the tool but not a verbatim copy, so step 5 skips it.
+            content = (source_root / rel).read_text()
+            dst.write_text(_MERGERS[rel](content, dst.read_text(), content))
+            managed.add(rel)
+            continue
+        _copy_file(source_root / rel, dst)
         copied.add(rel)
 
     # 2. Directory copies (language tool directories)
@@ -182,6 +201,10 @@ def scaffold_repo(
         dst = target_path / rel
         managed.add(rel)
         filtered = _renamed(filtered, dst, manifest.original_name, repo_name)
+        if rel in _MERGERS and dst.exists():
+            everything = filter_sections(content, set(manifest.languages), set(manifest.features), filename=rel)
+            shippable = _renamed(everything, dst, manifest.original_name, repo_name)
+            filtered = _MERGERS[rel](filtered, dst.read_text(), shippable)
         to_write = _resolve_managed(filtered, dst, confirm=confirm)
         if to_write is None:
             print(f"    kept existing {rel}")

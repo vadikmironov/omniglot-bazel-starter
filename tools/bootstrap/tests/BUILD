@@ -13,6 +13,13 @@ py_test(
 )
 
 py_test(
+    name = "test_gomod",
+    size = "small",
+    srcs = ["test_gomod.py"],
+    deps = ["//tools/bootstrap:bootstrap_lib"],
+)
+
+py_test(
     name = "test_manifest",
     size = "small",
     srcs = ["test_manifest.py"],

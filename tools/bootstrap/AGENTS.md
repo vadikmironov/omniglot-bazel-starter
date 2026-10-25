@@ -17,6 +17,10 @@ subset of this repo into the target, rewrites the module name, `git init`s, and
   file set for a selection; `effective_excluded_files()` applies feature-conditional excludes.
 - `src/bootstrap/processor.py` — the section-marker filter (`filter_sections`) and
   user-managed region splicing (`splice_user_region`).
+- `src/bootstrap/gomod.py` — re-bootstrap merges for the three files holding a
+  repo's Go dependencies (`go.mod`, `go.sum`, the `use_repo(go_deps, …)` call),
+  which Go's and Bazel's tidy commands rewrite, so they cannot carry a
+  user-managed region. The scaffolder's `_MERGERS` routes them here.
 - `src/bootstrap/scaffolder.py` — orchestrates copy → filter → render-README →
   substitute → git, then lock-file refresh and `_FEATURE_FINALIZERS` (e.g.
   `publish_gen`, `lint_gen`). Composite files and the README are renamed
