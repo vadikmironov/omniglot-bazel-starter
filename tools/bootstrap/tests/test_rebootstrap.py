@@ -268,11 +268,42 @@ class TestRebootstrap(_ScaffoldHarness):
         )
 
     def test_gomod_is_not_managed(self) -> None:
-        """go.mod carries no user-managed region — it is import-driven (tidy)."""
+        """go.mod carries no user-managed region: go rewrites it, so it is merged instead."""
         target = self._fresh_target()
         self._scaffold_into(target, {"go"})
         gomod = (target / "go.mod").read_text()
         self.assertFalse(has_user_region(gomod), "go.mod should not be a managed file")
+
+    def test_go_dependencies_survive_rebootstrap(self) -> None:
+        """What `go get` and `bazel mod tidy` added stays; a dropped feature's modules go."""
+        target = self._fresh_target()
+        self._scaffold_into(target, {"go"}, features={"profiling"})
+        gomod = target / "go.mod"
+        gosum = target / "go.sum"
+        segment = target / "tools" / "go" / "go_segment.MODULE.bazel"
+        gomod.write_text(
+            gomod.read_text().replace("require (\n", "require (\n\tgithub.com/google/uuid v1.6.0\n", 1)
+            + "\nreplace github.com/google/uuid => ../uuid\n"
+        )
+        gosum.write_text(gosum.read_text() + "github.com/google/uuid v1.6.0 h1:repo=\n")
+        segment.write_text(
+            segment.read_text().replace(
+                '"com_github_stretchr_testify",', '"com_github_stretchr_testify",\n    "com_github_google_uuid",'
+            )
+        )
+
+        self._scaffold_into(target, {"go"})  # re-bootstrap, profiling deselected
+        mod, sums, repos = gomod.read_text(), gosum.read_text(), segment.read_text()
+        self.assertIn("github.com/google/uuid v1.6.0", mod)
+        self.assertIn("replace github.com/google/uuid => ../uuid", mod)
+        self.assertIn("github.com/google/uuid v1.6.0 h1:repo=", sums)
+        self.assertIn('"com_github_google_uuid"', repos)
+        self.assertIn("github.com/stretchr/testify", mod, "starter baseline lost on re-bootstrap")
+        self.assertNotIn("github.com/google/pprof", mod, "deselected profiling left its module behind")
+        self.assertNotIn("com_github_google_pprof", repos, "deselected profiling left its repo behind")
+
+        self._scaffold_into(target, {"go"})  # again: nothing more to merge
+        self.assertEqual((gomod.read_text(), gosum.read_text(), segment.read_text()), (mod, sums, repos))
 
     def test_seeded_lock_survives_rebootstrap(self) -> None:
         """A repo's resolved lock is kept: the starter's copy locks other deps."""

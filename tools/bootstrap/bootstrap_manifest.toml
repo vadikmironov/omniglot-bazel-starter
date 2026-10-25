@@ -319,8 +319,10 @@ go = ["go.mod", "tools/go/go_segment.MODULE.bazel"]
 # the lock refresh was left with a lock missing every dependency the repo had
 # added. A re-bootstrap keeps the repo's lock instead, and the lock refresh
 # regenerates it from the merged manifest. A fresh scaffold still starts from
-# the starter's copy. go.sum is not a seed: go.mod has no user-managed region,
-# so the starter's go.sum is the right one.
+# the starter's copy. go.sum is not a seed: it has to match go.mod, which Go's
+# tooling rewrites and so cannot hold a user-managed region. The scaffolder
+# merges the repo's go.mod, go.sum and go_deps use_repo into the starter's
+# instead (bootstrap.gomod).
 # ---------------------------------------------------------------------------
 [seed]
 files = [

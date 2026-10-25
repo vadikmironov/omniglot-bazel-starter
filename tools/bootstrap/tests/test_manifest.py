@@ -274,8 +274,8 @@ class TestLoadManifest(unittest.TestCase):
         self.assertIn(PALANTIR_FILE, self.manifest.excluded_files)
 
     def test_seed_files(self) -> None:
-        # Locks resolved from a manifest with a user-managed region. go.mod has
-        # none, so the starter's go.sum is the right one and stays a plain copy.
+        # Locks resolved from a manifest with a user-managed region. go.sum is
+        # merged along with go.mod instead (bootstrap.gomod), so it is no seed.
         self.assertIn("tools/python/uv.lock", self.manifest.seed_files)
         self.assertNotIn("go.sum", self.manifest.seed_files)
 
