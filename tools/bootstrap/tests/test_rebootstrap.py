@@ -274,6 +274,24 @@ class TestRebootstrap(_ScaffoldHarness):
         gomod = (target / "go.mod").read_text()
         self.assertFalse(has_user_region(gomod), "go.mod should not be a managed file")
 
+    def test_seeded_lock_survives_rebootstrap(self) -> None:
+        """A repo's resolved lock is kept: the starter's copy locks other deps."""
+        target = self._fresh_target()
+        langs = {"python", "rust", "java"}
+        self._scaffold_into(target, langs)
+        for rel in self.manifest.seed_files:
+            self.assertTrue((target / rel).is_file(), f"fresh scaffold did not seed {rel}")
+            (target / rel).write_text(f"the repo's own lock: {rel}\n")
+
+        result = self._scaffold_into(target, langs)  # re-bootstrap
+        for rel in self.manifest.seed_files:
+            self.assertEqual(
+                (target / rel).read_text(), f"the repo's own lock: {rel}\n", f"re-bootstrap replaced {rel}"
+            )
+            # Still the tool's file: recorded, so never reported as an orphan.
+            self.assertIn(rel, result.files)
+            self.assertNotIn(rel, result.orphans)
+
 
 class TestReviewComparesLikeWithLike(_ScaffoldHarness):
     """``--review`` compares the rendered file after the repo rename, as the

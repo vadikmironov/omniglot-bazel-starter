@@ -59,6 +59,9 @@ class BootstrapManifest:
     language_files: dict[str, list[str]]
     composite_files: list[str]
     composite_language_files: dict[str, list[str]]
+    # Shipped only into a target without them, so a re-bootstrap keeps the
+    # repo's own (its resolved lock files).
+    seed_files: list[str]
     excluded_files: list[str]
     excluded_when_feature_absent: dict[str, list[str]]
     original_name: str
@@ -107,6 +110,7 @@ def load_manifest(manifest_path: Path) -> BootstrapManifest:
         language_files=data.get("language_files", {}),
         composite_files=data["composite"]["files"],
         composite_language_files=data.get("composite_language_files", {}),
+        seed_files=data.get("seed", {}).get("files", []),
         excluded_files=data.get("exclude", {}).get("files", []),
         excluded_when_feature_absent=data.get("exclude", {}).get("when_feature_absent", {}),
         original_name=data["substitutions"]["original_name"],

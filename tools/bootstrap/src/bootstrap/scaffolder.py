@@ -75,7 +75,8 @@ def scaffold_repo(
 
     The result lists every file this run manages: the copies, each file of a
     copied directory, the composite files (one kept on disk under ``--review``
-    is still managed) and the README. The marker records them as the repo's
+    is still managed), the seed files (shipped only when absent, managed either
+    way) and the README. The marker records them as the repo's
     file inventory. It also lists the orphans: files an earlier run's inventory
     recorded that this run no longer manages.
 
@@ -116,9 +117,22 @@ def scaffold_repo(
     # The subset written verbatim from the starter, which step 5 renames.
     copied: set[str] = set()
 
+    # A seed the target already has is the repo's own (its resolved lock): keep
+    # it, still managed, and leave it out of `copied` so step 5 never touches it.
+    seeds = set(manifest.seed_files)
+
+    def _keep_seed(rel: str) -> bool:
+        if rel not in seeds or not (target_path / rel).exists():
+            return False
+        managed.add(rel)
+        print(f"    kept existing {rel}")
+        return True
+
     # 1. Direct file copies (core + language + language_files)
     print("  Copying files...")
     for rel in resolved.copy:
+        if _keep_seed(rel):
+            continue
         _copy_file(source_root / rel, target_path / rel)
         copied.add(rel)
 
@@ -126,7 +140,10 @@ def scaffold_repo(
     print("  Copying tool directories...")
 
     def _copy_and_record(src: str, dst: str) -> str:
-        copied.add(Path(dst).relative_to(target_path).as_posix())
+        rel = Path(dst).relative_to(target_path).as_posix()
+        if _keep_seed(rel):
+            return dst
+        copied.add(rel)
         return shutil.copy2(src, dst)
 
     for rel_dir in resolved.directories:

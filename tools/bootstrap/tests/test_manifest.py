@@ -273,6 +273,12 @@ class TestLoadManifest(unittest.TestCase):
     def test_excluded_files(self) -> None:
         self.assertIn(PALANTIR_FILE, self.manifest.excluded_files)
 
+    def test_seed_files(self) -> None:
+        # Locks resolved from a manifest with a user-managed region. go.mod has
+        # none, so the starter's go.sum is the right one and stays a plain copy.
+        self.assertIn("tools/python/uv.lock", self.manifest.seed_files)
+        self.assertNotIn("go.sum", self.manifest.seed_files)
+
     def test_original_name(self) -> None:
         self.assertEqual(self.manifest.original_name, "omniglot-bazel-starter")
 
