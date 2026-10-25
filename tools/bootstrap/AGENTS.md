@@ -29,7 +29,10 @@ subset of this repo into the target, rewrites the module name, `git init`s, and
   in the starter checkout (`manifest.unignored_files`: tracked files plus
   untracked ones no ignore rule matches), so `__pycache__` and the like stay
   behind while uncommitted work still ships. Outside a git checkout it ships
-  everything. `_render_readme` filters `templates/README.md` for the
+  everything. A `[seed]` file (a lock resolved from a manifest with a
+  user-managed region) ships only into a target without one: a kept seed stays
+  managed, so it is never an orphan, but is neither overwritten nor renamed.
+  `_render_readme` filters `templates/README.md` for the
   selection, swaps the `{{code_dir}}` token, and writes `README.md` through the same
   managed-overwrite path as composite files (user-managed intro preserved on re-bootstrap).
 - `templates/README.md` — section-markered template for the *generated* repo README.

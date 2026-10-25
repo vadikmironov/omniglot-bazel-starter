@@ -11,6 +11,7 @@
 #   [language_files]  - Individual files in shared directories, keyed by language tag
 #   [composite]       - Files with section markers (# --- BEGIN/END lang:*|feature:* ---)
 #                       and/or a user-managed region preserved across re-bootstrap
+#   [seed]            - Copied only when the target has none; a re-bootstrap keeps the repo's
 #   [exclude]         - Files to skip (overrides all other sections);
 #                       [exclude.when_feature_absent] drops files when a feature is off
 #   [substitutions]   - String replacements applied to all generated files
@@ -307,6 +308,25 @@ go = ["go.mod", "tools/go/go_segment.MODULE.bazel"]
     ".clang-format",
     "tools/cpp/BUILD",
     "tools/cpp/llvm_segment.MODULE.bazel",
+]
+
+# ---------------------------------------------------------------------------
+# Seed — files shipped only into a target that does not have them yet
+#
+# A lock resolved from a manifest with a user-managed region belongs to the
+# repo, not the starter. The starter's copy locks the starter's own
+# dependencies and none of the repo's, so a re-bootstrap that skipped or failed
+# the lock refresh was left with a lock missing every dependency the repo had
+# added. A re-bootstrap keeps the repo's lock instead, and the lock refresh
+# regenerates it from the merged manifest. A fresh scaffold still starts from
+# the starter's copy. go.sum is not a seed: go.mod has no user-managed region,
+# so the starter's go.sum is the right one.
+# ---------------------------------------------------------------------------
+[seed]
+files = [
+    "tools/python/uv.lock",
+    "tools/rust/Cargo.lock",
+    "tools/java/maven_install.json",
 ]
 
 # ---------------------------------------------------------------------------
