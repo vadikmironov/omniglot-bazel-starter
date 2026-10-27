@@ -19,7 +19,7 @@ require (
 )
 
 // --- BEGIN exclude ---
-require golang.org/x/net v0.61.0
+require golang.org/x/net v0.62.0
 
 // --- END exclude ---
 
@@ -29,7 +29,7 @@ require (
 	// Imported directly by //tools/profile/pb2folded, so this is needed by
 	// every profiling scaffold — not just the C++ one, which additionally
 	// runs the pprof CLI as a tool (below).
-	github.com/google/pprof v0.0.0-20261016150608-1facf8f91b50
+	github.com/google/pprof v0.0.0-20261026192309-dbd0ed30aa88
 // --- END feature:profiling ---
 )
 
