@@ -217,6 +217,8 @@ maven.install(
         # --- END exclude ---
         # --- BEGIN feature:lint ---
         # PMD and SpotBugs back the Java lint_test aspects (see tools/lint/BUILD).
+        # PMD stays on 7.28.0: 7.29.0 skips symlinked inputs, so every input in Bazel's sandbox.
+        # https://github.com/pmd/pmd/blob/pmd_releases/7.29.0/pmd-core/src/main/java/net/sourceforge/pmd/lang/document/FileCollector.java#L146
         "net.sourceforge.pmd:pmd-core:7.28.0",
         "net.sourceforge.pmd:pmd-java:7.28.0",
         "net.sourceforge.pmd:pmd-cli:7.28.0",
