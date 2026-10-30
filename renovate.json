@@ -97,6 +97,19 @@
          }
       },
       {
+         "description": "PMD stays below 7.29.0. From 7.29.0 PMD skips every symlinked input (its fix for GHSA-wj6q-xw9m-26p6), and Bazel's sandbox gives every lint input as a symlink, so each PMD lint_test fails. The advisory is about CPD on untrusted sources; the lint gate runs PMD on this repo's own code.",
+         "matchManagers": [
+            "bazel-module"
+         ],
+         "matchDepTypes": [
+            "maven_install"
+         ],
+         "matchPackageNames": [
+            "/^net\\.sourceforge\\.pmd:/"
+         ],
+         "allowedVersions": "<7.29.0"
+      },
+      {
          "description": "Distroless images are digest pins on floating tags rebuilt continuously upstream — no versioned releases exist to render a changelog from. Link the source and say so in the PR body instead. Grouped because the digests refresh together and land in one MODULE.bazel.lock refresh.",
          "matchPackageNames": [
             "/^gcr_io_distroless_/"
