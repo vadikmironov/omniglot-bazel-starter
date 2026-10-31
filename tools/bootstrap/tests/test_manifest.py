@@ -149,7 +149,9 @@ class TestLoadManifest(unittest.TestCase):
         self.assertEqual(clf.get("rust"), ["tools/lint/gazelle/rust.go"])
         self.assertEqual(clf.get("java"), ["tools/lint/gazelle/java.go"])
         self.assertEqual(clf.get("python"), ["tools/lint/gazelle/python.go"])
-        # Marker-free raw-copy gated on feature AND language: the rust clippy gate.
+        # Marker-free raw copies gated on feature AND language: the clang-tidy
+        # binary, and the rust clippy gate.
+        self.assertIn("tools/lint/clang_tidy/main.cpp", feat.language_files.get("cpp", []))
         self.assertEqual(feat.language_files.get("rust"), ["tools/lint/clippy_assert_empty.sh"])
 
     def test_remote_cache_feature(self) -> None:

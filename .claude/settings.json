@@ -61,6 +61,8 @@
             "Bash(bazel run //tools/format:format)",
             "Bash(bazel build:*)",
             "Bash(bazel query:*)",
+            "Bash(bazel aquery *)",
+            "Bash(bazel mod *)",
             "Bash(bazel cquery:*)",
             "Bash(bazel test:*)",
             "Bash(bazel info:*)"
