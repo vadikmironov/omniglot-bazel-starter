@@ -8,6 +8,26 @@ inputs:
 runs:
   using: "composite"
   steps:
+    # Most runners have ~70 GB free, but some (seen on AWS-hosted ones) have
+    # so little that a cold fetch fills the disk. Clean up only on those, and
+    # before the caches restore: the cleanup takes 30 to 130 s.
+    - name: Free disk space if low
+      shell: bash
+      run: |
+        df -h /
+        free_gb=$(df --output=avail -BG / | tail -1 | tr -dc '0-9')
+        if [ "$free_gb" -lt 30 ]; then
+          echo "::notice::Only ${free_gb} GB free on /, removing preinstalled SDKs"
+          rm -rf /opt/hostedtoolcache        # ~8 GB  — cached language runtimes
+          sudo rm -rf /usr/local/lib/android # ~11 GB — Android SDK
+          sudo rm -rf /usr/share/dotnet      # ~3 GB  — .NET SDK
+          rm -rf /opt/ghc                    # ~2 GB  — Haskell GHC
+          sudo rm -rf /usr/local/.ghcup      #          Haskell ghcup
+          # Unset ANDROID_HOME so rules_android creates an empty stub
+          # instead of failing on the now-deleted SDK directory.
+          echo "ANDROID_HOME=" >> "$GITHUB_ENV"
+          df -h /
+        fi
     - name: Setup Bazel
       uses: bazel-contrib/setup-bazel@0.19.1
       with:
