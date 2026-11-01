@@ -17,9 +17,9 @@ concurrency:
 # ---------
 # Every pull request and push to main runs the full gate: build + test across the
 # hermetic Clang and hermetic GCC toolchains on Linux and hermetic Clang on macOS,
-# plus the lint phase (clang-tidy, GCC -fanalyzer, PMD/SpotBugs/ruff/mypy, and the
-# gazelle/publish/mint drift gates). Windows builds and tests //modules/... with
-# the MSVC toolchain — see build-windows.
+# plus the lint phase (clang-tidy under Clang and GCC, GCC -fanalyzer,
+# PMD/SpotBugs/ruff/mypy, and the gazelle/publish/mint drift gates). Windows
+# builds and tests //modules/... with the MSVC toolchain — see build-windows.
 #
 # Tiers
 # -----
@@ -132,6 +132,14 @@ jobs:
       run: bash .github/scripts/bazel.sh build --nobuild --lockfile_mode=error //...
     - name: Run linter check
       run: bash .github/scripts/bazel.sh test --test_tag_filters=lint //...
+    - name: Run C++ linter check (hermetic GCC)
+      # clang-tidy takes the compile command of the toolchain in use, so under
+      # GCC it goes through //tools/lint/clang_tidy, which swaps GCC's own
+      # headers for clang's; its intrinsics_fixture fails here without that.
+      # Only the C++ lint tests: the other linters don't use the C++ toolchain.
+      run: |
+        targets=$(bazel query 'kind(clang_tidy_test, //...)')
+        bash .github/scripts/bazel.sh test --config=gcc_hermetic --test_tag_filters=lint $targets
     - name: GCC static analysis (-fanalyzer, the clang-tidy analog)
       # GCC's built-in analyzer over first-party C++ only (the gcc_analyzer config
       # scopes -fanalyzer to modules/ sources); -Werror promotes findings to errors.
