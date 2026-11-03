@@ -58,10 +58,11 @@ clang-tidy parses with clang whichever C++ toolchain builds the code, but it
 takes that toolchain's compile command. Under `--config=gcc_hermetic`, the
 command names GCC's own header directory, `lib/gcc/<target>/<version>/include`.
 Its intrinsics headers use GCC builtins that clang lacks, so code that includes
-`<immintrin.h>` would fail to parse. The aspect therefore runs
-[`//tools/lint/clang_tidy`](clang_tidy/main.cpp), a wrapper that swaps that
-directory for clang's built-in headers before it starts clang-tidy. Under the
-LLVM toolchain it changes nothing.
+`<immintrin.h>` would fail to parse. A [patch](patches) on `aspect_rules_lint`,
+offered upstream, moves that directory to the end, as `-idirafter`, and turns
+`-nostdinc` into `-nostdlibinc`, so clang-tidy finds its own built-in headers
+before GCC's. Under the LLVM toolchain it changes nothing. CI lints
+[`fixtures/`](fixtures) under hermetic GCC to check it.
 
 ### Rust clippy
 

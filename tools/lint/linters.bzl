@@ -41,7 +41,7 @@ load("@rules_shell//shell:sh_test.bzl", "sh_test")
 
 # --- BEGIN lang:cpp ---
 clang_tidy = lint_clang_tidy_aspect(
-    binary = Label("//tools/lint/clang_tidy"),
+    binary = Label("//tools/lint:clang_tidy"),
     configs = [
         Label("//:.clang-tidy"),
     ],

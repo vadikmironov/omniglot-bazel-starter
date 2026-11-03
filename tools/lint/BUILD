@@ -1,10 +1,14 @@
 # gazelle:lint_ignore
 #
-# This BUILD defines the linter-tool binaries themselves (pmd, spotbugs)
-# as wrapper rules around prebuilt JARs. They carry no source files, so
-# the spotbugs/pmd aspects produce no rules_lint_human output group, and
-# any auto-generated lint_test would fail analysis. lint_ignore opts the
-# entire package out.
+# This BUILD defines the linter-tool binaries themselves (clang_tidy,
+# pmd, spotbugs) as wrapper rules around prebuilt JARs/binaries. They
+# carry no source files, so spotbugs/pmd/clang_tidy aspects produce
+# no rules_lint_human output group, and any auto-generated lint_test
+# would fail analysis. lint_ignore opts the entire package out.
+
+# --- BEGIN lang:cpp ---
+load("@bazel_skylib//rules:native_binary.bzl", "native_binary")
+# --- END lang:cpp ---
 
 # --- BEGIN lang:java ---
 load("@rules_java//java:defs.bzl", "java_binary")
@@ -20,6 +24,25 @@ load("//tools/java:package_defs.bzl", "log4j_build_deps", "wrap_build_deps")
 package(default_visibility = ["//:__subpackages__"])
 
 # --- END lang:core ---
+
+# --- BEGIN lang:cpp ---
+native_binary(
+    name = "clang_tidy",
+    src = select(
+        {
+            "@bazel_tools//src/conditions:linux_x86_64": "@llvm_toolchain_llvm//:bin/clang-tidy",
+            "@bazel_tools//src/conditions:linux_aarch64": "@llvm_toolchain_llvm//:bin/clang-tidy",
+            "@bazel_tools//src/conditions:darwin_x86_64": "@llvm_toolchain_llvm//:bin/clang-tidy",
+            "@bazel_tools//src/conditions:darwin_arm64": "@llvm_toolchain_llvm//:bin/clang-tidy",
+            # llvm_toolchain doesn't support windows: https://github.com/bazel-contrib/toolchains_llvm/issues/4
+            # as a workaround, you can download exes from
+            # https://github.com/llvm/llvm-project/releases/tag/llvmorg-18.1.6 and make available locally.
+            "@bazel_tools//src/conditions:windows_x64": "clang-tidy.exe",
+        },
+    ),
+    out = "clang_tidy",
+)
+# --- END lang:cpp ---
 
 # --- BEGIN lang:java ---
 java_binary(

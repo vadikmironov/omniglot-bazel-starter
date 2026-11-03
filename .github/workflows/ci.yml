@@ -133,9 +133,9 @@ jobs:
     - name: Run linter check
       run: bash .github/scripts/bazel.sh test --test_tag_filters=lint //...
     - name: Run C++ linter check (hermetic GCC)
-      # clang-tidy takes the compile command of the toolchain in use, so under
-      # GCC it goes through //tools/lint/clang_tidy, which swaps GCC's own
-      # headers for clang's; its intrinsics_fixture fails here without that.
+      # clang-tidy takes the compile command of the toolchain in use, and under
+      # GCC only the aspect_rules_lint patch in //tools/lint/patches puts its own
+      # headers ahead of GCC's; //tools/lint/fixtures fails here without that.
       # Only the C++ lint tests: the other linters don't use the C++ toolchain.
       run: |
         targets=$(bazel query 'kind(clang_tidy_test, //...)')

@@ -124,19 +124,16 @@ composite_files = [
 
 # Marker-free per-language files, shipped as raw copies gated on lint AND the
 # language (pruned on re-bootstrap when either is dropped):
-#   cpp:  tools/lint/clang_tidy, the clang-tidy binary that linters.bzl's aspect
-#         runs: a wrapper that gives clang-tidy clang's built-in headers in
-#         place of GCC's under --config=gcc_hermetic.
+#   cpp:  tools/lint/patches, the aspect_rules_lint patch that MODULE.bazel's
+#         feature:lint lang:cpp override applies, so clang-tidy finds its own
+#         headers before GCC's under --config=gcc_hermetic.
+#         (tools/lint/fixtures, which CI lints to check it, stays in this repo.)
 #   rust: clippy_assert_empty.sh, the clippy gate's assertion script, referenced
 #         by tools/lint/BUILD (exports_files) and linters.bzl (clippy_test).
 [features.lint.language_files]
 cpp = [
-    "tools/lint/clang_tidy/BUILD",
-    "tools/lint/clang_tidy/args.cpp",
-    "tools/lint/clang_tidy/args.h",
-    "tools/lint/clang_tidy/args_test.cpp",
-    "tools/lint/clang_tidy/intrinsics_fixture.cpp",
-    "tools/lint/clang_tidy/main.cpp",
+    "tools/lint/patches/BUILD",
+    "tools/lint/patches/aspect_rules_lint_2.9.1_gcc_builtin_headers.patch",
 ]
 rust = ["tools/lint/clippy_assert_empty.sh"]
 

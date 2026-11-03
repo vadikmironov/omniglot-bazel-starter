@@ -61,6 +61,21 @@ bazel_dep(name = "aspect_rules_lint", version = "2.9.1")
 bazel_dep(name = "rules_buf", version = "0.5.4")
 # --- END lang:core ---
 
+# --- BEGIN feature:lint lang:cpp ---
+# clang-tidy gets GCC's own compiler headers from a hermetic GCC toolchain, and
+# can't parse its intrinsics headers, so under --config=gcc_hermetic any source
+# that includes <immintrin.h> fails to lint. The patch moves that directory
+# behind clang-tidy's own headers. Drop once this lands upstream; see the patch
+# header.
+single_version_override(
+    module_name = "aspect_rules_lint",
+    patch_strip = 1,
+    patches = [
+        "//tools/lint/patches:aspect_rules_lint_2.9.1_gcc_builtin_headers.patch",
+    ],
+)
+# --- END feature:lint lang:cpp ---
+
 # --- BEGIN feature:publish ---
 #
 # Publish infrastructure
