@@ -10,7 +10,7 @@
     "org.apache.logging.log4j:log4j-core": 260343140,
     "org.apache.logging.log4j:log4j-slf4j-impl": 1608875535,
     "org.apache.logging.log4j:log4j-slf4j2-impl": -1564835513,
-    "org.jsoup:jsoup": -1622565922,
+    "org.jsoup:jsoup": -1612062818,
     "org.junit.jupiter:junit-jupiter-api": -1418253236,
     "org.junit.jupiter:junit-jupiter-engine": 549538408,
     "org.junit.jupiter:junit-jupiter-params": 1138766508,
@@ -67,7 +67,7 @@
     "org.functionaljava:functionaljava": 576697941,
     "org.jline:jline-native": 725915188,
     "org.jline:jline-terminal": 1498079606,
-    "org.jsoup:jsoup": 1818671647,
+    "org.jsoup:jsoup": -873373117,
     "org.jspecify:jspecify": -109882726,
     "org.junit.jupiter:junit-jupiter-api": 1070908820,
     "org.junit.jupiter:junit-jupiter-engine": -1247144809,
@@ -361,9 +361,9 @@
     },
     "org.jsoup:jsoup": {
       "shasums": {
-        "jar": "e9d8c856856680427f096d156f02a414289985c930998fcb519ce5be39b42003"
+        "jar": "fabbb4aaf7fb5340aed0613826ecd110427999d765d8e0367cedde2950d7097c"
       },
-      "version": "1.23.2"
+      "version": "1.24.1"
     },
     "org.jspecify:jspecify": {
       "shasums": {
