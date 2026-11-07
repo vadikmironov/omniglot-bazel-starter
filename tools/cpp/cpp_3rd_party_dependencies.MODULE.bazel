@@ -40,14 +40,14 @@ bazel_dep(name = "gperftools", version = "2.19.1")
 # Curl homepage: https://github.com/curl/curl
 # Documentation: https://curl.se/libcurl/c/
 #
-bazel_dep(name = "curl", version = "8.22.0.bcr.1")
+bazel_dep(name = "curl", version = "8.22.0.bcr.3")
 
 #
 # BCR page: https://registry.bazel.build/modules/libxml2
 # Libxml2 homepage: https://gitlab.gnome.org/GNOME/libxml2
 # Documentation: https://gnome.pages.gitlab.gnome.org/libxml2/devhelp/index.html
 #
-bazel_dep(name = "libxml2", version = "2.15.3")
+bazel_dep(name = "libxml2", version = "2.15.4")
 
 #
 # BCR page: https://registry.bazel.build/modules/spdlog
