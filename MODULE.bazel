@@ -58,7 +58,7 @@ bazel_dep(name = "aspect_rules_lint", version = "2.9.1")
 # rules_cc. Drop this once aspect_rules_lint depends on rules_buf >= 0.5.4.
 # https://github.com/aspect-build/rules_lint/blob/v2.9.1/MODULE.bazel#L45
 # https://github.com/bufbuild/rules_buf/blob/v0.5.4/MODULE.bazel#L26
-bazel_dep(name = "rules_buf", version = "0.5.4")
+bazel_dep(name = "rules_buf", version = "0.6.1")
 # --- END lang:core ---
 
 # --- BEGIN feature:lint lang:cpp ---
