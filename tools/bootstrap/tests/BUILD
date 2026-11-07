@@ -29,7 +29,8 @@ py_test(
 
 py_test(
     name = "test_scaffolder",
-    size = "small",
+    # ~5 s on Linux, but a loaded macOS CI runner can pass small's 60 s limit.
+    size = "medium",
     srcs = ["test_scaffolder.py"],
     local = True,
     tags = ["external"],
