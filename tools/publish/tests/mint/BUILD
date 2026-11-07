@@ -30,7 +30,8 @@ py_test(
 
 py_test(
     name = "test_git",
-    size = "small",
+    # ~1 s on Linux, but a loaded macOS CI runner can take 45 s or more.
+    size = "medium",
     srcs = ["test_git.py"],
     local = True,
     deps = ["//tools/publish:mint_lib"],
