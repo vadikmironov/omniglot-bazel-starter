@@ -1,6 +1,6 @@
 # Bazelisk configuration
 #
-# Documentation: https://github.com/bazelbuild/bazelisk/blob/v1.30.0/README.md#bazeliskrc-configuration-file
+# Documentation: https://github.com/bazelbuild/bazelisk/blob/master/README.md#bazeliskrc-configuration-file
 #
 # This file configures where Bazelisk downloads Bazel itself from.
 
@@ -10,5 +10,5 @@
 # --- BEGIN user-managed ---
 # Project-specific Bazelisk settings — preserved across re-bootstrap. Typical
 # entries fetch Bazel through a caching proxy (credentials from ~/.netrc), e.g.:
-#   BAZELISK_BASE_URL=https://artifactory.example.com/artifactory/github/bazelbuild/bazel/releases/download
+#   BAZELISK_BASE_URL=https://invalid.invalid/artifactory/github/bazelbuild/bazel/releases/download
 # --- END user-managed ---

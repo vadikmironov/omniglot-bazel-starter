@@ -27,7 +27,7 @@ test --test_output=errors
 test:perf --test_output=all
 
 # Downloader configuration for URL rewriting and blocking
-# https://bazel.build/versions/8.5.0/reference/command-line-reference#flag--downloader_config
+# https://bazel.build/reference/command-line-reference#param-downloader-config
 common --downloader_config=bazel_downloader.cfg
 
 # Enable automatic platform-specific configuration
