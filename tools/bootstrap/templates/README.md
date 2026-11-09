@@ -39,6 +39,11 @@ Behind a slow or stalling proxy, raise `DOWNLOAD_STALL_SECONDS` (default 30, the
 seconds under `DOWNLOAD_MIN_SPEED` before an attempt is abandoned) or
 `DOWNLOAD_MAX_STALLED_RETRIES` (default 5).
 
+Behind a corporate proxy, put your settings in the user-managed regions of
+`.bazeliskrc` (where Bazelisk downloads Bazel from), `bazel_downloader.cfg`
+(`rewrite` rules for Bazel's downloads) and `project.bazelrc` (committed Bazel
+flags, such as a custom certificate store). A re-bootstrap keeps them.
+
 ## Common Commands
 
 ```bash

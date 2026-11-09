@@ -408,8 +408,8 @@ build:profile --copt=-g --copt=-fno-omit-frame-pointer
 ##
 ## Project-wide overrides (committed)
 ##
-# Create project.bazelrc to layer repo-wide settings on top of this baseline.
-# Unlike the per-developer user.bazelrc below, it is meant to be committed.
+# project.bazelrc layers repo-wide settings on top of this baseline. Unlike the
+# per-developer user.bazelrc below, it is committed.
 try-import %workspace%/project.bazelrc
 
 ##
