@@ -252,6 +252,8 @@ class TestLoadManifest(unittest.TestCase):
             ".gitignore",
             ".bazelignore",
             "bazel_downloader.cfg",
+            ".bazeliskrc",
+            "project.bazelrc",
             "tools/format/BUILD",
             "user.bazelrc.template",
         }

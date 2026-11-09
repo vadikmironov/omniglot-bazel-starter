@@ -1,0 +1,13 @@
+##
+## Project-wide overrides (committed)
+##
+## .bazelrc imports this file near its end, so settings here layer on top of
+## the starter baseline. Per-developer settings belong in user.bazelrc instead.
+##
+
+# --- BEGIN user-managed ---
+# Project-specific Bazel flags — preserved across re-bootstrap. Typical entries
+# point Bazel at a custom certificate store (e.g. behind a TLS-inspecting
+# proxy):
+#   startup --host_jvm_args=-Djavax.net.ssl.trustStore=/path/to/cacerts
+# --- END user-managed ---

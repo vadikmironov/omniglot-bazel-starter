@@ -27,7 +27,7 @@ test --test_output=errors
 test:perf --test_output=all
 
 # Downloader configuration for URL rewriting and blocking
-# https://bazel.build/versions/8.5.0/reference/command-line-reference#flag--downloader_config
+# https://bazel.build/reference/command-line-reference#param-downloader-config
 common --downloader_config=bazel_downloader.cfg
 
 # Enable automatic platform-specific configuration
@@ -408,8 +408,8 @@ build:profile --copt=-g --copt=-fno-omit-frame-pointer
 ##
 ## Project-wide overrides (committed)
 ##
-# Create project.bazelrc to layer repo-wide settings on top of this baseline.
-# Unlike the per-developer user.bazelrc below, it is meant to be committed.
+# project.bazelrc layers repo-wide settings on top of this baseline. Unlike the
+# per-developer user.bazelrc below, it is committed.
 try-import %workspace%/project.bazelrc
 
 ##

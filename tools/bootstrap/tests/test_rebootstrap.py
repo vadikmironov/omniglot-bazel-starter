@@ -52,6 +52,8 @@ MANAGED_SOURCE_FILES = [
     ".gitignore",
     ".bazelignore",
     "bazel_downloader.cfg",
+    ".bazeliskrc",
+    "project.bazelrc",
     ".clang-tidy",
     "tools/python/pyproject.toml",
     "tools/rust/Cargo.toml",
@@ -216,6 +218,24 @@ class TestRebootstrap(_ScaffoldHarness):
         result = cfg.read_text()
         self.assertIn(rule, result, "user downloader rule lost on re-bootstrap")
         self.assertIn("Bazel downloader configuration", result, "starter baseline lost on re-bootstrap")
+
+    def test_bazeliskrc_and_project_bazelrc_user_entries_survive(self) -> None:
+        target = self._fresh_target()
+        self._scaffold_into(target, {"python"})
+
+        # User adds a Bazel mirror and a certificate store inside the regions.
+        entries = {
+            ".bazeliskrc": "BAZELISK_BASE_URL=https://proxy.example.com/github/bazelbuild/bazel/releases/download",
+            "project.bazelrc": "startup --host_jvm_args=-Djavax.net.ssl.trustStore=/etc/ssl/cacerts",
+        }
+        marker = "# --- END user-managed ---"
+        for rel, entry in entries.items():
+            path = target / rel
+            path.write_text(path.read_text().replace(marker, f"{entry}\n{marker}", 1))
+
+        self._scaffold_into(target, {"python"})  # re-bootstrap
+        for rel, entry in entries.items():
+            self.assertIn(entry, (target / rel).read_text(), f"user entry in {rel} lost on re-bootstrap")
 
     def test_file_predating_its_user_region_is_replaced_with_a_note(self) -> None:
         """A target written before its file gained a region has nothing to

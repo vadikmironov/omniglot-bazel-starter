@@ -150,6 +150,14 @@ This installer and the two toolchain installers (`tools/go/toolchains/host_go_sd
 | `DOWNLOAD_MAX_STALLED_RETRIES` | `5` | Consecutive attempts fetching nothing new before giving up |
 | `DOWNLOAD_RETRY_DELAY` | `2` | Seconds between attempts |
 
+#### Behind a corporate proxy
+
+Three committed files have a user-managed region for proxy settings, and a re-bootstrap keeps what you put there:
+
+- `.bazeliskrc`: where Bazelisk downloads Bazel itself from (`BAZELISK_BASE_URL`).
+- `bazel_downloader.cfg`: `rewrite` rules that send Bazel's downloads through a caching proxy (Artifactory or similar).
+- `project.bazelrc`: committed Bazel flags, for example a custom certificate store behind a TLS-inspecting proxy.
+
 ### Common Commands
 
 ```bash
