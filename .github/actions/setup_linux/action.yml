@@ -29,7 +29,7 @@ runs:
           df -h /
         fi
     - name: Setup Bazel
-      uses: bazel-contrib/setup-bazel@0.19.1
+      uses: bazel-contrib/setup-bazel@0.19.2
       with:
         # Bazel version from .bazelversion
         bazelisk-cache: true
