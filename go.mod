@@ -29,7 +29,7 @@ require (
 	// Imported directly by //tools/profile/pb2folded, so this is needed by
 	// every profiling scaffold — not just the C++ one, which additionally
 	// runs the pprof CLI as a tool (below).
-	github.com/google/pprof v0.0.0-20261105003125-4bf881d7fb0b
+	github.com/google/pprof v0.0.0-20261111200114-fac431ef4d26
 // --- END feature:profiling ---
 )
 
