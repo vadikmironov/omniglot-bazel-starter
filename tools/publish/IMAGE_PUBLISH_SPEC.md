@@ -124,8 +124,8 @@ For each canonical binary rule (`cc_binary`, `go_binary`, `java_binary`, `py_bin
 ### MODULE.bazel — added to `tools/publish/publish_segment.MODULE.bazel`
 
 ```python
-bazel_dep(name = "rules_oci", version = "2.3.0")
-bazel_dep(name = "tar.bzl",   version = "0.10.7")
+bazel_dep(name = "rules_oci", version = "<pinned>")
+bazel_dep(name = "tar.bzl",   version = "<pinned>")
 
 oci = use_extension("@rules_oci//oci:extensions.bzl", "oci")
 
