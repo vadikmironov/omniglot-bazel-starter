@@ -132,8 +132,10 @@ cc_binary   = "@gcr_io_distroless_cc"
 ```
 
 Bases are pinned by digest in
-`tools/publish/publish_segment.MODULE.bazel`. Bumping a digest is a
-manual operation (`crane digest <image>:<tag>`).
+`tools/publish/publish_segment.MODULE.bazel`. To bump a digest, run
+`crane digest <image>:<tag>`, or use Renovate: its `bazel-module`
+manager updates `oci.pull` digests when `managerFilePatterns` includes
+`*.MODULE.bazel`.
 
 `image_app_prefix` controls where each binary lands inside the image:
 empty string places the binary at the tar root, otherwise at

@@ -185,7 +185,7 @@ cc_binary   = "@gcr_io_distroless_cc"
 
 ### Pinning
 
-All bases pinned by digest. Single platform (`linux/amd64`) for the MVP. Bumping is manual via `crane digest <image>:<tag>`.
+All bases pinned by digest. Single platform (`linux/amd64`) for the MVP. To bump a digest, run `crane digest <image>:<tag>`, or use Renovate: its `bazel-module` manager updates `oci.pull` digests when `managerFilePatterns` includes `*.MODULE.bazel`.
 
 ## Publish target topology
 
@@ -304,6 +304,5 @@ exec "${RUNFILES}/_main/<package>/_<name>_push" \
 ## Follow-up items
 
 - **Multi-platform support.** Natural axis is multi-arch Linux (amd64 + arm64) via `oci_image_index`. Windows / macOS are different problems treated as separate publishing tracks.
-- **Renovate digest-bump for base images.** `customManagers` rule for `*.MODULE.bazel`.
 - **JWT pre-fetch mode (Phase 2 auth).** For environments that audit static-cred-on-disk policy.
 - **Migrate existing publish macros' intermediates to underscore-prefix.** Convention consistency once `image_publish` ships. Tracked in `.claude/memory/project_publish_underscore_prefix_migration.md`.
