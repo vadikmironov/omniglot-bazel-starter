@@ -30,14 +30,14 @@ bazel_dep(name = "bazel_skylib", version = "1.9.2")
 # Please find documentation here:
 # https://github.com/bazelbuild/rules_shell/releases
 #
-bazel_dep(name = "rules_shell", version = "0.8.0")
+bazel_dep(name = "rules_shell", version = "0.10.0")
 
 #
 # Install a prebuilt version of buildifier. Buildifier is a linter and autoformatter
 # for starlark files.
 # https://github.com/keith/buildifier-prebuilt/releases
 #
-bazel_dep(name = "buildifier_prebuilt", version = "10.1.0", dev_dependency = True)
+bazel_dep(name = "buildifier_prebuilt", version = "10.2.0", dev_dependency = True)
 
 #
 # aspect_rules_lint block
